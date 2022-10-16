@@ -51,7 +51,7 @@ Ubuntu/Debian:
 
 To run c1, `cd` into the main project directory and run `./c1`.
 
-Copies of the asset files from the Crash Bandicoot game disc are needed for the game to function. Asset files are the (.NSD/.NSF) files located in the `/S0`, `/S1`, `/S2`, and `/S3` directories, respectively. Each of these files must be copied from its respective `/S*` directory into the `/streams` directory. Additionally, after copying files to the `/streams` directory, they must renamed from the uppercase format ``S00000%%.NS[F,D]` to the lowercase format `s00000%%.ns[f,d]`.
+Copies of the asset files from the Crash Bandicoot game disc are needed for the game to function. Asset files are the (.NSD/.NSF) files located in the `/S0`, `/S1`, `/S2`, and `/S3` directories, respectively. Each of these files must be copied from its respective `/S*` directory into the `/streams` directory. Additionally, after copying files to the `/streams` directory, they must renamed from the uppercase format `S00000%%.NS[F,D]` to the lowercase format `s00000%%.ns[f,d]`.
 
 The game is currently hardcoded to boot straight into level `09` (aka. N. Sanity Beach), bypassing the main menu screen(s). To choose a different boot level, redefine the `LID_BOOTLEVEL` constant in `common.h` and recompile.
 
