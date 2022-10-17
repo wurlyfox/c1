@@ -107,7 +107,7 @@ int init() {
   return SUCCESS;
 }
 
-int kill() {
+int _kill() {
   GLKill();
   SDLKill();
 }

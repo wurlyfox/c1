@@ -795,6 +795,7 @@ void EMU_Break(uint32_t id)
 	// TODO
 }
 
+/*
 void EMU_NativeCall(void *method)
 {
 	static uint32_t stackbuffer[16];
@@ -817,6 +818,7 @@ void EMU_NativeCall(void *method)
 		: "%ecx","%edx","%edi","flags","memory"
 	);
 }
+*/
 
 void EMU_Cycle(int cycles)
 {

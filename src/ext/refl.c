@@ -274,7 +274,8 @@ refl_type vec_type = {
   .fields = {
     REFL_FIELD(vec,int32_t,x),
     REFL_FIELD(vec,int32_t,y),
-    REFL_FIELD(vec,int32_t,z)
+    REFL_FIELD(vec,int32_t,z),
+    REFL_TERM
   }
 };
 
@@ -284,7 +285,8 @@ refl_type vec16_type = {
   .fields = {
     REFL_FIELD(vec16,int16_t,x),
     REFL_FIELD(vec16,int16_t,y),
-    REFL_FIELD(vec16,int16_t,z)
+    REFL_FIELD(vec16,int16_t,z),
+    REFL_TERM
   }
 };
 
@@ -294,7 +296,8 @@ refl_type ang_type = {
   .fields = {
     REFL_FIELD(ang,int32_t,y),
     REFL_FIELD(ang,int32_t,x),
-    REFL_FIELD(ang,int32_t,z)
+    REFL_FIELD(ang,int32_t,z),
+    REFL_TERM
   }
 };
 
@@ -303,7 +306,8 @@ refl_type ang2_type = {
   .flags = REFL_FLAGS_STATIC,
   .fields = {
     REFL_FIELD(ang2,int32_t,x),
-    REFL_FIELD(ang2,int32_t,y)
+    REFL_FIELD(ang2,int32_t,y),
+    REFL_TERM
   }
 };
 
@@ -313,7 +317,8 @@ refl_type rgb8_type = {
   .fields = {
     REFL_FIELD(rgb8,uint8_t,r),
     REFL_FIELD(rgb8,uint8_t,g),
-    REFL_FIELD(rgb8,uint8_t,b)
+    REFL_FIELD(rgb8,uint8_t,b),
+    REFL_TERM
   }
 };
 
@@ -323,7 +328,8 @@ refl_type rgb16_type = {
   .fields = {
     REFL_FIELD(rgb16,uint16_t,r),
     REFL_FIELD(rgb16,uint16_t,g),
-    REFL_FIELD(rgb16,uint16_t,b)
+    REFL_FIELD(rgb16,uint16_t,b),
+    REFL_TERM
   }
 };
 
@@ -332,7 +338,8 @@ refl_type bound_type = {
   .flags = REFL_FLAGS_STATIC,
   .fields = {
     REFL_FIELD(bound,vec,p1),
-    REFL_FIELD(bound,vec,p2)
+    REFL_FIELD(bound,vec,p2),
+    REFL_TERM
   }
 };
 
@@ -341,7 +348,19 @@ refl_type mat16_type = {
   .flags = REFL_FLAGS_STATIC,
   .fields = {
     REFL_ARRAY_FIELD(mat16,vec16,v,3),
-    REFL_FIELD(mat16,vec16,t)
+    REFL_FIELD(mat16,vec16,t),
+    REFL_TERM
+  }
+};
+
+refl_type texinfo_type = {
+  .name = "texinfo",
+  .flags = REFL_FLAGS_STATIC,
+  .fields = {
+    { .name = "f1", .typename = "uint32_t", .offset = 0 },
+    { .name = "f2", .typename = "uint32_t", .offset = 4 },
+    { .name = "f3", .typename = "uint32_t", .offset = 8 },
+    REFL_TERM
   }
 };
 
@@ -364,7 +383,8 @@ refl_type page_type = {
     REFL_DYNARRAY_FIELD_F(page,uint32_t,entry_offsets,entry_count,CountPlusOne),
     REFL_DYNARRAY_FIELD_F(page,entry*,entries,entry_count,CountPlusOne),
     REFL_DYNARRAY_FIELD_A(page,entry,entries2,entry_offsets,entry_count),
-    REFL_ARRAY_FIELD(page,uint8_t,data,PAGE_SIZE)
+    REFL_ARRAY_FIELD(page,uint8_t,data,PAGE_SIZE),
+    REFL_TERM
   }
 };
 
@@ -375,8 +395,9 @@ refl_type page_compressed_type = {
     REFL_FIELD(page_compressed,uint16_t,magic),
     REFL_FIELD(page_compressed,uint16_t,pad),
     REFL_FIELD(page_compressed,uint32_t,length),
-    REFL_FIELD(page_compressed,uint32_t,skip)
+    REFL_FIELD(page_compressed,uint32_t,skip),
     // REFL_FIELD(page_compressed,uint8_t,data[]);
+    REFL_TERM
   }
 };
 
@@ -389,7 +410,8 @@ refl_type tpage_type = {
     REFL_FIELD(tpage,eid_t,eid),
     REFL_FIELD(tpage,uint32_t,entry_type),
     REFL_FIELD(tpage,uint32_t,checksum),
-    REFL_ARRAY_FIELD(tpage,uint8_t,data,PAGE_SIZE)
+    REFL_ARRAY_FIELD(tpage,uint8_t,data,PAGE_SIZE),
+    REFL_TERM
   }
 };
 
@@ -399,7 +421,8 @@ refl_type page_ref_type = {
   .fields = {
     REFL_FIELD(page_ref,pgid_t,pgid),
     REFL_FIELD(page_ref,page*,pg),
-    REFL_FIELD(page_ref,uint32_t,value)
+    REFL_FIELD(page_ref,uint32_t,value),
+    REFL_TERM
   }
 };
 
@@ -420,7 +443,8 @@ refl_type entry_type = {
     REFL_FIELD(entry,int,item_count),
     REFL_DYNARRAY_FIELD_F(entry,uint32_t,item_offsets,item_count,CountPlusOne),
     REFL_DYNARRAY_FIELD_F(entry,uint8_t*,items,item_count,CountPlusOne),
-    REFL_DYN2DARRAY_FIELD_A(entry,uint8_t,items2,item_offsets,item_count,ItemSize)
+    REFL_DYN2DARRAY_FIELD_A(entry,uint8_t,items2,item_offsets,item_count,ItemSize),
+    REFL_TERM
   },
   .subtype_fn = EntrySubtype
 };
@@ -443,7 +467,8 @@ refl_type nsd_ldat_type = {
     REFL_FIELD(nsd_ldat, uint32_t, unk_10),
     REFL_ARRAY_FIELD(nsd_ldat, eid_t, exec_map, NSD_EXEC_COUNT),
     REFL_FIELD(nsd_ldat, uint32_t, fov),
-    REFL_ARRAY_FIELD(nsd_ldat, uint8_t, image_data, 0xF5F8)
+    REFL_ARRAY_FIELD(nsd_ldat, uint8_t, image_data, 0xF5F8),
+    REFL_TERM
   }
 };
 
@@ -456,7 +481,8 @@ refl_type nsd_pte_type = {
     REFL_FIELD(nsd_pte,uint32_t,value),
     REFL_FIELD(nsd_pte,eid_t,eid),
     REFL_FIELD(nsd_pte,entry*,entry),
-    REFL_FIELD(nsd_pte,uint32_t,key)
+    REFL_FIELD(nsd_pte,uint32_t,key),
+    REFL_TERM
   }
 };
 
@@ -478,7 +504,8 @@ refl_type nsd_type = {
     REFL_ARRAY_FIELD(nsd, uint32_t, compressed_page_offsets, NSD_COMPRESSED_PAGE_COUNT),
     REFL_ARRAY_FIELD(nsd, uint8_t*, compressed_pages, NSD_COMPRESSED_PAGE_COUNT),
     REFL_DYNARRAY_FIELD(nsd, nsd_pte, page_table, page_table_size),
-    REFL_FIELD_A(nsd, nsd_ldat, ldat, page_table)
+    REFL_FIELD_A(nsd, nsd_ldat, ldat, page_table),
+    REFL_TERM
   }
 };
 
@@ -488,7 +515,8 @@ refl_type entry_ref_type = {
   .fields = {
     REFL_FIELD(entry_ref,eid_t,eid),
     REFL_FIELD(entry_ref,entry*,en),
-    REFL_FIELD(entry_ref,uint32_t,value)
+    REFL_FIELD(entry_ref,uint32_t,value),
+    REFL_TERM
   }
 };
 
@@ -501,7 +529,8 @@ refl_type ns_loadlist_type = {
     REFL_ARRAY_FIELD(ns_loadlist,eid_t,eids,8),
     REFL_ARRAY_FIELD(ns_loadlist,entry*,entries,8),
     REFL_ARRAY_FIELD(ns_loadlist,pgid_t,pgids,32),
-    REFL_ARRAY_FIELD(ns_loadlist,page*,pages,32)
+    REFL_ARRAY_FIELD(ns_loadlist,page*,pages,32),
+    REFL_TERM
   }
 };
 
@@ -523,7 +552,8 @@ refl_type zone_world_type = {
     REFL_FIELD(zone_world,uint8_t*,polygons),
     REFL_FIELD(zone_world,uint8_t*,vertices),
     REFL_FIELD(zone_world,uint8_t*,texinfos),
-    REFL_ARRAY_FIELD(zone_world,entry*,tpages,8)
+    REFL_ARRAY_FIELD(zone_world,entry*,tpages,8),
+    REFL_TERM
   }
 };
 
@@ -548,7 +578,8 @@ refl_type zone_gfx_type = {
     REFL_FIELD(zone_gfx,rgb8,far_color),
     REFL_FIELD(zone_gfx,uint8_t,unused_b),
     REFL_FIELD(zone_gfx,gool_colors,object_colors),
-    REFL_FIELD(zone_gfx,gool_colors,player_colors)
+    REFL_FIELD(zone_gfx,gool_colors,player_colors),
+    REFL_TERM
   }
 };
 
@@ -565,7 +596,8 @@ refl_type zone_header_type = {
     REFL_ARRAY_FIELD(zone_header,eid_t,neighbors,8),
     REFL_FIELD(zone_header,ns_loadlist,loadlist),
     REFL_FIELD(zone_header,uint32_t,display_flags),
-    REFL_FIELD(zone_header,zone_gfx,gfx)
+    REFL_FIELD(zone_header,zone_gfx,gfx),
+    REFL_TERM
   }
 };
 
@@ -577,7 +609,8 @@ refl_type zone_octree_type = {
     REFL_FIELD(zone_octree,uint16_t,max_depth_x),
     REFL_FIELD(zone_octree,uint16_t,max_depth_y),
     REFL_FIELD(zone_octree,uint16_t,max_depth_z),
-    REFL_DYNARRAY_FIELD_F(zone_octree,uint16_t,nodes,,OctreeNodeCount)
+    REFL_DYNARRAY_FIELD_F(zone_octree,uint16_t,nodes,,OctreeNodeCount),
+    REFL_TERM
   }
 };
 
@@ -592,18 +625,20 @@ refl_type zone_rect_type = {
     REFL_FIELD(zone_rect,uint32_t,h),
     REFL_FIELD(zone_rect,uint32_t,d),
     REFL_FIELD(zone_rect,uint32_t,unk),
-    REFL_FIELD(zone_rect,zone_octree,octree)
+    REFL_FIELD(zone_rect,zone_octree,octree),
+    REFL_TERM
   }
 };
 
 refl_type zone_neighbor_path_type = {
-  .name = "zone_path",
+  .name = "zone_neighbor_path",
   .flags = REFL_FLAGS_STATIC,
   .fields = {
     REFL_FIELD(zone_neighbor_path,uint8_t,relation),
     REFL_FIELD(zone_neighbor_path,uint8_t,neighbor_zone_idx),
     REFL_FIELD(zone_neighbor_path,uint8_t,path_idx),
-    REFL_FIELD(zone_neighbor_path,uint8_t,goal)
+    REFL_FIELD(zone_neighbor_path,uint8_t,goal),
+    REFL_TERM
   }
 };
 
@@ -616,7 +651,8 @@ refl_type zone_path_point_type = {
     REFL_FIELD(zone_path_point,int16_t,z),
     REFL_FIELD(zone_path_point,int16_t,rot_x),
     REFL_FIELD(zone_path_point,int16_t,rot_y),
-    REFL_FIELD(zone_path_point,int16_t,rot_z)
+    REFL_FIELD(zone_path_point,int16_t,rot_z),
+    REFL_TERM
   }
 };
 
@@ -640,7 +676,8 @@ refl_type zone_path_type = {
     REFL_FIELD(zone_path,int16_t,direction_x),
     REFL_FIELD(zone_path,int16_t,direction_y),
     REFL_FIELD(zone_path,int16_t,direction_z),
-    REFL_DYNARRAY_FIELD(zone_path,zone_path_point,points,length)
+    REFL_DYNARRAY_FIELD(zone_path,zone_path_point,points,length),
+    REFL_TERM
   }
 };
 
@@ -650,7 +687,8 @@ refl_type zone_entity_path_point_type = {
   .fields = {
     REFL_FIELD(zone_entity_path_point,int16_t,x),
     REFL_FIELD(zone_entity_path_point,int16_t,y),
-    REFL_FIELD(zone_entity_path_point,int16_t,z)
+    REFL_FIELD(zone_entity_path_point,int16_t,z),
+    REFL_TERM
   }
 };
 
@@ -668,7 +706,8 @@ refl_type zone_entity_type = {
     REFL_FIELD(zone_entity,uint16_t,init_flags_c),
     REFL_FIELD(zone_entity,uint8_t,type),
     REFL_FIELD(zone_entity,uint8_t,subtype),
-    REFL_DYNARRAY_FIELD(zone_entity,zone_entity_path_point,path_points,path_length)
+    REFL_DYNARRAY_FIELD(zone_entity,zone_entity_path_point,path_points,path_length),
+    REFL_TERM
   }
 };
 
@@ -680,7 +719,8 @@ refl_type zone_type = {
     REFL_FIELD_A(entry,zone_header,header,item_offsets),
     REFL_FIELD_A(entry,zone_rect,rect,header),
     REFL_DYNARRAY_FIELD_AF(entry,zone_path,paths,rect,0,ZonePathCount),
-    REFL_DYNARRAY_FIELD_AF(entry,zone_entity,entities,paths,0,ZoneEntityCount)
+    REFL_DYNARRAY_FIELD_AF(entry,zone_entity,entities,paths,0,ZoneEntityCount),
+    REFL_TERM
   }
 };
 
@@ -694,7 +734,8 @@ refl_type gool_header_type = {
     REFL_FIELD(gool_header,uint32_t,unk_0x8),
     REFL_FIELD(gool_header,uint32_t,init_sp),
     REFL_FIELD(gool_header,uint32_t,subtype_map_idx),
-    REFL_FIELD(gool_header,uint32_t,unk_0x14)
+    REFL_FIELD(gool_header,uint32_t,unk_0x14),
+    REFL_TERM
   }
 };
 
@@ -703,7 +744,8 @@ refl_type gool_state_maps_type = {
   .flags = REFL_FLAGS_STATIC,
   .fields = {
     REFL_DYNARRAY_FIELD_F(gool_state_maps,uint16_t,event_map,0,GoolEventMapCount),
-    REFL_DYNARRAY_FIELD_AF(gool_state_maps,uint16_t,subtype_map,event_map,0,GoolSubtypeMapCount)
+    REFL_DYNARRAY_FIELD_AF(gool_state_maps,uint16_t,subtype_map,event_map,0,GoolSubtypeMapCount),
+    REFL_TERM
   }
 };
 
@@ -716,7 +758,8 @@ refl_type gool_state_type = {
     REFL_FIELD(gool_state,uint16_t,extern_idx),
     REFL_FIELD(gool_state,uint16_t,pc_event),
     REFL_FIELD(gool_state,uint16_t,pc_trans),
-    REFL_FIELD(gool_state,uint16_t,pc_code)
+    REFL_FIELD(gool_state,uint16_t,pc_code),
+    REFL_TERM
   }
 };
 
@@ -725,7 +768,8 @@ refl_type gool_vertex_anim_type = {
   .basename = "gool_anim",
   .flags = REFL_FLAGS_STATIC,
   .fields = {
-    REFL_FIELD(gool_vertex_anim,eid_t,eid)
+    REFL_FIELD(gool_vertex_anim,eid_t,eid),
+    REFL_TERM
   }
 };
 
@@ -735,7 +779,8 @@ refl_type gool_sprite_anim_type = {
   .flags = REFL_FLAGS_STATIC,
   .fields = {
     REFL_FIELD(gool_sprite_anim,eid_t,tpage),
-    REFL_DYNARRAY_FIELD(gool_sprite_anim,texinfo,texinfos,SpriteTexinfoCount)
+    REFL_DYNARRAY_FIELD(gool_sprite_anim,texinfo,texinfos,SpriteTexinfoCount),
+    REFL_TERM
   }
 };
 
@@ -745,7 +790,8 @@ refl_type gool_glyph_type = {
   .fields = {
     REFL_FIELD(gool_glyph,texinfo,texinfo),
     REFL_FIELD(gool_glyph,uint16_t,width),
-    REFL_FIELD(gool_glyph,uint16_t,height)
+    REFL_FIELD(gool_glyph,uint16_t,height),
+    REFL_TERM
   }
 };
 
@@ -757,7 +803,8 @@ refl_type gool_frag_type = {
     REFL_FIELD(gool_frag,uint16_t,x1),
     REFL_FIELD(gool_frag,uint16_t,y1),
     REFL_FIELD(gool_frag,uint16_t,x2),
-    REFL_FIELD(gool_frag,uint16_t,y2)
+    REFL_FIELD(gool_frag,uint16_t,y2),
+    REFL_TERM
   }
 };
 
@@ -769,7 +816,8 @@ refl_type gool_font_type = {
     REFL_FIELD(gool_font,eid_t,tpage),
     REFL_ARRAY_FIELD(gool_font,gool_glyph,glyphs,63),
     REFL_FIELD(gool_font,gool_frag,backdrop),
-    REFL_FIELD(gool_font,int,has_backdrop)
+    REFL_FIELD(gool_font,int,has_backdrop),
+    REFL_TERM
   }
 };
 
@@ -780,7 +828,8 @@ refl_type gool_text_type = {
   .fields = {
     REFL_FIELD(gool_text,uint32_t,unk_0x4),
     REFL_FIELD(gool_text,uint32_t,glyphs_offset),
-    REFL_DYN2DARRAY_FIELD_F(gool_text,char,strings,unk_0x4,0,(refl_sizefn_t)ReflStrlen)
+    REFL_DYN2DARRAY_FIELD_F(gool_text,uint8_t,strings,unk_0x4,0,(refl_sizefn_t)ReflStrlen),
+    REFL_TERM
   }
 };
 
@@ -791,7 +840,8 @@ refl_type gool_frag_anim_type = {
   .fields = {
     REFL_FIELD(gool_frag_anim,eid_t,tpage),
     REFL_FIELD(gool_frag_anim,uint32_t,frag_count),
-    REFL_DYNARRAY_FIELD_F(gool_frag_anim,gool_frag,frags,0,GoolFragCount)
+    REFL_DYNARRAY_FIELD_F(gool_frag_anim,gool_frag,frags,0,GoolFragCount),
+    REFL_TERM
   }
 };
 
@@ -804,7 +854,8 @@ refl_type gool_anim_type = {
     REFL_FIELD(gool_anim,uint8_t,length),
     REFL_FIELD(gool_anim,uint8_t,unused_2),
     REFL_FIELD(gool_anim,eid_t,eid),
-    REFL_ARRAY_FIELD(gool_anim,uint8_t,data,0)
+    REFL_ARRAY_FIELD(gool_anim,uint8_t,data,0),
+    REFL_TERM
   },
   .subtype_fn = GoolAnimSubtype
 };
@@ -820,7 +871,8 @@ refl_type gool_colors_type = {
     REFL_FIELD(gool_colors,rgb16,intensity),
     REFL_ARRAY_FIELD(gool_colors,rgb16,vert_colors,4),
     REFL_ARRAY_FIELD(gool_colors,uint16_t,c,12),
-    REFL_ARRAY_FIELD(gool_colors,uint16_t,a,24)
+    REFL_ARRAY_FIELD(gool_colors,uint16_t,a,24),
+    REFL_TERM
   }
 };
 
@@ -833,7 +885,8 @@ refl_type gool_type = {
     REFL_DYNARRAY_FIELD_AF(gool,uint32_t,data,code,0,GoolDataCount),
     REFL_FIELD_A(gool,gool_state_maps,state_maps,data),
     REFL_DYNARRAY_FIELD_AF(gool,gool_state,states,state_maps,0,GoolStateCount),
-    REFL_DYNARRAY_FIELD_AF(gool,gool_anim,anims,states,0,GoolAnimCount)
+    REFL_DYNARRAY_FIELD_AF(gool,gool_anim,anims,states,0,GoolAnimCount),
+    REFL_TERM
   }
 };
 
@@ -848,7 +901,8 @@ refl_type gool_links_type = {
     REFL_FIELD(gool_links,gool_object*,creator),
     REFL_FIELD(gool_links,gool_object*,player),
     REFL_FIELD(gool_links,gool_object*,collider),
-    REFL_FIELD(gool_links,gool_object*,interrupter)
+    REFL_FIELD(gool_links,gool_object*,interrupter),
+    REFL_TERM
   }
 };
 
@@ -857,7 +911,8 @@ refl_type gool_link_type = {
   .flags = REFL_FLAGS_STATIC,
   .fields = {
     REFL_FIELD(gool_link,gool_object*,prev),
-    REFL_FIELD(gool_link,gool_object*,next)
+    REFL_FIELD(gool_link,gool_object*,next),
+    REFL_TERM
   }
 };
 
@@ -877,7 +932,8 @@ refl_type gool_vectors_type = {
     REFL_FIELD(gool_vectors,vec,misc_c),
     REFL_FIELD(gool_vectors,uint32_t,mode_flags_a),
     REFL_FIELD(gool_vectors,uint32_t,mode_flags_b),
-    REFL_FIELD(gool_vectors,uint32_t,mode_flags_c)
+    REFL_FIELD(gool_vectors,uint32_t,mode_flags_c),
+    REFL_TERM
   }
 };
 
@@ -937,7 +993,8 @@ refl_type gool_process_type = {
     REFL_FIELD(gool_process,uint32_t,_150),
     REFL_FIELD(gool_process,uint32_t,_154),
     REFL_FIELD(gool_process,uint32_t,node),
-    REFL_ARRAY_FIELD(gool_process,uint32_t,memory,64)
+    REFL_ARRAY_FIELD(gool_process,uint32_t,memory,64),
+    REFL_TERM
   }
 };
 
@@ -947,7 +1004,8 @@ refl_type gool_handle_type = {
   .fields = {
     REFL_FIELD(gool_handle,int,type),
     REFL_FIELD(gool_handle,gool_object*,children),
-    REFL_FIELD(gool_handle,int,subtype)
+    REFL_FIELD(gool_handle,int,subtype),
+    REFL_TERM
   }
 };
 
@@ -964,7 +1022,8 @@ refl_type gool_object_type = {
     REFL_FIELD(gool_object,gool_colors,colors),
     REFL_ARRAY_FIELD(gool_object,uint16_t,colors_i,24),
     REFL_FIELD(gool_object,gool_process,process),
-    REFL_ARRAY_FIELD(gool_object,uint32_t,regs,0x1FC)
+    REFL_ARRAY_FIELD(gool_object,uint32_t,regs,0x1FC),
+    REFL_TERM
   }
 };
 
@@ -974,7 +1033,8 @@ refl_type gool_objnode_type = {
   .fields = {
     REFL_FIELD(gool_objnode,gool_object*,obj),
     REFL_FIELD(gool_objnode,uint32_t,node),
-    REFL_FIELD(gool_objnode,uint32_t,value)
+    REFL_FIELD(gool_objnode,uint32_t,value),
+    REFL_TERM
   }
 };
 
@@ -988,7 +1048,8 @@ refl_type gool_event_query_type = {
     REFL_FIELD(gool_event_query,int,argc),
     REFL_FIELD(gool_event_query,int,type),
     REFL_FIELD(gool_event_query,int,count),
-    REFL_FIELD(gool_event_query,uint32_t*,argv)
+    REFL_FIELD(gool_event_query,uint32_t*,argv),
+    REFL_TERM
   }
 };
 
@@ -1000,7 +1061,8 @@ refl_type gool_nearest_query_type = {
     REFL_FIELD(gool_nearest_query,gool_object*,obj),
     REFL_FIELD(gool_nearest_query,gool_object*,nearest_obj),
     REFL_FIELD(gool_nearest_query,int32_t,dist),
-    REFL_FIELD(gool_nearest_query,uint32_t,event)
+    REFL_FIELD(gool_nearest_query,uint32_t,event),
+    REFL_TERM
   }
 };
 
@@ -1010,7 +1072,8 @@ refl_type gool_bound_type = {
   .flags = REFL_FLAGS_STATIC,
   .fields = {
     REFL_FIELD(gool_bound,bound,bound),
-    REFL_FIELD(gool_bound,gool_object*,obj)
+    REFL_FIELD(gool_bound,gool_object*,obj),
+    REFL_TERM
   }
 };
 
@@ -1020,7 +1083,8 @@ refl_type gool_move_state_type = {
   .fields = {
     REFL_FIELD(gool_move_state,int,dir),
     REFL_FIELD(gool_move_state,int32_t,angle),
-    REFL_FIELD(gool_move_state,int32_t,speed_scale)
+    REFL_FIELD(gool_move_state,int32_t,speed_scale),
+    REFL_TERM
   }
 };
 
@@ -1031,7 +1095,8 @@ refl_type gool_accel_state_type = {
     REFL_FIELD(gool_accel_state,int32_t,accel),
     REFL_FIELD(gool_accel_state,int32_t,max_speed),
     REFL_FIELD(gool_accel_state,uint32_t,unk),
-    REFL_FIELD(gool_accel_state,int32_t,decel)
+    REFL_FIELD(gool_accel_state,int32_t,decel),
+    REFL_TERM
   }
 };
 
@@ -1040,7 +1105,8 @@ refl_type gool_const_buf_type = {
   .flags = REFL_FLAGS_STATIC,
   .fields = {
     REFL_FIELD(gool_const_buf,uint32_t*,buf),
-    REFL_FIELD(gool_const_buf,int,idx)
+    REFL_FIELD(gool_const_buf,int,idx),
+    REFL_TERM
   }
 };
 
@@ -1049,7 +1115,8 @@ refl_type gool_state_ref_type = {
   .flags = REFL_FLAGS_STATIC,
   .fields = {
     REFL_FIELD(gool_state_ref,uint32_t,state),
-    REFL_FIELD(gool_state_ref,int,guard)
+    REFL_FIELD(gool_state_ref,int,guard),
+    REFL_TERM
   }
 };
 
@@ -1057,7 +1124,8 @@ refl_type gool_handles = {
   .name = "gool_handles",
   .flags = REFL_FLAGS_STATIC,
   .fields = {
-    { .name = "h", .typename="gool_handle", .count=8, .offset=0 }
+    { .name = "h", .typename="gool_handle", .count=8, .offset=0 },
+    REFL_TERM
   }
 };
 
@@ -1079,8 +1147,10 @@ refl_type *types[] = {
   &gool_link_type, &gool_objnode_type, &gool_event_query_type, &gool_nearest_query_type,
   &gool_bound_type, &gool_move_state_type, &gool_accel_state_type,
   &gool_const_buf_type, &gool_state_ref_type,
-  &vec_type, &vec16_type, &ang_type, &ang2_type, &rgb8_type, &rgb16_type, &mat16_type, &bound_type,
-  &gool_handles
+  &vec_type, &vec16_type, &ang_type, &ang2_type, &rgb8_type, &rgb16_type, 
+  &mat16_type, &bound_type, &texinfo_type,
+  &gool_handles, 
+  0
 };
 
 void ReflInitA() {

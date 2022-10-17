@@ -75,6 +75,8 @@ typedef struct _refl_type {
 { .name=#n, .flags=REFL_FLAGS_2DARRAY, .after=#a, .typename=#ft, .fcount=#fc, .size_fn=sfn }
 #define REFL_DYN2DARRAY_FIELD_AF(t,ft,n,a,fc,cfn,sfn) \
 { .name=#n, .flags=REFL_FLAGS_2DARRAY, .after=#a, .typename=#ft, .fcount=#fc, .count_fn=cfn, .size_fn=sfn }
+#define REFL_TERM \
+{ .name="\0" }
 
 typedef struct {
   refl_field *field;

@@ -88,7 +88,7 @@ int main() {
 #endif
   init();
   CoreLoop(LID_BOOTLEVEL);
-  kill();
+  _kill();
   return 0;
 }
 

@@ -53,6 +53,7 @@ TReflGetPrimA(t,u); \
 TReflGetPrimAF(t,u);
 
 TReflPrim(int, int);
+TReflPrim(size_t, size);
 TReflPrimAll(int32_t, int32, Int32);
 TReflPrimAll(int16_t, int16, Int16);
 TReflPrimAll(int8_t, int8, Int8);
@@ -216,6 +217,8 @@ void ReflTypeInit(refl_type *type) {
   if (type->flags & REFL_FLAGS_INITED
    || !(type->flags & REFL_FLAGS_STATIC))
     return;
+  if (type->flags & REFL_FLAGS_PRIM)
+    return; 
   /* inheritance extension
      it a base type name exists then look it up
      then insert the type into the base type's subtypes list */
@@ -254,10 +257,10 @@ void ReflTypeInit(refl_type *type) {
   type->flags |= REFL_FLAGS_INITED;
 }
 
-refl_type *prims[8] = {
+refl_type *prims[9] = {
   &refl_int32, &refl_int16, &refl_int8,
   &refl_uint32, &refl_uint16, &refl_uint8,
-  &refl_int, 0
+  &refl_int, &refl_size, 0
 };
 
 /**

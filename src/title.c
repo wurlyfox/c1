@@ -318,7 +318,7 @@ int TitleLoading(lid_t lid, uint8_t *image_data, nsd *nsd) {
   rect.x = context.draw_clip.x - (w/2) - 256;
   rect.y = context.draw_clip.y - (h/2) + 108;
   rect.w = w; rect.h = h;
-  TextureCopy((uint8_t*)src, (uint8_t*)dst, &rect.dim, 0, 0, 0, palette, 2, 2, 3);
+  //TextureCopy((uint8_t*)src, (uint8_t*)dst, &rect.dim, 0, 0, 0, palette, 2, 2, 3);
   GLDrawImage(&rect.dim, (uint8_t*)image_cvt, &rect.loc);
 #endif
   ns.draw_skip_counter = 2;
