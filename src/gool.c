@@ -428,7 +428,7 @@ int GoolObjectSearchTree(
   if (!child) { return 0; }
   while (!res && child) {
     sibling = child->sibling;
-    res = GoolObjectSearchTree(sibling, func, arg);
+    res = GoolObjectSearchTree(child, func, arg);
     child = sibling;
   }
   return res;
