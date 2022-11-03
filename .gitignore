@@ -1,0 +1,7 @@
+# compile output
+*.o
+c1
+
+# user files
+streams/*
+!README.MD
