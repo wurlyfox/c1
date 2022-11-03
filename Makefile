@@ -43,7 +43,7 @@ OUT = c1
 INCLUDE = -I./src/ -I/usr/include/freetype2
 
 # C compiler flags (-g -O3 -Wall)
-CCFLAGS = -g -fplan9-extensions -lSDL2 -lSDL2_mixer -lfluidsynth -lGL -lfreetype
+CCFLAGS = -g -fplan9-extensions -lSDL2 -lSDL2_mixer -lfluidsynth -lGL -lfreetype -m32
 
 # compiler
 CC = gcc

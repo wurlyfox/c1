@@ -5,3 +5,7 @@ c1
 # user files
 streams/*
 !README.MD
+
+# visual studio stuff
+.vscode/
+
