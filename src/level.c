@@ -12,10 +12,10 @@ const uint32_t size_map[16] = {  0, -256, -128, -64, -48, -40, -32, -26,   /* 80
 const uint8_t percent_map[16] = {  2,  16,  30,  44,  58,  72,  86, 100,   /* 80052CE4 */
                                  112, 124, 136, 148, 160, 172, 184, 196 };
 /* .sdata */
-int bonus_return;           /* 80056490; gp[0x25] */
-int ldat_not_inited;        /* 80056494; gp[0x26] */
-char title_zone_name[8];    /* 80056498; gp[0x27] */
-int first_spawn;            /* 800564A0; gp[0x29] */
+int bonus_return = 0;       /* 80056490; gp[0x25] */
+int ldat_not_inited = 1;    /* 80056494; gp[0x26] */
+char title_zone_name[8] = "0b_pZ"; /* 80056498; gp[0x27] */
+int first_spawn = 0;        /* 800564A0; gp[0x29] */
 /* .bss */
 entry *cur_zone, *obj_zone; /* 80057914, 80057918 */
 zone_path *cur_path;        /* 8005791C */
@@ -1182,7 +1182,7 @@ gool_objnode ZoneFindNearestObjectNode2(gool_object *obj, vec *v) {
   found = 0;
   for (i=0;i<object_bound_count;i++) {
     bound = &object_bounds[i];
-    if (!(bound->obj->status_b & 0x40020000 == 0x20000)) { continue; }
+    if (!((bound->obj->status_b & 0x40020000) == 0x20000)) { continue; }
     if (va.x >= bound->p1.x - 35000 && va.x <= bound->p2.x + 35000
       && va.z >= bound->p1.z - 35000 && va.z <= bound->p2.z + 35000) {
       if (va.y >= bound->p1.y && va.y <= bound->p2.y) {
@@ -1232,7 +1232,7 @@ gool_objnode ZoneFindNearestObjectNode3(gool_object *obj, vec *v, int flags, int
   int i, yz_max, flag2, subtype;
 
   res.value = 0;
-  if (!(obj->status_b & 0x4000000) || (flags & 4 && !(obj->parent->status_b)))
+  if (!(obj->status_b & 0x4000000) || ((flags & 4) && !(obj->parent->status_b)))
     return res;
   yz_max = -999999999;
   header = (zone_header *)cur_zone->items[0];
@@ -1398,7 +1398,7 @@ int ZoneQueryOctrees(vec *v, gool_object *obj, zone_query *query) {
     }
   }
   count = query->result_count;
-  *((uint16_t*)(&query->results[count])) = -1;
+  *((int32_t*)(&query->results[count])) = -1;
   // printf("result count: %i\n", count);
   return count;
 }

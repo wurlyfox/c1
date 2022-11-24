@@ -58,7 +58,7 @@ extern void SwCalcObjectMatrices(mat16 *m_rot, tgeo_header *header,
 extern void SwCalcObjectRotMatrix(mat16 *m_rot, tgeo_header *header,
   gool_vectors *vectors, sw_transform_struct *params);
 extern int SwCalcSpriteRotMatrix(gool_vectors *obj_vectors,
-  gool_vectors *cam_vectors, int flag, int size, mat16 *m_rot,
+  gool_vectors *cam_vectors, int flag, int shrink, mat16 *m_rot,
   int32_t depth, int32_t max_depth, sw_transform_struct *params);
 extern void SwTransformSvtx(svtx_frame *frame, void *ot,
   tgeo_polygon *polys, tgeo_header *header, uint32_t cull_mask,
@@ -85,5 +85,10 @@ extern void SwTransformWorldsDark(poly_id_list *poly_id_list, void *ot,
   int32_t proj, int anim_phase, void **prims_tail, sw_transform_struct *params);
 extern void SwTransformWorldsDark2(poly_id_list *poly_id_list, void *ot,
   int32_t proj, int anim_phase, void **prims_tail, sw_transform_struct *params);
+
+#ifdef CFLAGS_DRAW_OCTREES
+#include "level.h"
+extern void SwTransformZoneQuery(zone_query *query, void *ot, void **prims_tail);
+#endif
 
 #endif /* _SOFT_H_ */

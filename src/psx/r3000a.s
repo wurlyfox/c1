@@ -7751,7 +7751,7 @@ sin_x = $s0
 #       M    = [1,    0,  0]  # mask for limiting rotation to xy plane
 #              [0,    1,  0]
 #              [0,    0,  0]
-#       vs   = vectors->scale >> depth
+#       vs   = vectors->scale >> shrink
 #
 # a0 = obj_vectors: sprite (obj) vectors
 # a1 = cam_vectors: cam vectors

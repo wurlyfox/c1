@@ -74,6 +74,8 @@
 #define GOOL_FLAG_STRING_CENTER     0x4000000
 #define GOOL_FLAG_SOLID_BOTTOM      0x8000000
 #define GOOL_FLAG_STALL             0x10000000
+#define GOOL_FLAG_PAUSED            0x20000000  /* GOOL_DEBUG extension only */
+#define GOOL_FLAG_STEP              0x40000000  /* GOOL_DEBUG extension only */
 
 /* state/status c flags */
 #define GOOL_FLAG_GROUND_STATE      0x4
@@ -184,9 +186,9 @@ typedef struct {
   union {
     vec misc_c;
     struct {
-      uint32_t mode_flags_a;
-      uint32_t mode_flags_b;
-      uint32_t mode_flags_c;
+      int32_t mode_flags_a;
+      int32_t mode_flags_b;
+      int32_t mode_flags_c;
     };
   };
 } gool_vectors;
@@ -355,5 +357,56 @@ extern int GoolTransform(vec*,vec*,ang*,vec*,vec*);
 extern int GoolTransform2(vec*,vec*,int);
 extern int GoolCollide(gool_object*,bound*,gool_object*,bound*);
 extern int GoolSendToColliders(gool_object*,uint32_t,int,int,uint32_t*);
+
+#ifdef CFLAGS_GOOL_DEBUG
+
+#define GOOL_FLAG_PAUSED_TRANS   1
+#define GOOL_FLAG_PAUSED_CODE    2
+#define GOOL_FLAGS_PAUSED        3
+#define GOOL_FLAG_SAVED_TRANS    4
+#define GOOL_FLAG_RESTORED_TRANS 8
+#define GOOL_FLAG_STEP_TRANS     16
+#define GOOL_FLAG_STEP_CODE      32
+#define GOOL_FLAGS_STEP          48
+#define GOOL_FLAG_SERIAL_STEP    64
+#define GOOL_FLAG_SERIAL_STATE   128
+
+typedef struct {
+  int argc;
+  uint32_t argv[128];
+  uint32_t flags;
+  uint32_t *pc;
+  int len;
+  uint32_t data[128];
+} gool_frame;
+
+typedef struct {
+  gool_object *obj;
+  gool_object obj_prev;
+  uint32_t flags;
+  uint32_t breakpoints[128];
+  gool_frame frames[32];
+  int frame_count;
+  uint32_t *prev_pc;
+} gool_debug;
+
+typedef struct {
+  int inited;
+  gool_debug debugs[512];
+  int free_count;
+  gool_debug *free_dbgs[512];
+  gool_debug *by_id[GOOL_SPAWN_COUNT];
+  gool_debug *by_ptr[32];
+  gool_debug *main_dbg;
+} gool_debug_cache;
+
+extern void GoolObjectPrint(gool_object *obj, FILE *stream);
+extern void GoolObjectPrintDebug(gool_object *obj, FILE *stream);
+extern gool_debug *GoolObjectDebug(gool_object *obj);
+extern void GoolObjectPause(gool_object *obj, int type, int trans);
+extern void GoolObjectResume(gool_object *obj, int type);
+extern void GoolObjectStep(gool_object *obj, int type);
+
+#endif /* CFLAGS_GOOL_DEBUG */
 
 #endif /* _GOOL_H_ */

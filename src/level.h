@@ -58,7 +58,7 @@ typedef struct {
   int32_t solid_objs_y;
 } zone_query_summary;
 
-typedef struct {
+typedef struct _zone_query {
   union {
     zone_query_result results[0x200];
     zone_query_result_rect result_rect;

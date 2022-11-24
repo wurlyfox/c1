@@ -11,7 +11,6 @@ Texture cache, for paletted textures.
 
 ## description ##
 
-The psx gpu supports *paletted textures* (enabled for graphics primitives of color modes 0 and 1). Many of the textures used in the crash games are paletted textures.
 
 Texture data in the crash games is a combination of raw 15 bit direct colors and 8 or 4 bit indices. Each index indirectly references a particular one of the 15 bit colors in the non-indexed portion of the data. The raw 15 bit direct colors portions of the data can be divided into two parts:
 - raw direct colors (non-indexed pixels), used by color mode 2
@@ -61,72 +60,3 @@ In this file we explicitly specify a list of the field names and typenames for e
 The remaining information is computed at runtime, including typename lookup, sizes of variable size fields, and offsets of fields packed after variable sized ones. For the latter we have to provide a bit of extra information to the structure parser, including callbacks to calculate sizes of elements of 2-dimensional primitive arrays (i.e. entry item sizes), and to calculate counts of variable length arrays when the length is some function of another field value (ex. count + 1).
 
 See `/ext/lib/refl.md` for an overview of the type reflection functionality.
-
-# `/src/ext/gui.c` #
-
-## terminology ##
-- *item* - an item is the basic building block for all other gui entities
-- *base item* - an item with no child items and therefore which has minimal complexity; the 4 types of base item include: static item (no type), label, button, and slider
-- *control* - an item consisting of one or more child items and thus which is considered higher in complexity than base items; a control, as a whole, is still considered 'single-purpose' (as is a base item) and therefore is not too much higher in complexity.
-  examples of 'built-in' controls include: *editable text, scrollbar, and list (*excluding the child cursor, editable text can be considered a base item)
-- *view* - an item with one or more child items/controls, which is generally considered higher in complexity than both controls and base items; almost always a list
-- *specific view*  - a view which is not wholistically bound to any particular data and thus can have a user-defined or application-specific form; examples are not limited to entire hierarchies of controls, any of which can be dependent on one another; usually complex enough to be considered 'multi-purpose'; a specfic view IS AN item, and HAS one or more controls/items
-- *generic view* - a view which is bound to particular data and thus takes a form which is synchronized with the data; from the inner-scope pov the view could be considered multi-purpose but from the outer-scope it is said to be 'single-purpose' due to the wholistic nature of the bound data; therefore such views can be referred to as controls (ex. list[view], tree[view]); a generic view IS A control and IS AN item, and HAS one or more controls/items
-- *custom control* - a user-defined (non-built-in) control, possibly a generic view
-- *custom view* - a user-defined specific view; does not include generic views
-
-## contents ##
-the /src/ext/gui.c file consists of:
-
-- global map and filter callbacks
-- item hierarchy search and/or replace helper functions
-- custom controls (generic or specific)
-  - constructors
-  - mappers for mapping any and all parts of the input data to [parts of] a control
-  - specific 'deconstructors' or extractors to break apart input data into mappable sub-parts (to assist with unfold-type maps)
-  - default handlers for root items or items which map from any parts of the input data
-  - parsers and unparsers for text items which map from any parts of input data
-- custom views (not incl generic views)
-  - constructors for views
-  - specific handlers for view items (particularly those that are dependent on multiple items in the view)
-- main gui endpoint wrappers
-  - init, update, draw
-
-`GuiItemReplace` - item replace helper function
-
-### Extractors ###
-`GuiObjChildren` - specific extractor of children for gool objects; used to tree-map a gool object and its hierarchy
-(unparsers)
-`GuiUnparseObjPtr` - unparser for text item rep of gool objects
-
-### Generic mappers ###
-(for structure fields mapped via reflection)
-
-`GuiReflText` - default mapper for primitive type fields
-`GuiReflList` - default mapper for unimplemented structure (non-primitive) type fields
-`GuiReflVec`  - default mapper for `vec` type fields
-`GuiReflVec16` - default mapper for `vec16` type fields
-`GuiReflAng`  - default mapper for `ang` type fields
-`GuiBoxColor` - callback function for background color of static controls resulting from `GuiReflRgb8`
-`GuiBoxColor16` - callback function for background color of static controls resulting from `GuiReflRgb16`
-`GuiReflRgb8` - default mapper for `rgb8` type fields
-`GuiReflRgb16` - default mapper for `rgb16` type fields
-`GuiReflMat16` - default mapper for `mat16` type fields
-`GuiReflBound` - default mapper for `bound` type fields
-`GuiReflObjPtr` - default mapper for `gool_object` pointer type fields
-
-### Mappers ###
-`GuiMapObjField` - main mapper for `gool_object` structure fields
-
-### Custom control constructors ###
-`GuiObjView` - constructor for generic view of gool objects; main mapper for `gool_object`
-`GuiObjTree` - constructor for `gool_object` tree specialization of `GuiTextTree`
-
-### Custom views ###
-`GuiObjSelect` - custom handler for selecting an object in the object tree in the debug view
-`GuiDebugView` - constructor for the debug view
-
-### Main lower level gui wrappers ###
-`GuiInit` - initializer to register callbacks with the lower level gui system and create the root item
-`GuiUpdate` - function to update the item hierarchy (via lower level gui call)
-`GuiDraw` - function to draw the item hierarchy (via lower level gui call)

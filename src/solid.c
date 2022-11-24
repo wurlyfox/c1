@@ -305,7 +305,7 @@ static int StopAtHighestObjectBelow(gool_object *obj, vec *trans, vec *next_tran
       query->i++;
       colliding = 1;
     }
-    if (colliding && bound->obj->status_b & GOOL_FLAG_SOLID_TOP) {
+    if (colliding && (bound->obj->status_b & GOOL_FLAG_SOLID_TOP)) {
       exec = bound->obj->global;
       header = (gool_header*)exec->items[0];
       if (!(obj->state_flags & GOOL_FLAG_FLING_STATE)
@@ -500,7 +500,7 @@ static int StopAtZone(gool_object *obj, vec *next_trans) {
         GoolSendEvent(0, obj, GOOL_EVENT_DROWN, 1, &arg);
       }
       header = (zone_header*)obj->zone->items[0];
-      if (header->flags & 2 && obj->invincibility_state != 2) { /* zone not solid at bottom? */
+      if ((header->flags & 2) && obj->invincibility_state != 2) { /* zone not solid at bottom? */
         arg = 0x6400;
         GoolSendEvent(0, obj, GOOL_EVENT_FALL_KILL, 1, &arg); /* fall into a hole and die */
       }
@@ -517,7 +517,7 @@ static int StopAtZone(gool_object *obj, vec *next_trans) {
     obj->zone = neighbor; /* set objects zone to correct */
   if (!obj->zone) { return -255; } /* return error if still no zone */
   header = (zone_header*)obj->zone->items[0];
-  if (header->flags & 4 && obj->trans.y < header->water_y /* lower than water? */
+  if ((header->flags & 4) && obj->trans.y < header->water_y /* lower than water? */
     && (ns.ldat->lid == LID_UPSTREAM || ns.ldat->lid == LID_UPTHECREEK)) { /* upstream or up the creek? */
     arg = 0x27100;
     GoolSendEvent(0, obj, GOOL_EVENT_DROWN, 1, &arg); /* water death */
@@ -659,7 +659,7 @@ static void PlotWallB(int x1, int z1, int x2, int z2, int op) {
   if (x2 <= 0 || x1 >= 32 || z1 >= 32) { return; } /* return if 2d range is out of bounds */
   bits = 0xFFFFFFFF;
   if (x2 < 32) { bits <<= (32 - x2); }
-  if (x1 >= 0) { bits &= ~(0x80000000 >> x1); }
+  if (x1 >= 0) { bits &= ~((int)0x80000000 >> x1); } /* force arithmetic shift */
   if (bits) {
     if (z1 < 0) { z1 = 0; }
     if (z2 > 32) { z2 = 32; }
@@ -689,7 +689,7 @@ static void PlotObjWalls(vec *next_trans, gool_object *obj, zone_query *query, i
   if (!object_bound_count) { return; }
   header = (zone_header*)cur_zone->items[0];
   zone_has_walls = !(header->flags & 0x100000);
-  GoolObjectCalcBound(obj, &obj_bound);
+  GoolCalcBound(&obj->bound, next_trans, &obj_bound);
   test_bound.p1.x = obj_bound.p1.x - (100<<8);
   test_bound.p1.y = obj_bound.p1.y;
   test_bound.p1.z = obj_bound.p1.z - (100<<8);
@@ -698,7 +698,7 @@ static void PlotObjWalls(vec *next_trans, gool_object *obj, zone_query *query, i
   test_bound.p2.z = obj_bound.p2.z + (100<<8);
   for (i=0;i<object_bound_count;i++) {
     bound = &object_bounds[i];
-    if (flag && bound->obj == obj->collider && test_bound.p1.y < bound->p2.y) { continue; }
+    if (flag && bound->obj == obj->collider && test_bound.p1.y >= bound->p2.y) { continue; }
     if (!TestBoundIntersection(&test_bound, &bound->bound)) { continue; }
     node_bound.p1.x = bound->p1.x + bound->obj->hotspot_size;
     node_bound.p1.y = bound->p1.y;
@@ -717,7 +717,7 @@ static void PlotObjWalls(vec *next_trans, gool_object *obj, zone_query *query, i
         delta.x = (next_trans->x - bound->obj->trans.x) >> 8;
         delta.z = (next_trans->z - bound->obj->trans.z) >> 8;
         dist_xz = sqrt((delta.x*delta.x)+(delta.z*delta.z)) << 8;
-        if (dist_xz < 0x19000) { continue; }
+        if (dist_xz <= 0x19000) { continue; }
       }
       x1 = shr_floor((node_bound.p1.x-next_trans->x)*4, 13);
       z1 = shr_floor((node_bound.p1.z-next_trans->z)*4, 13);
@@ -752,7 +752,7 @@ void PlotWalls(vec *next_trans, gool_object *obj, zone_query *query) {
     for (i=0;i<128;i++)
       wall_cache[i] = 0;
     flags = 0;
-    if (obj->status_c & 2 || (obj->invincibility_state >= 2 && obj->invincibility_state <= 4))
+    if ((obj->status_c & 2) || (obj->invincibility_state >= 2 && obj->invincibility_state <= 4))
       flags = 2;
 #ifdef PSX
     RPlotQueryWalls(query,
@@ -795,12 +795,13 @@ static int ReplotWalls(int op, int flags, vec *next_trans, gool_object *obj) {
   bound node_bound, dist;
   int x1, x2, z1, z2; /* bit index */
   int level, type, result_count;
-  int plot;
+  int plot, i;
 
   result_count = 0;
   query = &cur_zone_query;
   result = query->results;
-  while (result->value != -1) { /* while not done iterating results */
+  for (i=0;i<query->result_count;i++) { /* while not done iterating results */
+    result = &query->results[i];
     if (!result->is_node) {
       result_rect = (zone_query_result_rect*)result;
       zone_dim.w = result_rect->w << 8;
@@ -830,7 +831,7 @@ static int ReplotWalls(int op, int flags, vec *next_trans, gool_object *obj) {
       dist.p2.y = node_bound.p2.y - next_trans->y;
       plot = ((flags == 0 && dist.p1.y<=(100<<8) && dist.p2.y>=(-400<<8)))
            || (flags == 1 && dist.p2.y>=0)
-           || (flags == 2);
+           || (flags != 0 && flags != 1);
       if (!plot) {
         ++result;
         continue;
@@ -929,7 +930,7 @@ int StopAtWalls(vec *trans, int x, int z, int *adj_x, int *adj_z, gool_object *o
       break; /* all bits in the bitmap have been tested, so break */
     if (!obj->collider) /* no collider? */
       break; /* shouldn't expect to find any non-solid bits, so break */
-    collider_header = (gool_header*)obj->collider->global->items[1];
+    collider_header = (gool_header*)obj->collider->global->items[0];
     if (collider_header->type == 0x22) /* collider is a box? */
       break; /* shouldn't expect to find any non-solid bits, so break */
     for (i=0;i<32;i++) {
@@ -942,7 +943,7 @@ int StopAtWalls(vec *trans, int x, int z, int *adj_x, int *adj_z, gool_object *o
   }
   if (ret < 0x100) { /* function has not been called recursively? */
     if (obj->collider)
-      collider_header = (gool_header*)obj->collider->global->items[1];
+      collider_header = (gool_header*)obj->collider->global->items[0];
     if (!obj->collider || collider_header->type != 0x22) { /* no collider or its a non-box? */
       if (ReplotWalls(0, 0, trans, obj)) {
         ReplotWalls(1, 1, trans, obj);
@@ -1047,6 +1048,7 @@ int ZoneQueryOctree(zone_rect *zone_rect, bound *bound, zone_query_results *resu
   results->rect.max_depth_x = max_depth.x;
   results->rect.max_depth_y = max_depth.y;
   results->rect.max_depth_z = max_depth.z;
+  results->rect.zero = 0;
   result_count = 0;
   ZoneQueryOctreeR(zone_rect, node, n_rect, &t_rect, &max_depth, results->r, &result_count, 0);
   return result_count+2;
@@ -1110,8 +1112,9 @@ void PlotQueryWalls(
     nbound.p1.z = ((nbound.p1.z - trans_z) << 2) >> 13;
     nbound.p2.z = ((nbound.p2.z - trans_z) << 2) >> 13;
     if (-32 < nbound.p1.z && nbound.p1.z < 32) {
-      for (i=nbound.p1.x;i<nbound.p2.x;i+=8)
+      for (i=nbound.p1.x;i<nbound.p2.x;i+=8) {
         PlotWall(i, nbound.p1.z);
+      }
     }
     if (-32 < nbound.p2.x && nbound.p2.x < 32) {
       for (i=nbound.p1.z;i<nbound.p2.z;i+=8)

@@ -2,6 +2,9 @@
  * fluidsynth pc audio backend
  */
 #include "audio.h"
+
+#ifdef CFLAGS_SFX_FLUIDSYNTH
+
 #include <fluidsynth.h>
 
 fluid_settings_t *asettings;
@@ -10,7 +13,9 @@ fluid_sfloader_t *aloader;
 fluid_audio_driver_t *adriver;
 fluid_preset_t *presets[24] = { 0 };
 fluid_sample_t *samples[24] = { 0 };
-uint8_t keys_on[24] = { 0 };
+fluid_voice_t *fluid_voices[24] = { 0 };
+uint32_t sample_lengths[24] = { 0 };
+uint32_t keys_on[24] = { 0 };
 
 typedef struct {
   int bank;
@@ -71,8 +76,9 @@ static int preset_noteon(fluid_preset_t *preset, fluid_synth_t *synth, int chan,
   fluid_voice_t *voice;
 
   sample = samples[chan];
-  voice = fluid_synth_alloc_voice(synth, sample, chan, 60, 127);
+  voice = fluid_synth_alloc_voice(synth, sample, chan, key, 127);
   fluid_synth_start_voice(synth, voice);
+  fluid_voices[chan] = voice;
 }
 
 static const char *sfont_get_name(fluid_sfont_t *sfont) {
@@ -114,20 +120,26 @@ static fluid_sfont_t *sfloader_load(fluid_sfloader_t *loader, const char *filena
 }
 
 void SwAudioInit() {
-  int sfont_id;
-  return; /* audio not working yet! */
+  int sfont_id, i;
 
   asettings = new_fluid_settings();
+  fluid_settings_setstr(asettings, "audio.driver", "sdl2");
+  fluid_settings_setint(asettings, "audio.periods", 4);
+  fluid_settings_setint(asettings, "audio.period-size", 2048);
+  fluid_settings_setint(asettings, "synth.midi-channels", 24);
   synth = new_fluid_synth(asettings);
   aloader = new_fluid_sfloader(sfloader_load, delete_fluid_sfloader);
   fluid_synth_add_sfloader(synth, aloader);
-  sfont_id = fluid_synth_sfload(synth, 0, 0);
+  sfont_id = fluid_synth_sfload(synth, "unused", 0);
   adriver = new_fluid_audio_driver(asettings, synth);
+  for (i=0;i<24;i++) {
+    // fluid_synth_program_change(synth, i, i);
+    fluid_synth_program_select(synth, i, sfont_id, 0, i);
+  }
 }
 
 void SwAudioKill() {
   int i;
-  return;
 
   for (i=0;i<24;i++) {
     if (samples[i]) {
@@ -142,18 +154,21 @@ void SwAudioKill() {
 
 void SwSetMVol(uint32_t vol) {
   /* TODO: linear or log? */
-  fluid_synth_set_gain(synth, (float)(vol/127)*10);
+  fluid_synth_set_gain(synth, (float)(vol/(127)));
 }
 
+uint8_t pcm_buf[0x100000];
 void SwLoadSample(int voice_idx, uint8_t *data, size_t size) {
   fluid_sample_t *sample;
 
   if (samples[voice_idx])
     SwUnloadSample(voice_idx);
+  size = ADPCMToPCM16(data, size, pcm_buf);
   /* assuming 16 bit sample points, nbframes = size / 2 */
   sample = new_fluid_sample();
-  fluid_sample_set_sound_data(sample, (short*)data, NULL, size/2, 44100, 0);
+  fluid_sample_set_sound_data(sample, (short*)pcm_buf, NULL, size/2, 11025, 0);
   samples[voice_idx] = sample;
+  sample_lengths[voice_idx] = (size*17)/11025;
 }
 
 void SwUnloadSample(int voice_idx) {
@@ -162,21 +177,30 @@ void SwUnloadSample(int voice_idx) {
 }
 
 void SwNoteOn(int voice_idx) {
-  keys_on[voice_idx] = 1;
-  fluid_synth_noteon(synth, voice_idx, 60, 127);
+  if (keys_on[voice_idx]) { return; }
+  keys_on[voice_idx] = sample_lengths[voice_idx];
+  fluid_synth_noteon(synth, voice_idx, 1, 127);
 }
 
 void SwNoteOff(int voice_idx) {
+  if (!keys_on[voice_idx]) { return; }
   keys_on[voice_idx] = 0;
-  fluid_synth_noteoff(synth, voice_idx, 60);
+  fluid_synth_noteoff(synth, voice_idx, 1);
 }
 
 void SwVoiceSetVolume(int voice_idx, uint32_t voll, uint32_t volr) {
   int32_t pan;
-  uint32_t volume;
+  uint32_t volume, sum;
 
-  pan = 500*(volr-voll)/(volr+voll);
-  volume = ((1000*voll)/(500-pan)) >> 7;
+  sum = volr+voll;
+  if (sum != 0) {
+    pan = 500*(volr-voll)/sum;
+    volume = ((1000*voll)/(500-pan)) >> 7;
+  }
+  else {
+    pan = 0;
+    volume = 0;
+  }
   /* attenuation is mapped to cc 7 by default */
   fluid_synth_set_gen(synth, voice_idx, GEN_PAN, (float)pan);
   fluid_synth_cc(synth, voice_idx, 7, volume);
@@ -187,7 +211,32 @@ void SwVoiceSetPitch(int voice_idx, uint32_t pitch) {
 }
 
 void SwGetAllKeysStatus(uint8_t *status) {
-  int i;
-  for (i=0;i<24;i++)
-    status[i] = keys_on[i];
+  fluid_voice_t *voice;
+  int i, on;
+  for (i=0;i<24;i++) {
+    if (keys_on[i] == 1) {
+      keys_on[i] = 0;
+      status[i] = 0;
+      SwNoteOff(i);
+    }
+    else if (keys_on[i]) {
+      --keys_on[i];
+      status[i] = 1;
+    }
+  }
 }
+
+#else
+
+void SwAudioInit() {}
+void SwAudioKill() {}
+void SwSetMVol(uint32_t vol) {}
+void SwLoadSample(int voice_idx, uint8_t *data, size_t size) {}
+void SwUnloadSample(int voice_idx) {}
+void SwNoteOn(int voice_idx) {}
+void SwNoteOff(int voice_idx) {}
+void SwVoiceSetVolume(int voice_idx, uint32_t voll, uint32_t volr) {}
+void SwVoiceSetPitch(int voice_idx, uint32_t pitch) {}
+void SwGetAllKeysStatus(uint8_t *status) {}
+
+#endif

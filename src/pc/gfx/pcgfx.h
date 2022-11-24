@@ -29,7 +29,7 @@ typedef struct {
   rgb colors[3];
   fvec uvs[3];
   int texid;
-  int pad;
+  int flags;
 } poly3i;
 
 typedef struct {
@@ -38,7 +38,7 @@ typedef struct {
   rgb colors[4];
   fvec uvs[4];
   int texid;
-  int pad;
+  int flags;
 } poly4i;
 
 #endif /* _PC_GFX_H_ */

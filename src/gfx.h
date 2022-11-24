@@ -6,6 +6,8 @@
 #include "ns.h"
 #include "gool.h"
 
+#include "level.h"
+
 #include "formats/gool.h"
 #include "formats/svtx.h"
 #include "formats/cvtx.h"

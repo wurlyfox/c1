@@ -24,7 +24,7 @@ static inline int32_t GetTicks() {
   int32_t ticks;
 
   clock_gettime(CLOCK_MONOTONIC_RAW, &tp);
-  ticks = (((int64_t)tp.tv_sec*1000000000)+tp.tv_nsec) / 963765;
+  ticks = ((((int64_t)tp.tv_sec*1000000000)+tp.tv_nsec) / 963765);
   //printf("%i ticks elapsed\n", ticks);
   return ticks;
 }

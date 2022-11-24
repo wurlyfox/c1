@@ -3,7 +3,7 @@
 
 #include "./ext/lib/gui.h"
 
-extern void GuiInit(gui_callbacks *callbacks);
+extern void GuiInit();
 extern void GuiUpdate();
 extern void GuiDraw();
 

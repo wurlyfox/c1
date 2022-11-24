@@ -1,4 +1,10 @@
 #include <SDL2/SDL.h>
+#ifdef CFLAGS_GUI
+#define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
+#define CIMGUI_USE_SDL
+#include "cimgui.h"
+#include "cimgui_impl.h"
+#endif
 
 #include "ns.h"
 #include "math.h"
@@ -28,9 +34,16 @@ void SDLInit() {
     WINDOW_WIDTH, WINDOW_HEIGHT,
     SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
   ogl_context = SDL_GL_CreateContext(window);
+#ifdef CFLAGS_GUI
+  igCreateContext(0);
+  ImGui_ImplSDL2_InitForOpenGL(window, ogl_context);
+#endif
 }
 
 void SDLKill() {
+#ifdef CFLAGS_GUI
+  ImGui_ImplSDL2_Shutdown();
+#endif
   SDL_GL_DeleteContext(ogl_context);
   SDL_DestroyWindow(window);
   SDL_Quit();
@@ -39,6 +52,9 @@ void SDLKill() {
 void SDLUpdate() {
   SDL_Event e;
   while (SDL_PollEvent(&e)) {
+#ifdef CFLAGS_GUI
+    ImGui_ImplSDL2_ProcessEvent(&e);
+#endif
     switch (e.type) {
     case SDL_QUIT:
       done = 1;
@@ -66,6 +82,9 @@ void SDLUpdate() {
       break;
     }
   }
+#ifdef CFLAGS_GUI
+  ImGui_ImplSDL2_NewFrame();
+#endif
 }
 
 void SDLSwap() {

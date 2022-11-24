@@ -149,9 +149,9 @@ typedef struct {
   uint16_t path_length;
   union {
     struct {
-      uint16_t init_flags_a;
-      uint16_t init_flags_b;
-      uint16_t init_flags_c;
+      int16_t init_flags_a;
+      int16_t init_flags_b;
+      int16_t init_flags_c;
     };
     ang16 rot;
   };

@@ -39,13 +39,43 @@ static inline void zeromem(void *dst, int size) {
 #define setnc(d,s) _setnc(d,s,sizeof(s))
 #define padnc(d,s) _padnc(d,s,sizeof(d),sizeof(s))
 
-#define SeqNext(s,t,d) \
-d = (t*)s; \
-s += sizeof(t)
+#define Next(g,t,d) \
+d = (t*)g; \
+g += sizeof(t)
 
-#define MidNext(m,t,d) \
-d = (t*)m; \
-m += sizeof(t);
+int ADPCMToPCM16(uint8_t *adpcm, size_t size, uint8_t *pcm) {
+  const int f0[16] ={ 0,60,115, 98,122,0,0,0,0,0,0,0,0,0,0,0 };
+  const int f1[16] ={ 0, 0,-52,-55,-60,0,0,0,0,0,0,0,0,0,0,0 };
+  VagLine *line;
+  double s0, s1, tmp;
+  int16_t *ld;
+  uint8_t *start;
+  int i, j;
+
+  start = pcm;
+  s0 = 0; s1 = 0;
+  for (i=0;i<size/sizeof(VagLine);i++) {
+    Next(adpcm, VagLine, line);
+    for (j=0;j<14;j++) {
+      Next(pcm, int16_t, ld);
+      tmp = s0*(double)f0[line->predict]+s1*(double)f1[line->predict];
+      *ld=((int16_t)(line->data[j].adl<<12))>>line->factor;
+      s1 = s0;
+      s0 = (double)(*ld)+(tmp/64);
+      *ld=(int16_t)s0;
+      Next(pcm, int16_t, ld);
+      tmp = s0*(double)f0[line->predict]+s1*(double)f1[line->predict];
+      *ld=((int16_t)(line->data[j].adh<<12))>>line->factor;
+      s1 = s0;
+      s0 = (double)(*ld)+(tmp/64);
+      *ld=(int16_t)s0;
+    }
+  }
+  return (int)(pcm - start);
+}
+
+#define SeqNext(s,t,d) Next(s,t,d)
+#define MidNext(m,t,d) Next(m,t,d)
 
 int SeqToMid(uint8_t *seq, uint8_t *mid) {
   MThd *mthd; SThd *sthd;
@@ -129,9 +159,7 @@ int SeqToMid(uint8_t *seq, uint8_t *mid) {
   return length;
 }
 
-#define Sf2Next(s,t,d) \
-d = (t*)s; \
-s += sizeof(t)
+#define Sf2Next(s,t,d) Next(s,t,d)
 
 #define Sf2NextCk(s,c,n) \
 Sf2Next(s,CK,c); \
@@ -147,9 +175,7 @@ Sf2NextCk(s,c,n); \
 c->ckSize = setnc((char*)s,a); \
 s += c->ckSize
 
-#define VabNext(v,t,d) \
-d = (t*)v; \
-v += sizeof(t)
+#define VabNext(v,t,d) Next(v,t,d)
 
 /*
 VAB file        => bank
@@ -178,7 +204,6 @@ int VabToSf2(uint8_t *vab, uint8_t *sf2) {
   VagBody *waves[254], *wave;
   VagAtr *atr;
   VabHead *vh; VabBody *vb;
-  VagLine *line;
   CK *ck0, *ck1, *ck2, *ck3;
   iRC irc; hRC hrc;
   sfPresetHeader *presets[128];
@@ -186,9 +211,7 @@ int VabToSf2(uint8_t *vab, uint8_t *sf2) {
   sfInst *insts[128];
   sfInstBag *ibags[128][17], *tibag;
   uint32_t wave_offs;
-  int32_t s0, s1, tmp;
-  int16_t *ld;
-  int i, j, k, prog_count, zone_count, sample_count;
+  int i, j, prog_count, zone_count, sample_count;
 
   vh = &((Vab*)vab)->head;
   vb =  ((Vab*)vab)->body;
@@ -214,28 +237,10 @@ int VabToSf2(uint8_t *vab, uint8_t *sf2) {
   Sf2NextCs(sf2, ck2, "INAM", "General MIDI");
   ck1->ckSize = (sf2 - (uint8_t*)ck1) - 6;
   Sf2NextCk(sf2, ck1, "sdta");
-  const int f0[16] ={ 0,60,115, 98,122,0,0,0,0,0,0,0,0,0,0,0 };
-  const int f1[16] ={ 0, 0,-52,-55,-60,0,0,0,0,0,0,0,0,0,0,0 };
   for (i=0;i<vh->hdr.vs;i++) {
     wave = waves[i];
     Sf2NextCk(sf2, ck2, "smpl");
-    for (j=0;j<vh->wave_sizes[i]/sizeof(VagLine);j++) {
-      VabNext(wave, VagLine, line);
-      for (k=0;k<14;k++) {
-        Sf2Next(sf2, int16_t, ld);
-        tmp = s0*f0[line->predict]+s1*f1[line->predict];
-        *ld=((int16_t)(line->data[k].adl<<12))>>line->factor;
-        s1 = s0;
-        s0 = (*ld<<12)+(tmp>>6);
-        *ld+=(tmp+(1<<17))>>18;
-        Sf2Next(sf2, int16_t, ld);
-        tmp = s0*f0[line->predict]+s1*f1[line->predict];
-        *ld=((int16_t)(line->data[k].adh<<12))>>line->factor;
-        s1 = s0;
-        s0 = (*ld<<12)+(tmp>>6);
-        *ld+=(tmp+(1<<17))>>18;
-      }
-    }
+    sf2 += ADPCMToPCM16(wave, vh->wave_sizes[i], sf2);
     ck2->ckSize = (sf2 - (uint8_t*)ck2) - 6;
   }
   ck1->ckSize = (sf2 - (uint8_t*)ck1) - 6;
@@ -326,7 +331,7 @@ int VabToSf2(uint8_t *vab, uint8_t *sf2) {
     prog = &progs[i];
     if (prog->atr->tones == 0) { continue; }
     for (j=0;j<prog->atr->tones;j++) {
-      atr = prog->vagatr[k];
+      atr = prog->vagatr[j];
       ibags[i][j]->wInstModNdx = ((sf2 - (uint8_t*)ck2) - 6) / sizeof(sfInstModList);
       /* pbmin 0-127, 127=1 octave */
       /* 1 = 12/127 semitone */

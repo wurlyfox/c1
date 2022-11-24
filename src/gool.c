@@ -428,7 +428,7 @@ int GoolObjectSearchTree(
   if (!child) { return 0; }
   while (!res && child) {
     sibling = child->sibling;
-    res = GoolObjectSearchTree(obj, func, arg);
+    res = GoolObjectSearchTree(child, func, arg);
     child = sibling;
   }
   return res;
@@ -693,9 +693,9 @@ gool_object *GoolObjectSpawn(entry *zone, int entity_idx) {
     obj->rot.x = entity->rot.x;
     obj->rot.z = entity->rot.z;
   }
-  obj->mode_flags_a = entity->init_flags_a << 8;
-  obj->mode_flags_b = entity->init_flags_b << 8;
-  obj->mode_flags_c = entity->init_flags_c << 8;
+  obj->mode_flags_a = ((int32_t)entity->init_flags_a) << 8;
+  obj->mode_flags_b = ((int32_t)entity->init_flags_b) << 8;
+  obj->mode_flags_c = ((int32_t)entity->init_flags_c) << 8;
   GoolObjectOrientOnPath(obj, 0, &obj->trans);
   if (obj == crash && next_lid == -1)
     LevelSaveState(obj, &savestate, 1); /* save state when spawning crash */
@@ -793,7 +793,9 @@ int GoolObjectInit(gool_object *obj, int exec, int subtype, int argc, int *argv)
   obj->voice_id = -2;
   if (parent && parent->handle.type == 1) {
     obj->zone = parent->zone;
-    obj->vectors = parent->vectors;
+    obj->trans = parent->trans;
+    obj->rot = parent->rot;
+    obj->scale = parent->scale;
   }
   else {
     vectors = &obj->vectors;
@@ -932,12 +934,12 @@ void GoolObjectLocalBound(gool_object *obj, vec *scale) {
     res = (int)NSLookup(&anim->eid);
     if (ISERRORCODE(res)) { return; } /* return if unable to resolve */
   }
+  scale_abs = *scale;
+  scale_abs.x = abs(scale_abs.x); /* don't flip in x dir for negative values */
   if (anim->type == 1) { /* vertex anim? */
     svtx = NSLookup(&anim->v.eid);
     frame_idx = obj->anim_frame >> 8;
     frame = (svtx_frame*)svtx->items[frame_idx];
-    scale_abs = *scale;
-    scale_abs.x = abs(scale_abs.x); /* don't flip in x dir for negative values */
     bnd = *(bound*)&frame->bound_x1;
     if (obj == crash) { /* is crash object? */
       bnd.p1.x += frame->col_x; /* readjust bound box center for collision purposes */
@@ -955,12 +957,9 @@ void GoolObjectLocalBound(gool_object *obj, vec *scale) {
     obj->bound.p2.z = ((bnd.p2.z >> 8) * scale_abs.z) >> 4;
   }
   else { /* bounding box is a 25x25x25 box */
-    scale_abs.x = abs(scale->x);
-    scale_abs.y = abs(scale->y);
-    scale_abs.z = abs(scale->z);
-    obj->bound.p1.x = (-scale_abs.x * 200) >> 4;
-    obj->bound.p1.y = (-scale_abs.y * 200) >> 4;
-    obj->bound.p1.z = (-scale_abs.z * 200) >> 4;
+    obj->bound.p1.x = -((scale_abs.x * 200) >> 4);
+    obj->bound.p1.y = -((scale_abs.y * 200) >> 4);
+    obj->bound.p1.z = -((scale_abs.z * 200) >> 4);
     obj->bound.p2.x = (scale_abs.x * 200) >> 4;
     obj->bound.p2.y = (scale_abs.y * 200) >> 4;
     obj->bound.p2.z = (scale_abs.z * 200) >> 4;
@@ -1002,7 +1001,7 @@ int GoolObjectChangeState(gool_object *obj, uint32_t state, int argc, uint32_t *
   int i, res; // ?, $v0
 
   once_p = obj->once_p;
-  if (state == 0xFF || obj->status_b & GOOL_FLAG_STALL)
+  if (state == 0xFF || (obj->status_b & GOOL_FLAG_STALL))
     return ERROR_INVALID_STATE;
   obj->state = state;
   exec = obj->global;
@@ -1123,7 +1122,8 @@ int GoolObjectUpdate(gool_object *obj, int flag) {
     case 0x600: animate = cur_display_flags & GOOL_FLAG_ANIMATE_C356; break;
     case 0x200:
       animate = cur_display_flags & GOOL_FLAG_ANIMATE_C2;
-      animate = animate && (obj->subtype==4||obj->subtype==7);
+      if (header->type == 4 && (obj->subtype == 4 || obj->subtype == 7))
+        flag = 1; /* override */
       break;
     default:
       animate = 0;
@@ -1131,19 +1131,37 @@ int GoolObjectUpdate(gool_object *obj, int flag) {
     }
   }
   if (animate && flag) {
+#ifdef CFLAGS_GOOL_DEBUG
+    gool_debug *dbg;
+    dbg = GoolObjectDebug(obj);
+#endif
     if ((status_b & GOOL_FLAG_STALL) && (obj->anim_counter != 0)) {
       obj->anim_counter--; /* decrement while stall flag is set */
       if (obj->anim_counter == 0)
         obj->status_b &= ~GOOL_FLAG_STALL; /* clear stall flag when 0 is reached */
     }
+#ifdef CFLAGS_GOOL_DEBUG
+    else if ((dbg->flags & GOOL_FLAGS_PAUSED) == GOOL_FLAGS_PAUSED) {}
+#endif
     else { /* countdown finished in previous frame */
       obj->anim_stamp = frames_elapsed; /* record 'timestamp' */
       if ((status_b & GOOL_FLAG_COLLIDABLE) && /* collidable object? */
         obj->anim_stamp == crash->anim_stamp) /* same frame as crash? */
         GoolObjectBound(obj); /* calculate bound */
+#ifdef CFLAGS_GOOL_DEBUG
+      if (dbg->flags & GOOL_FLAG_PAUSED_TRANS) {}
+      else if (obj->tp) {
+        if (!(dbg->flags & GOOL_FLAG_RESTORED_TRANS)) { /* not resuming from trans block? */
+          GoolObjectPushFrame(obj, 0, 0xFFFF);
+          obj->pc = obj->tp;
+        }
+        else
+          dbg->flags &= ~GOOL_FLAG_RESTORED_TRANS;
+#else
       if (obj->tp) { /* is there a trans block to run? */
         GoolObjectPushFrame(obj, 0, 0xFFFF);
         obj->pc = obj->tp;
+#endif
         flags = GOOL_FLAG_SUSPEND_ON_RET | GOOL_FLAG_SUSPEND_ON_RETLNK;
         res = GoolObjectInterpret(obj, flags, &response); /* run it */
         if (ISERRORCODE(res)) { return res; } /* return on fail */
@@ -1152,6 +1170,10 @@ int GoolObjectUpdate(gool_object *obj, int flag) {
       timestamp = top & 0x00FFFFFF;
       wait = (top & 0xFF000000) >> 24;
       elapsed_since = frames_elapsed - timestamp;
+#ifdef CFLAGS_GOOL_DEBUG
+      if (dbg->flags & GOOL_FLAG_PAUSED_CODE) {}
+      else
+#endif
       if (elapsed_since > wait) { /* if more frames have elapsed than the required wait time [since prev switch] */
         obj->sp--;                /* get rid of the now useless tag */
         res = GoolObjectInterpret(obj, GOOL_FLAG_SUSPEND_ON_ANIM, &response); /* ...and continue execution until another animation instruction is reached */
@@ -1383,13 +1405,14 @@ static int GoolTextStringTransform(
   char c, c2, buf[16];
   int i, center, flag;
 
+  flag = 1;
   center = 0;
   if (prims_tail && (obj->status_b & GOOL_FLAG_STRING_CENTER)) {
     center = 1;
     bound2.p1.x = 999999;
     bound2.p1.y = 999999;
-    bound2.p1.x = -999999;
-    bound2.p1.y = -999999;
+    bound2.p2.x = -999999;
+    bound2.p2.y = -999999;
   }
   bound.p1.x = val;
   max_x = 0;
@@ -1402,6 +1425,7 @@ static int GoolTextStringTransform(
       switch (c) {
       case 'n':
       case '%':
+        c = *(str++);
         bound.p1.x = val;
         y_offs -= (font->glyphs[0].height << size);
         break;
@@ -1498,7 +1522,7 @@ void GoolTextObjectTransform(gool_object *obj, gool_text *text, int terms_skip, 
   res = SwCalcSpriteRotMatrix(
     &obj->vectors,
     (gool_vectors*)&cam_trans_prev,
-    !(obj->status_b & GOOL_FLAG_2D),
+    (obj->status_b & GOOL_FLAG_2D),
     size,
     &ms_rot,
     screen_proj,
@@ -1514,18 +1538,18 @@ void GoolTextObjectTransform(gool_object *obj, gool_text *text, int terms_skip, 
   anims = obj->global->items[5];
   font_offset = obj->invincibility_state >> 8;
   if (font_offset == 0)
-    font = (gool_font*)&anims[text->glyphs_offset];
+    font = (gool_font*)&anims[text->glyphs_offset*4];
   else
-    font = (gool_font*)&anims[font_offset];
+    font = (gool_font*)&anims[font_offset*4];
   sprintf(buf, &str[i], obj->sp[-2], obj->sp[-3], obj->sp[-4], obj->sp[-5]);
-  while(str[i++] != 0); /* skip to first null term char */
+  while(buf[i++] != 0); /* skip to first null term char */
   i--;
   if (i-- != start) { /* not a zero length str? */
     while (i!=start) { /* go back until 0x20 is reached */
-      if (str[i] == 0x20) { break; }
+      if (buf[i] == 0x20) { break; }
       i--;
     }
-    str[i+1] = 0; /* place null term after 0x20 or single char */
+    buf[i+1] = 0; /* place null term after 0x20 or single char */
   }
 #ifdef PSX
   res = (int)NSLookup(&font->tpage);
@@ -1539,11 +1563,11 @@ void GoolTextObjectTransform(gool_object *obj, gool_text *text, int terms_skip, 
 #else
   tpag = font->tpage;
   if (flag)
-    arg = GoolTextStringTransform(obj, str, 0, font, tpag, size, 0);
+    arg = GoolTextStringTransform(obj, buf, 0, font, tpag, size, 0);
   else
     arg = 0;
   prims_tail = GLGetPrimsTail();
-  GoolTextStringTransform(obj, str, -arg/4, font, tpag, size, prims_tail);
+  GoolTextStringTransform(obj, buf, -arg/4, font, tpag, size, prims_tail);
 #endif
 }
 
@@ -1606,7 +1630,7 @@ int GoolObjectColors(gool_object *obj) {
     }
     break;
   default:
-    if (obj == crash && obj->status_b & 0x400)
+    if (obj == crash && (obj->status_b & 0x400))
       GoolObjectColorByZone(obj);
     break;
   }
@@ -1660,27 +1684,35 @@ int GoolObjectBound(gool_object *obj) {
     else if (rot_x < 0x600) { /* between 0x200 and 0x600 */
       bound->p1.x = trans.x + obj->bound.p1.z; /* i.e. 45 and 135 */
       bound->p1.y = trans.y + obj->bound.p1.y;
-      bound->p1.z = trans.z - obj->bound.p1.x;
+      bound->p1.z = trans.z - obj->bound.p2.x;
       bound->p2.x = trans.x + obj->bound.p2.z;
       bound->p2.y = trans.y + obj->bound.p2.y;
-      bound->p2.z = trans.z - obj->bound.p2.x;
+      bound->p2.z = trans.z - obj->bound.p1.x;
     }
     else if (rot_x < 0xA00) { /* between 0xA00 and 0xE00 */
       bound->p1.x = trans.x + obj->bound.p1.x; /* i.e. 225 and 315 */
       bound->p1.y = trans.y + obj->bound.p1.y;
-      bound->p1.z = trans.z - obj->bound.p1.z;
+      bound->p1.z = trans.z - obj->bound.p2.z;
       bound->p2.x = trans.x + obj->bound.p2.x;
       bound->p2.y = trans.y + obj->bound.p2.y;
-      bound->p2.z = trans.z - obj->bound.p2.z;
+      bound->p2.z = trans.z - obj->bound.p1.z;
     }
     else { /* between 0x600 and 0xA00 */
-      bound->p1.x = trans.x - obj->bound.p1.z; /* i.e. 135 and 225 */
+      bound->p1.x = trans.x - obj->bound.p2.z; /* i.e. 135 and 225 */
       bound->p1.y = trans.y + obj->bound.p1.y;
       bound->p1.z = trans.z + obj->bound.p1.x;
-      bound->p2.x = trans.x - obj->bound.p2.z;
+      bound->p2.x = trans.x - obj->bound.p1.z;
       bound->p2.y = trans.y + obj->bound.p2.y;
       bound->p2.z = trans.z + obj->bound.p2.x;
     }
+  }
+  else {
+    bound->p1.x = obj->trans.x + obj->bound.p1.x;
+    bound->p1.y = obj->trans.y + obj->bound.p1.y;
+    bound->p1.z = obj->trans.z + obj->bound.p1.z;
+    bound->p2.x = obj->trans.x + obj->bound.p2.x;
+    bound->p2.y = obj->trans.y + obj->bound.p2.y;
+    bound->p2.z = obj->trans.z + obj->bound.p2.z;
   }
   if (obj->anim_stamp == crash->anim_stamp) { /* rendered during same frame as crash? */
     crash_bound.p1.x = crash->trans.x + crash->bound.p1.x;
@@ -1689,7 +1721,7 @@ int GoolObjectBound(gool_object *obj) {
     crash_bound.p2.x = crash->trans.x + crash->bound.p2.x;
     crash_bound.p2.y = crash->trans.y + crash->bound.p2.y;
     crash_bound.p2.z = crash->trans.z + crash->bound.p2.z;
-    if (TestBoundIntersection(&bound->bound, &crash_bound)) /* collision with crash? */
+    if (TestBoundIntersection(&crash_bound, &bound->bound)) /* collision with crash? */
       GoolCollide(obj, &bound->bound, crash, &crash_bound); /* handle it (i.e. signal objs) */
     else
       obj->collider = 0;
@@ -2067,6 +2099,11 @@ G_TRANS_GOPB(obj,ins,b)
 (((a) == 0x1F) ? GoolObjectPop(obj) \
                : *((uint32_t*)&obj->self+(a)))
 
+#ifdef CFLAGS_GOOL_DEBUG
+gool_debug_cache debug_cache = { 0 };
+int GoolObjectTryBreak(gool_object *obj, uint32_t opcode, uint32_t flags, int res);
+#endif /* CFLAGS_GOOL_DEBUG */
+
 //----- (800201DC) --------------------------------------------------------
 int GoolObjectInterpret(gool_object *obj, uint32_t flags, gool_state_ref *transition) {
   uint32_t instruction, opcode;
@@ -2093,8 +2130,15 @@ int GoolObjectInterpret(gool_object *obj, uint32_t flags, gool_state_ref *transi
 #define sb r2.sb
 #define sl r2.sl
 #define dst r2.dst
+#ifdef CFLAGS_GOOL_DEBUG
+  gool_debug *dbg;
 
+  dbg = GoolObjectDebug(obj);
+  if (dbg && ((dbg->flags & GOOL_FLAGS_PAUSED)==GOOL_FLAGS_PAUSED)) { return SUCCESS; } /* paused */
+#endif
   while (1) {
+    if (dbg) { dbg->obj_prev = *obj; }
+    res = 0;
     instruction = *(obj->pc++);
     opcode = G_OPCODE(instruction);
     switch (opcode) {
@@ -2319,15 +2363,12 @@ int GoolObjectInterpret(gool_object *obj, uint32_t flags, gool_state_ref *transi
     }
     case 0x82:
       res = GoolOpControlFlow(obj,instruction,&flags,transition);
-      if (ISCODE(res)) { return res; }
       break;
     case 0x83:
       res = GoolOpChangeAnim(obj,instruction,&flags);
-      if (ISCODE(res)) { return res; }
       break;
     case 0x84:
       res = GoolOpChangeAnimFrame(obj,instruction,&flags);
-      if (ISCODE(res)) { return res; }
       break;
     case 0x85:
       GoolOpTransformVectors(obj,instruction);
@@ -2343,13 +2384,11 @@ int GoolObjectInterpret(gool_object *obj, uint32_t flags, gool_state_ref *transi
     } /* fall through!!! */
     case 0x8F:
       res = GoolOpSendEvent(obj,instruction,&flags,recipient,opcode);
-      if (ISCODE(res)) { return res; }
       break;
     case 0x88:
     case 0x89:
       /* rename: GoolOpStateReturn? */
       res = GoolOpReturnStateTransition(obj,instruction,&flags,transition,opcode);
-      if (ISCODE(res)) { return res; }
       break;
     case 0x8A:
     case 0x91:
@@ -2368,6 +2407,10 @@ int GoolObjectInterpret(gool_object *obj, uint32_t flags, gool_state_ref *transi
       GoolOpReactSolidSurfaces(obj,instruction);
       break;
     }
+#ifdef CFLAGS_GOOL_DEBUG
+    res = GoolObjectTryBreak(obj,opcode,flags,res);
+#endif
+    if (ISCODE(res)) { return res; }
   }
 }
 #undef a
@@ -2380,6 +2423,57 @@ int GoolObjectInterpret(gool_object *obj, uint32_t flags, gool_state_ref *transi
 #undef sb
 #undef sl
 #undef dst
+
+#ifdef CFLAGS_GOOL_DEBUG
+#define GOOL_FLAGS_TRANS_BLOCK (GOOL_FLAG_SUSPEND_ON_RET | GOOL_FLAG_SUSPEND_ON_RETLNK)
+#define GOOL_FLAGS_CODE_BLOCK GOOL_FLAG_SUSPEND_ON_ANIM
+int GoolObjectTryBreak(gool_object *obj, uint32_t opcode, uint32_t flags, int res) {
+  gool_debug *dbg;
+  uint32_t offs, mask, idx;
+  int brk, rtn;
+
+  dbg = GoolObjectDebug(obj);
+  if (!dbg) { return res; }
+  brk = 0;
+  rtn = ISCODE(res);
+  if ((flags & GOOL_FLAGS_TRANS_BLOCK) == GOOL_FLAGS_TRANS_BLOCK) { /* trans block currently executing? */
+    if ((dbg->flags & GOOL_FLAG_STEP_TRANS)
+     && (!(dbg->flags & GOOL_FLAG_SERIAL_STEP) || !(dbg->flags & GOOL_FLAG_SERIAL_STATE))) {
+      brk = 1;
+      if (rtn && (dbg->flags & GOOL_FLAG_SERIAL_STEP))
+        dbg->flags |= GOOL_FLAG_SERIAL_STATE;
+    }
+  }
+  if ((flags & GOOL_FLAGS_CODE_BLOCK) == GOOL_FLAGS_CODE_BLOCK) {
+    if ((dbg->flags & GOOL_FLAG_STEP_CODE)
+     && (!(dbg->flags & GOOL_FLAG_SERIAL_STEP) || (dbg->flags & GOOL_FLAG_SERIAL_STATE))) {
+      brk = 2;
+      if (rtn && (dbg->flags & GOOL_FLAG_SERIAL_STEP))
+        dbg->flags &= ~GOOL_FLAG_SERIAL_STATE;
+    }
+  }
+  if (!brk) {
+    offs = (uint32_t)(obj->pc-(uint32_t*)obj->external->items[1]);
+    mask = 0x80000000 >> (offs % 32);
+    idx = offs/32;
+    if (dbg->breakpoints[idx] & mask) { brk=1; }
+  }
+  if (brk) {
+    if (rtn && (opcode == 0x83 || opcode == 0x84)) {}
+    else if (brk==2) {
+      GoolObjectPush(obj, 0); /* wait value */
+    }
+    GoolObjectPause(obj, brk, ((brk==1) && !rtn));
+    if (brk==1)
+      dbg->flags &= ~GOOL_FLAG_STEP_TRANS;
+    else if (brk==2)
+      dbg->flags &= ~GOOL_FLAG_STEP_CODE;
+    if (rtn) { return res; }
+    return SUCCESS;
+  }
+  return res;
+}
+#endif
 
 static inline
 void GoolOp13unnamed(gool_object *obj, uint32_t instruction) {
@@ -3616,7 +3710,7 @@ int GoolCollide(gool_object *tgt, bound *tgt_bound, gool_object *src, bound *src
       dist_new = ApxDist(&tgt->trans, &src->trans);
       /* if source is further from target than target's current collider */
       /* and current collider does not have collision priority flag set */
-      if (dist_new > dist_cur && !(cur_collider->state_flags & 0x800))
+      if (dist_new >= dist_cur && !(cur_collider->state_flags & 0x800))
         return ERROR_COLLISION_OVERRIDE;
     }
   }
@@ -3781,7 +3875,9 @@ int GoolObjectInterrupt(gool_object *obj, uint32_t addr, int argc, uint32_t *arg
   return res;
 }
 
-//------ object debug info extensions -------------------------------------
+//------ object debugging extensions -------------------------------------
+#ifdef CFLAGS_GOOL_DEBUG
+
 #define GOOL_DEBUG_DISLEN 8
 extern char *GoolDisassemble(uint32_t, uint32_t);
 
@@ -3837,3 +3933,176 @@ void GoolObjectPrintDebug(gool_object *obj, FILE *stream) {
       fprintf(stream, "    %s\n", line);
   }
 }
+
+static void GoolObjectPreserveFrames(gool_object *obj) {
+  gool_debug *dbg;
+  gool_frame *frame;
+  uint32_t *pc, *fp, *sp, *psp;
+  uint32_t flags, range;
+  uint16_t rsp, rfp;
+  uint32_t *prev_sp;
+  int i,j,frame_count;
+
+  dbg = GoolObjectDebug(obj);
+  if (!dbg) { return; }
+  dbg->prev_pc = obj->pc;
+  fp = obj->fp; sp = obj->sp;
+  frame_count = 0;
+  do {
+    flags = *fp;
+    range = *(fp+2);
+    rfp=range>>16;
+    fp = (uint32_t*)((uint8_t*)&obj->process + rfp);
+    ++frame_count;
+  } while (flags != 0xFFFF);
+  fp = obj->fp; sp = obj->sp;
+  i=0;
+  for (i=frame_count-1;i>=0;i--) {
+    frame = &dbg->frames[i];
+    flags = *fp;
+    range = *(fp+2);
+    rsp=range&0xFFFF;rfp=range>>16;
+    psp = (uint32_t*)((uint8_t*)&obj->process + rsp);
+    frame->argc = fp - psp;
+    for (j=0;psp!=fp;j++)
+      frame->argv[j] = *(psp++);
+    pc = (uint32_t*)*(fp+1);
+    frame->flags = flags;
+    frame->pc = pc;
+    if (i==0) { frame->pc = (uint32_t*)-1; }
+    fp+=3;
+    for (j=0;fp!=sp;j++)
+      frame->data[j] = *(fp++);
+    frame->len = j;
+    fp = (uint32_t*)((uint8_t*)&obj->process + rfp);
+    sp = (uint32_t*)((uint8_t*)&obj->process + rsp);
+  }
+  dbg->frame_count = frame_count;
+  obj->pc = pc;
+  obj->fp = fp;
+  obj->sp = sp;
+}
+
+static void GoolObjectRestoreFrames(gool_object *obj) {
+  gool_debug *dbg;
+  gool_frame *frame;
+  int i,j;
+
+  dbg = GoolObjectDebug(obj);
+  if (!dbg) { return; }
+  for (i=0;i<dbg->frame_count;i++) {
+    frame = &dbg->frames[i];
+    for (j=0;j<frame->argc;j++)
+      GoolObjectPush(obj, frame->argv[j]);
+    GoolObjectPushFrame(obj, frame->argc, frame->flags);
+    if ((int)frame->pc != -1)
+      *(obj->fp+1) = (uint32_t)frame->pc;
+    for (j=0;j<frame->len;j++)
+      GoolObjectPush(obj, frame->data[j]);
+  }
+  obj->pc = dbg->prev_pc;
+}
+
+static gool_debug *GoolObjectDebugAlloc() {
+  gool_debug_cache *cache;
+  int i;
+
+  cache = &debug_cache;
+  if (!cache->inited) {
+    for (i=0;i<512;i++)
+      cache->free_dbgs[i] = &cache->debugs[i];
+    cache->free_count=512;
+    cache->inited = 1;
+  }
+  if (cache->free_count == 0) { return (gool_debug*)-1; }
+  i = --cache->free_count;
+  return cache->free_dbgs[i];
+}
+
+static void GoolObjectDebugFree(gool_debug *dbg) {
+  gool_debug_cache *cache;
+  int i;
+
+  cache = &debug_cache;
+  if (!cache->inited) { return; }
+  i = cache->free_count++;
+  cache->free_dbgs[i] = dbg;
+}
+
+gool_debug *GoolObjectDebug(gool_object *obj) {
+  gool_debug *dbg;
+  uint32_t id;
+  int i;
+
+  dbg = 0;
+  if (obj->entity) {
+    id = obj->pid_flags >> 8;
+    dbg = debug_cache.by_id[id];
+    if (!dbg) {
+      dbg = debug_cache.by_id[id] = GoolObjectDebugAlloc();
+    }
+  }
+  else {
+    for (i=0;i<32;i++) {
+      dbg = debug_cache.by_ptr[i];
+      if (!dbg) {
+        dbg = debug_cache.by_ptr[i] = GoolObjectDebugAlloc();
+        break;
+      }
+      if (dbg->obj == obj) { break; }
+    }
+  }
+  return dbg;
+}
+
+void GoolObjectPause(gool_object *obj, int type, int trans) {
+  gool_debug *dbg;
+  int block_type;
+
+  dbg = GoolObjectDebug(obj);
+  if (!dbg) { return; }
+  if (type == 0)
+    dbg->flags |= GOOL_FLAGS_PAUSED;
+  else if (type == 1)
+    dbg->flags |= GOOL_FLAG_PAUSED_TRANS;
+  else if (type == 2)
+    dbg->flags |= GOOL_FLAG_PAUSED_CODE;
+  if (trans) {
+    GoolObjectPreserveFrames(obj);
+    dbg->flags |= GOOL_FLAG_SAVED_TRANS;
+  }
+}
+
+void GoolObjectResume(gool_object *obj, int type) {
+  gool_debug *dbg;
+
+  dbg = GoolObjectDebug(obj);
+  if (!dbg) { return; }
+  if (type == 0)
+    dbg->flags &= ~GOOL_FLAGS_PAUSED;
+  else if (type == 1)
+    dbg->flags &= ~GOOL_FLAG_PAUSED_TRANS;
+  else if (type == 2)
+    dbg->flags &= ~GOOL_FLAG_PAUSED_CODE;
+  if (dbg->flags & GOOL_FLAG_SAVED_TRANS) {
+    GoolObjectRestoreFrames(obj);
+    dbg->flags &= ~GOOL_FLAG_SAVED_TRANS;
+    dbg->flags |= GOOL_FLAG_RESTORED_TRANS;
+  }
+}
+
+void GoolObjectStep(gool_object *obj, int type) {
+  gool_debug *dbg;
+
+  dbg = GoolObjectDebug(obj);
+  if (!dbg) { return; }
+  GoolObjectResume(obj, type);
+  if (type == 0)
+    dbg->flags |= GOOL_FLAGS_STEP;
+  else if (type == 1)
+    dbg->flags |= GOOL_FLAG_STEP_TRANS;
+  else if (type == 2)
+    dbg->flags |= GOOL_FLAG_STEP_CODE;
+}
+
+#endif

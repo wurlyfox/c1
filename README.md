@@ -2,31 +2,36 @@
 
 This is a port of the game *Crash Bandicoot* to C.
 
-The code is designed to compile for both psx and pc. At the moment only pc-specific code is working. Furthermore the code will only compile for 32-bit targets; 64-bit is not yet supported.
+The code is designed to compile for both psx and pc. At the moment only pc-specific code is working.
 
 ## Status ##
 
 - Code - 100% ported; mostly untested
 - Functionality - 30%
 
-At the moment the game is only partially playable. Current issues include:
+At the moment the game is only partially playable. Currently identified issues include:
 
-- collision issues
-- inaccurate object lighting/colors
-- failure to render some objects
-- camera lag
-- incorrect display list ordering of objects
-- unimplemented transparency
-- no rejection of object geometry outside of viewing frustum
-- crash upon occurrence of various events (death, collecting 3 doctor, etc.)
-- various GOOL issues
-- different behavior when compiled with optimization flags
+- path traversing objects are not oriented correctly
+- object phong shading is inaccurate
+- some objects fail to render
+- display list ordering of objects is incorrect
+- transparency has not been implemented
+- object geometry outside of viewing frustum is not rejected as it should be
+- various events (collecting 3 doctor, etc.) cause the game to crash
+- it is sometimes possible to jump in mid-air when beside walls
+- text is not rendered at the correct locations
+- compiling with optimization flags causes the game to behave differently (aside from performance improvements)
+- various inaccuracies/errors in GOOL subsystem code
 
-Sound has been disabled as it is not yet working, however the code is present.
+Sound has been disabled as it is not working correctly, however the code is present. If you want to enable it (SFX only), add the `-DCFLAGS_SFX_FLUIDSYNTH` compilation flag to the appropriate section of the Makefile.
 
 ## Compiling ##
 
-As of currently, compilation has only been tested on 32-bit Debian. However, the game should build on any 32-bit system with a working GNU toolchain and other dependencies listed below.
+As of currently, compilation has only been tested on Ubuntu/Debian. However, the game should build on any system with a working 32-bit GNU toolchain and other dependencies listed below.
+
+Note that only 32-bit target executables are currently supported. If you are not already running a 32-bit OS, you will need multilib versions of gcc and g++ and 32-bit versions of the dependencies.
+
+To compile c1, install the dependencies listed below, `cd` into the main project directory, and run `make`.
 
 ### Dependencies ###
 
@@ -37,10 +42,13 @@ As of currently, compilation has only been tested on 32-bit Debian. However, the
 - SDL 2
 - SDL_Mixer 2.0
 - FluidSynth
-- Freetype (for in-game UI)
+- Dear ImGui / cimgui (embedded in project)
+- g++ / libstdc++ (for ImGui compilation)
 
 Ubuntu/Debian:
-`sudo apt install build-essential libgl1-mesa-dev libsdl2-dev libsdl2-mixer-dev libfluidsynth-dev libfreetype-dev`
+
+- 64-bit: `sudo apt install build-essential gcc-multilib g++-multilib libstdc++6:i386 libgl1-mesa-dev:i386 libsdl2-dev:i386 libsdl2-mixer-dev:i386 libfluidsynth-dev:i386`
+- 32-bit: `sudo apt install build-essential libstdc++6 libgl1-mesa-dev libsdl2-dev libsdl2-mixer-dev libfluidsynth-dev`
 
 #### psx ####
 (note: psx build currently does not work)
@@ -72,6 +80,7 @@ The game is currently hardcoded to boot straight into level `09` (aka. N. Sanity
 - start - <kbd>Enter</kbd>
 - select - <kbd>Space</kbd>
 - toggle in-game GUI - <kbd>Esc</kbd>
+- toggle in-game GUI keyboard focus - <kbd>Tab</kbd>
 
 ## Structure ##
 Project structure is listed below, including descriptions for each file.
@@ -80,6 +89,7 @@ Note that further documentation can be found in the `doc` directory.
 ```
 .
 ├── doc                      # documentation
+│   ├── changelog.md         # project changelog
 │   ├── coding.md            # project coding standards
 │   ├── outline.md           # game outline
 │   ├── funcs.md             # function descriptions
@@ -132,20 +142,20 @@ Note that further documentation can be found in the `doc` directory.
 │   ├── title.c,h            # handles title screen loading, transition between title states, and drawing of title card backdrops
 │   ├── util                 # utilities
 │   │   ├── list.c,h         # generic linked list
-│   │   ├── tree.c,h         # generic tree       
+│   │   ├── tree.c,h         # generic tree
 │   ├── ext                  # extensions to original game code
 │   │   ├── lib              # libraries
-│   │   │   ├── gui.c        # minimal GUI library
-│   │   │   └── refl.c       # minimal type reflection library    
+│   │   │   ├── gui.c        # minimal GUI library ([c]imgui thin wrapper)
+│   │   │   ├── refl.c       # minimal type reflection library
+│   │   │   └── cimgui       # cimgui and imgui
 │   │   ├── gui.c,h          # in-game GUI
-│   │   ├── refl.c,h         # game-specific type metadata    
+│   │   ├── refl.c,h         # game-specific type metadata
 │   │   └── disgool.c,h      # GOOL disassembler
 │   └── patches              # patching of functions with code generated by c1c's discompiler
 │       ├── emu.c,h          # modified version of c1c's emulator
 │       ├── zz.c,h           # stubs and imports for decompiled code
 │       └── zz_*.h           # decompiled code from c1c
 ├── streams                  # game assets (.NSD/.NSF files)
-├── DejaVuSansMono.ttf       # font for in-game GUI
 ├── Makefile                 # project makefile
 └── README.md                # project overview; this file
 ```

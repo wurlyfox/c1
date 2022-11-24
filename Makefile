@@ -40,13 +40,30 @@ OBJ = $(SRC:.c=.o)
 OUT = c1
 
 # include dirs.
-INCLUDE = -I./src/ -I/usr/include/freetype2
+INCLUDE = -I./src/
 
 # C compiler flags (-g -O3 -Wall)
-CCFLAGS = -g -fplan9-extensions -lSDL2 -lSDL2_mixer -lfluidsynth -lGL -lfreetype
+DEFS = -DCFLAGS_GFX_SW_PERSP -DCFLAGS_DRAW_OCTREES -DCFLAGS_GUI -DCFLAGS_GOOL_DEBUG
+LDLIBS = -lSDL2 -lSDL2_mixer -lfluidsynth -lGL -lm -lstdc++
+CFLAGS = -g -fplan9-extensions -m32
+CFLAGS += $(LDLIBS) $(DEFS)
 
-# compiler
+# compiler/make
 CC = gcc
+MAKE = make
+
+# [c]imgui
+CIMGUI_PATH = ./src/ext/lib/cimgui
+CIMGUI_OBJ = $(CIMGUI_PATH)/imgui/backends/imgui_impl_opengl2.o \
+	$(CIMGUI_PATH)/imgui/backends/imgui_impl_sdl.o \
+	$(CIMGUI_PATH)/imgui/imgui_draw.o \
+	$(CIMGUI_PATH)/imgui/imgui_tables.o \
+	$(CIMGUI_PATH)/imgui/imgui_widgets.o \
+	$(CIMGUI_PATH)/imgui/imgui.o \
+	$(CIMGUI_PATH)/cimgui.o
+INCLUDE += -I$(CIMGUI_PATH) -I$(CIMGUI_PATH)/imgui
+OBJ = $(CIMGUI_OBJ)
+OBJ += $(SRC:.c=.o)
 
 all: $(SRC) $(OUT)
 
@@ -56,8 +73,12 @@ clean:
 #install:
 #	...
 
+$(CIMGUI_OBJ):
+	cd $(CIMGUI_PATH) && $(MAKE)
+
 .c.o:
-	$(CC) $(INCLUDE) -c $< -o $@ $(CCFLAGS)
+	$(CC) $(INCLUDE) -c $< -o $@ $(CFLAGS)
 
 $(OUT): $(OBJ)
-	$(CC) $(OBJ) -o $(OUT) $(CCFLAGS)
+	$(CC) $(OBJ) -o $(OUT) $(CFLAGS)
+

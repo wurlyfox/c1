@@ -161,11 +161,11 @@ typedef struct tree_delta {
 } tree_delta_t;
 
 /* aliases */
-#define tnna tree_node_next_ancestor
-#define tnnd tree_node_next_descendant
-#define tnnc tree_node_next_cousin
-#define tnpa tree_node_prev_ancestor
-#define tnld tree_node_last_descendant
+#define tnna(n,r) tree_node_next_ancestor((tree_node_t*)(n), (tree_node_t*)(r))
+#define tnnd(n) tree_node_next_descendant((tree_node_t*)(n))
+#define tnnc(n,r) tree_node_next_cousin((tree_node_t*)(n), (tree_node_t*)(r))
+#define tnpa(n,r) tree_node_prev_ancestor((tree_node_t*)(n), (tree_node_t*)(r))
+#define tnld(n) tree_node_last_descendant((tree_node_t*)(n))
 #define tnprcn tree_node_preorder_cond_next
 #define tnpocn tree_node_postorder_cond_next
 #define tnlocn tree_node_levelorder_cond_next
@@ -212,11 +212,11 @@ tree_node_levelorder_cond_next(n,1,r)
 /* iterate; stop at first value/node that meets cond */
 #define first_child(p,d,c) \
 d=0; \
-for (tree_node_t *n=(p->child);(n||(d=0))&&(d=n->data,!(c));n=n->next)
+for (tree_node_t *n=(tree_node_t*)(p->child);(n||(d=0))&&(d=n->data,!(c));n=n->next)
 
 #define first_child_indexed(p,d,i,c) \
 d=0; i=0; \
-for (tree_node_t *n=(p->child);(n||(d=0))&&(d=n->data,!(c));n=n->next,i++)
+for (tree_node_t *n=(tree_node_t*)(p->child);(n||(d=0))&&(d=n->data,!(c));n=n->next,i++)
 
 #define first_child_node(p,n,c) \
 for (n=(p->child);n&&(!(c));n=n->next)
@@ -227,21 +227,21 @@ for (n=(p->child),i=0;n&&(!(c));n=n->next,i++)
 /* traverse; stop at first value/node that meets cond */
 #define tree_first_preorder(r,d,c) \
 d=0; \
-for (tree_node_t *n=(r);(n||(d=0))&&(d=n->data,!(c));n=tnprn(n,r))
+for (tree_node_t *n=(tree_node_t*)(r);(n||(d=0))&&(d=n->data,!(c));n=tnprn(n,r))
 
 #define tree_first_node_preorder(r,n,c) \
 for (n=(r);n&&(!(c));n=tnprn(n,r))
 
 #define tree_first_postorder(r,d,c) \
 d=0; \
-for (tree_node_t *n=tnnd(r);(n||(d=0))&&(d=n->data,!(c));n=tnpon(n,r))
+for (tree_node_t *n=(tree_node_t*)tnnd(r);(n||(d=0))&&(d=n->data,!(c));n=tnpon(n,r))
 
 #define tree_first_node_postorder(r,n,c) \
 for (n=tnnd(r);n&&(!(c));n=tnpon(n,r))
 
 #define tree_first_levelorder(r,d,c) \
 d=0; \
-for (tree_node_t *n=(r);(n||(d=0))&&(d=n->data,!(c));n=tnlon(n,r))
+for (tree_node_t *n=(tree_node_t*)(r);(n||(d=0))&&(d=n->data,!(c));n=tnlon(n,r))
 
 #define tree_first_node_levelorder(r,n,c) \
 for (n=(r);n&&(!(c));n=tnlon(n,r))

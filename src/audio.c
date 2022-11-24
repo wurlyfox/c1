@@ -104,7 +104,7 @@ int AudioInit() {
 #endif
   /* set inital values for master voice */
   master_voice.delay_counter = 1;
-  master_voice.sustain_counter = 0x80;
+  master_voice.sustain_counter = 128;
   master_voice.amplitude = 0x3FFF;
   master_voice.pitch = 0x1000;
   master_voice.obj = 0;
@@ -241,7 +241,7 @@ void AudioVoiceFree(gool_object *obj) {
   count = max_midi_voices;
   for (i=0;i<24;i++) {
     voice = &voices[i];
-    if (voice->flags & 8 && voice->obj == obj) {
+    if ((voice->flags & 8) && voice->obj == obj) {
       ramp_rate = 9;
       AudioControl(voice->flags, 0x40000000, &res, voice->obj);
       voice->obj = 0;
@@ -415,13 +415,13 @@ int AudioVoiceCreate(gool_object *obj, eid_t *eid, int vol) {
   attr.pitch = voice->pitch;
   SpuSetVoiceAttr(&attr);
   SpuSetReverbVoice((voice->flags>>10)&1, attr.voice);
-  if (voice->flags & 0x10) /* key triggered on create? */
+  if (!(voice->flags & 0x10)) /* non-delayed voice? */
     SpuSetKey(SPU_ON, attr.voice); /* turn key on immediately */
 #else
+  if (!(voice->flags & 0x10)) /* non-delayed voice? */
+    SwNoteOn(idx); /* turn key on immediately */
   SwVoiceSetVolume(idx, volume.left, volume.right);
   SwVoiceSetPitch(idx, voice->pitch);
-  if (voice->flags & 0x10)
-    SwNoteOn(idx);
 #endif
   voice->id = ++voice_id_ctr; /* allocate next id for the voice */
   voice->flags |= 8; /* set 'used' flag */
@@ -562,7 +562,7 @@ void AudioControl(int id, int op, generic *arg, gool_object *obj) {
     case 6: /* set glide/ramp rate */
       ramp_rate = arg->s32 ? arg->s32 : 1;
       break;
-    case 7: /* trigger note on */
+    case 7: /* delay voice */
       voice->case7val = arg->u32;
       voice->flags |= 0x10;
       break;
@@ -659,7 +659,7 @@ void AudioUpdate() {
   for (i=max_midi_voices;i<24;i++) {
     voice = &voices[i];
     if (!(voice->flags & 8)) { continue; } /* skip inactive/free voices */
-    if (voice->flags & 0x10) { /* key triggered? */
+    if (voice->flags & 0x10) { /* delayed voice? */
       if (--voice->delay_counter == 0) { /* decrement delay; has countdown finished? */
         voice->flags &= ~0x10; /* clear key triggered status */
 #ifdef PSX
@@ -691,6 +691,11 @@ void AudioUpdate() {
         continue;
       }
     }
+#ifndef PSX
+    else {
+      voice->flags &= ~8;
+    }
+#endif
 #ifdef PSX
     attr.mask = 0;
 #endif
@@ -726,7 +731,7 @@ void AudioUpdate() {
       SwVoiceSetPitch(i, voice->pitch);
 #endif
     }
-    if (voice->flags & 0x200 && voice->obj) { /* voice emitted from object? */
+    if ((voice->flags & 0x200) && voice->obj) { /* voice emitted from object? */
       voice->trans = voice->obj->trans; /* set to object trans */
       GoolTransform2(&voice->trans, &voice->r_trans, 1); /* trans, rotate, and scale */
       volume = AudioSpatialize(&voice->r_trans, voice->amplitude); /* spatialize w.r.t. object */
@@ -743,7 +748,7 @@ void AudioUpdate() {
       SpuSetVoiceAttr(&attr); /* apply changes */
     }
 #endif
-    if (voice->flags & 1 || (!flag && voice->flags & 2)) { /* forced off? */
+    if ((voice->flags & 1) || (!flag && (voice->flags & 2))) { /* forced off? */
 #ifdef PSX
       SpuSetKey(SPU_OFF, 1<<i); /* turn key off */
 #else

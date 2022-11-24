@@ -358,7 +358,11 @@ static void NSPageUpdateEntries(int idx) {
         eid = page->type == 4 ? pte->eid : EID_NONE;
         insts[ps->tail->idx] = eid;
       }
+#ifdef PSX
       pte->value = (((entry->items[0] - (uint8_t*)page) + ps->tail->addr) << 2) | 0x80000002;
+#else
+      pte->entry = entry;
+#endif
       type = entry->type;
       if (subsys[type].on_load)
         (*subsys[type].on_load)(entry);

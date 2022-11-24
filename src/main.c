@@ -21,6 +21,7 @@
 #include "pc/init.h"
 #include "pc/time.h"
 #include "pc/gfx/gl.h"
+#include "pc/gfx/soft.h" // for ext only
 #endif
 
 /* .data */
@@ -69,6 +70,11 @@ extern eid_t crash_eid;
 extern gool_handle handles[8];
 extern int bonus_return;
 extern level_state savestate;
+
+#ifdef CFLAGS_DRAW_OCTREES
+extern zone_query cur_zone_query;
+int draw_octrees = 0;
+#endif
 
 #ifdef PSX
 extern gfx_context_db context;
@@ -130,6 +136,11 @@ void CoreLoop(lid_t lid) {
   int ticks_elapsed;
 #endif
 
+#if (LID_BOOTLEVEL!=LID_TITLE)
+  //life_count=3;
+  //init_life_count=3;
+  sfx_vol=255;
+#endif
   NSInit(&ns, lid);
   CoreObjectsCreate();
   do {
@@ -234,9 +245,6 @@ void CoreLoop(lid_t lid) {
 #else
     ot = context.ot;
 #endif
-    //cur_display_flags &= ~GOOL_FLAG_DISPLAY_C1;
-    //cur_display_flags = 0;
-    //cur_display_flags &= ~GOOL_FLAG_DISPLAY_WORLDS;
     header = (zone_header*)cur_zone->items[0];
     if ((cur_display_flags & GOOL_FLAG_DISPLAY_WORLDS) && header->world_count && !wgeom_disabled) {
       if (header->flags & ZONE_FLAG_DARK2)
@@ -252,6 +260,12 @@ void CoreLoop(lid_t lid) {
       else
         GfxTransformWorlds(ot);
     }
+#if defined(CFLAGS_DRAW_OCTREES) && !defined(PSX)
+    if (pads[0].tapped & 4)
+      draw_octrees = !draw_octrees;
+    if (draw_octrees)
+      SwTransformZoneQuery(&cur_zone_query, ot, GLGetPrimsTail());
+#endif
     GoolUpdateObjects(!paused);
 #ifndef PSX
     GLClear();

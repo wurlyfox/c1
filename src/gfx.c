@@ -1384,7 +1384,7 @@ void GfxTransformFragment(gool_frag *frag, int32_t z, eid_t tpag,
   prim->texid=texid;
   z_sum=prim->verts[0].z+prim->verts[1].z+prim->verts[2].z;
   z_dist=z+(0x800-screen_proj/2); /* far??? */
-  z_idx=(z_sum/32)-z_dist;
+  z_idx=z_dist-(z_sum/32);
   z_idx=limit(z_idx, 0, 0x7FF);
   next=((poly4i**)ot)[z_idx];
   prim->next=next;
@@ -1400,14 +1400,15 @@ void GfxTransformFontChar(gool_object *obj, gool_glyph *glyph, int32_t z,
   vec verts[4], r_verts[4];
   fvec uvs[4];
   texinfo info;
+  rgb8 rgb;
   int32_t z_sum, z_dist;
   void **prims_tail;
   int i, idx, z_idx, texid;
 
-  verts[0].x=bound->p1.x;verts[0].y=bound->p2.y;
-  verts[1].x=bound->p2.x;verts[1].y=bound->p2.y;
-  verts[2].x=bound->p1.x;verts[2].y=bound->p1.y;
-  verts[3].x=bound->p2.x;verts[3].y=bound->p1.y;
+  verts[2].x=bound->p1.x;verts[2].y=bound->p2.y;
+  verts[3].x=bound->p2.x;verts[3].y=bound->p2.y;
+  verts[0].x=bound->p1.x;verts[0].y=bound->p1.y;
+  verts[1].x=bound->p2.x;verts[1].y=bound->p1.y;
   for (i=0;i<4;i++) {
     verts[i].z = 0;
 #ifdef GFX_SW_PERSP
@@ -1427,9 +1428,10 @@ void GfxTransformFontChar(gool_object *obj, gool_glyph *glyph, int32_t z,
   for (i=0;i<4;i++) {
     prim->verts[i]=r_verts[i];
     if (gouraud) {
-      prim->colors[i].r=(info.r*obj->vert_colors[i].r)>>8;
-      prim->colors[i].g=(info.g*obj->vert_colors[i].g)>>8;
-      prim->colors[i].b=(info.b*obj->vert_colors[i].b)>>8;
+      rgb.r = (info.r*obj->vert_colors[i].r)>>8;
+      rgb.g = (info.g*obj->vert_colors[i].g)>>8;
+      rgb.b = (info.b*obj->vert_colors[i].b)>>8;
+      prim->colors[i]=Rgb8To32(rgb);
     }
     else {
       // prim->colors[i]=info.rgb;
@@ -1440,7 +1442,7 @@ void GfxTransformFontChar(gool_object *obj, gool_glyph *glyph, int32_t z,
   prim->texid=texid;
   z_sum=prim->verts[0].z+prim->verts[1].z+prim->verts[2].z;
   z_dist=z+(0x800-screen_proj/2); /* far??? */
-  z_idx=(z_sum/32)-z_dist;
+  z_idx=z_dist-(z_sum/32);
   z_idx=limit(z_idx, 0, 0x7FF);
   next=((poly4i**)ot)[z_idx];
   prim->next=next;

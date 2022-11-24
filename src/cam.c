@@ -19,12 +19,12 @@ int32_t cam_offset_y  =  0x3E800; /* 800564B4; gp[0x2E] */
 int32_t cam_offset_x  =        0; /* 800564B8; gp[0x2F] */
 /* .sbss */
 int32_t cam_speed = 0;            /* 800565C0; gp[0x71] */
-int32_t dcam_accel;               /* 800565C4; gp[0x72] */
-int32_t dcam_angvel;              /* 800565C8; gp[0x73] */
-int32_t dcam_angvel2;             /* 800565CC; gp[0x74] */
-int32_t dcam_rot_y1;              /* 800565D0; gp[0x75] */
-int32_t dcam_rot_y2;              /* 800565D4; gp[0x76] */
-int32_t dcam_trans_z;             /* 800565D8; gp[0x77] */
+int32_t dcam_accel = 0;           /* 800565C4; gp[0x72] */
+int32_t dcam_angvel = 0;          /* 800565C8; gp[0x73] */
+int32_t dcam_angvel2 = 0;         /* 800565CC; gp[0x74] */
+int32_t dcam_rot_y1 = 0;          /* 800565D0; gp[0x75] */
+int32_t dcam_rot_y2 = 0;          /* 800565D4; gp[0x76] */
+int32_t dcam_trans_z = 0;         /* 800565D8; gp[0x77] */
 
 extern ns_struct ns;
 extern level_state savestate;
@@ -60,6 +60,9 @@ static void CamAdjustProgress(int32_t speed, cam_info *cam) {
   entry *next_zone;
   int next_progress, next_idx;
 
+#ifndef PSX
+  speed *= 2;
+#endif
   if (cam->flags & 2) { /* forward change in progress? */
     next_progress = cur_progress + speed; /* calc next progress */
     if (cam->next_path) { /* change to a new path? */
@@ -129,7 +132,7 @@ static int CamGetProgress(vec *trans, zone_path *path, cam_info *cam, int flags,
   if (path == cur_path) /* already the current path? */
     cam->next_path = 0; /* no next path */
   else { /* new path */
-    if (path->direction_x && rel_path.y < -12800 && header->flags & 0x40000)
+    if (path->direction_x && rel_path.y < -12800 && (header->flags & 0x40000))
       return 0;
     cam->next_path = path; /* set the next path */
   }
@@ -428,14 +431,14 @@ static void CamFollow(gool_object *obj, uint32_t flag) {
       /* calculate entry point of neighbor path and distance from it */
       if (neighbor_path.goal & 1) { /* goal is in front of current path? */
         cameras[icam].entrance = 0; /* entering at start of the path */
-        cameras[icam].delta_progress = dist_exit + cameras[icam].progress + 0x100;
         cameras[icam].relation = 2; /* current path behind neighbor path */
+        cameras[icam].delta_progress = dist_exit + cameras[icam].progress + 0x100;
       }
       else { /* goal is behind the current path */
         n_end = (n_path->length << 8) - 1;
         cameras[icam].entrance = n_end; /* entering at end */
-        cameras[icam].delta_progress = dist_exit + (n_end-(cameras[icam].progress)) + 0x100;
         cameras[icam].relation = 1; /* current path in front of neighbor path */
+        cameras[icam].delta_progress = dist_exit + (n_end-(cameras[icam].progress)) + 0x100;
       }
       cameras[icam].flags = neighbor_path.relation;
       icam++;
@@ -451,7 +454,7 @@ static void CamFollow(gool_object *obj, uint32_t flag) {
       break;
     } /* break on cams for paths w/cam mode 1 */
     if ((!cam_nearest->progress_made && cameras[i].progress_made)
-      || (cam_nearest->dist < dist_nearest
+      || (cameras[i].dist < dist_nearest
         && cam_nearest->progress_made == cameras[i].progress_made)) {
       cam_nearest = &cameras[i];
       dist_nearest = cam_nearest->dist;
@@ -473,7 +476,7 @@ static void CamFollow(gool_object *obj, uint32_t flag) {
     else if (cam_nearest->delta_progress < 0x500) /* from 2 to 5 non-inclusive? */
       cam_speed = 0x200; /* limit to 2 */
     else /* > 5 */
-      cam_speed = min((cam_nearest->delta_progress/2)+0x100, cam_speed+0x100);
+      cam_speed = min((cam_nearest->delta_progress/2), cam_speed)+0x100;
     CamAdjustProgress(cam_speed, cam_nearest);
   }
 }
@@ -509,7 +512,7 @@ int CamUpdate() {
   case 3:
     header = (zone_header*)cur_zone->items[0];
     skip = 0;
-    if (pads[0].tapped & 0xF0 && !(header->flags & 0x81000))
+    if ((pads[0].tapped & 0xF0) && !(header->flags & 0x81000))
       skip = 1; /* skip the transition */
     do { /* auto-increment progress and update; or skip to next non-auto-cam path */
       if (!(header->flags & 0x1000))

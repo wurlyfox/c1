@@ -251,7 +251,7 @@ int SwCalcSpriteRotMatrix(
   gool_vectors *obj_vectors,
   gool_vectors *cam_vectors,
   int flag,
-  int size,
+  int shrink,
   mat16 *m_rot,
   int32_t depth,
   int32_t max_depth,
@@ -269,7 +269,7 @@ int SwCalcSpriteRotMatrix(
     // || min(12000,max_depth?max_depth:12000) < trans.z)
     //  return 0;
     rot.y = ((int32_t)(cam_vectors->rot.y << 21)) >> 21;
-    rot.x = ((int32_t)(cam_vectors->rot.x << 20)) >> 20;
+    rot.x = ((int32_t)(cam_vectors->rot.x << 21)) >> 21;
     rot.z = ((int32_t)(cam_vectors->rot.z << 20)) >> 20;
     rot.x = obj_vectors->rot.x - limit(rot.x,-170,170);
     rot.y = obj_vectors->rot.y - limit(rot.y,-170,170);
@@ -282,9 +282,9 @@ int SwCalcSpriteRotMatrix(
     params->trans = trans;
     rot = obj_vectors->rot;
   }
-  scale.x = obj_vectors->scale.x >> depth;
-  scale.y = obj_vectors->scale.y >> depth;
-  scale.z = obj_vectors->scale.z >> depth;
+  scale.x = obj_vectors->scale.x >> shrink;
+  scale.y = obj_vectors->scale.y >> shrink;
+  scale.z = obj_vectors->scale.z >> shrink;
   SwCopyMatrix(&m_rot2, m_rot);
   SwRotMatrixZXY(&params->m_rot, &rot);
   SwMulMatrix(&m_rot2, &params->m_rot);
@@ -343,7 +343,7 @@ void SwTransformSvtx(
       u_vert.x=((frame->x-128)+vert->x)*4;
       u_vert.y=((frame->y-128)+vert->y)*4;
       u_vert.z=((frame->z-128)+vert->z)*4;
-#ifdef GFX_SW_PERSP
+#ifdef CFLAGS_GFX_SW_PERSP
       SwRotTransPers(&u_vert, &r_verts[ii], &params->trans, &params->m_rot,
         &params->screen, params->screen_proj);
 #else
@@ -459,7 +459,7 @@ void SwTransformCvtx(
       u_vert.x=((frame->x-128)+vert->x)*4;
       u_vert.y=((frame->y-128)+vert->y)*4;
       u_vert.z=((frame->z-128)+vert->z)*4;
-#ifdef GFX_SW_PERSP
+#ifdef CFLAGS_GFX_SW_PERSP
       SwRotTransPers(&u_vert, &r_verts[ii], &params->trans, &params->m_rot,
         &params->screen, params->screen_proj);
 #else
@@ -536,7 +536,7 @@ void SwTransformSprite(
   verts[2].x=-size;verts[2].y= size;verts[2].z=0;
   verts[3].x= size;verts[3].y= size;verts[3].z=0;
   for (i=0;i<4;i++) {
-#ifdef GFX_SW_PERSP
+#ifdef CFLAGS_GFX_SW_PERSP
     SwRotTransPers(&verts[i], &r_verts[i], &params->trans, &params->m_rot,
       &params->screen, params->screen_proj);
 #else
@@ -692,7 +692,7 @@ static void SwTransformAndShadeWorlds(
         vert_id.vert_idx = ii;
         pre_shader(vert_id, &u_verts[ii], &colors[ii], params);
       }
-#ifdef GFX_SW_PERSP
+#ifdef CFLAGS_GFX_SW_PERSP
       SwRotTransPers(&u_verts[ii], &r_verts[ii], &world->trans, &params->m_rot,
         &params->screen, params->screen_proj);
 #else
@@ -919,3 +919,92 @@ void SwTransformWorldsDark2(
   sw_transform_struct *params) {
   SwTransformAndShadeWorlds(poly_id_list,ot,proj,anim_phase,prims_tail,params,0,SwDark2Shader);
 }
+
+#ifdef CFLAGS_DRAW_OCTREES
+
+#include "level.h"
+extern vec cam_trans;
+extern mat16 ms_cam_rot;
+const int rface_vert_idxes[6][4] = { { 0, 1, 2, 3 },
+                                     { 1, 5, 3, 7 },
+                                     { 4, 5, 6, 7 },
+                                     { 0, 4, 2, 6 },
+                                     { 4, 5, 0, 1 },
+                                     { 6, 7, 2, 3 } };
+/* extensions */
+void SwTransformZoneQuery(zone_query *query, void *ot, void **prims_tail) {
+  zone_query_result *result;
+  zone_query_result_rect *result_rect;
+  bound nbound, v_nbound, *nodes_bound;
+  dim zone_dim;
+  vec max_depth, u_vert, r_verts[8], zero;
+  rgb8 color;
+  poly4i *prim, *next;
+  int16_t node;
+  int i, ii, iii, level, type, subtype;
+
+  zero.x = 0; zero.y = 0; zero.z = 0;
+  nodes_bound = &query->nodes_bound;
+  result = &query->results[0];
+  for (i=0;i<query->result_count;i++) {
+    if (result->value == -1) { break; }
+    if (!result->is_node) {
+      result_rect = (zone_query_result_rect*)result;
+      zone_dim.w = result_rect->w << 8;
+      zone_dim.h = result_rect->h << 8;
+      zone_dim.d = result_rect->d << 8;
+      max_depth.x = result_rect->max_depth_x;
+      max_depth.y = result_rect->max_depth_y;
+      max_depth.z = result_rect->max_depth_z;
+      result += 2;
+      continue;
+    }
+    node = (result->node << 1) | 1;
+    level = result->level;
+    type = (node & 0xE) >> 1;
+    subtype = (node & 0x3F0) >> 4;
+    nbound.p1.x = ((int32_t)result->x << 4) + nodes_bound->p1.x;
+    nbound.p1.y = ((int32_t)result->y << 4) + nodes_bound->p1.y;
+    nbound.p1.z = ((int32_t)result->z << 4) + nodes_bound->p1.z;
+    ++result;
+    nbound.p2.x = nbound.p1.x + (zone_dim.w >> min(level, max_depth.x));
+    nbound.p2.y = nbound.p1.y + (zone_dim.h >> min(level, max_depth.y));
+    nbound.p2.z = nbound.p1.z + (zone_dim.d >> min(level, max_depth.z));
+    v_nbound.p1.x = nbound.p1.x >> 8;
+    v_nbound.p1.y = nbound.p1.y >> 8;
+    v_nbound.p1.z = nbound.p1.z >> 8;
+    v_nbound.p2.x = nbound.p2.x >> 8;
+    v_nbound.p2.y = nbound.p2.y >> 8;
+    v_nbound.p2.z = nbound.p2.z >> 8;
+    for (ii=0;ii<8;ii++) {
+      if (ii%2) { u_vert.x = v_nbound.p1.x; }
+      else { u_vert.x = v_nbound.p2.x; }
+      if ((ii/2)%2) { u_vert.y = v_nbound.p1.y; }
+      else { u_vert.y = v_nbound.p2.y; }
+      if ((ii/4)%2) { u_vert.z = v_nbound.p1.z; }
+      else { u_vert.z = v_nbound.p2.z; }
+      u_vert.x -= (cam_trans.x >> 8);
+      u_vert.y -= (cam_trans.y >> 8);
+      u_vert.z -= (cam_trans.z >> 8);
+      SwRotTransPers(&u_vert, &r_verts[ii], &zero, &ms_cam_rot, &params.screen, params.screen_proj);
+    }
+    color.r = 127+((type&1)*(subtype+1)*2);
+    color.g = 127+((type&2)*(subtype+1)*2);
+    color.b = 127+((type&4)*(subtype+1)*2);
+    for (ii=0;ii<6;ii++) {
+      prim=(poly4i*)(*prims_tail);
+      for (iii=0;iii<4;iii++) {
+        prim->verts[iii]=r_verts[rface_vert_idxes[ii][iii]];
+        prim->colors[iii]=Rgb8To32(color);
+      }
+      prim->texid=-1;
+      next=((poly4i**)ot)[0x7FE];
+      prim->next=next;
+      prim->type=3;
+      ((poly4i**)ot)[0x7FE]=prim;
+      *prims_tail+=sizeof(poly4i);
+    }
+  }
+}
+
+#endif
