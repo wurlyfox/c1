@@ -294,24 +294,16 @@ int GoolObjectOrientOnPath(gool_object *obj, int progress, vec *loc) {
     proj_part = ((dot.x + dot.z)/dist_xz);
     x = abs((((proj_part>>4)*(dir.x>>4)) / dist_xz) - dist_obj.x);
     z = abs((((proj_part>>4)*(dir.z>>4)) / dist_xz) - dist_obj.z);
-    /* using the vector projection, compute the absolute values of
-       the components of the perpendicular distance vector (i.e. from
-       object current location to nearest point on the direction
-       vector at the path point) */
-    x = abs(x - dist_obj.x);
-    z = abs(z - dist_obj.z);
     /* do a sort of manhattan distance calc
        is this moment of inertia? */
     if (z<x)
       obj->misc_c.y = x + z/2;
     else
       obj->misc_c.y = z + x/2;
-    if (obj->misc_c.y > obj->_154) {
-      obj->misc_c.y = obj->_154;
-      if (dist_obj.z && (dist_xz < 0 || dist_xz > 0x100))
-        obj->status_a |= 0x200;
+    if (obj->misc_c.y > obj->_154 || proj >= 0x100 || idx == 0) {
+      obj->status_a |= 0x200;
     }
-    if (dir.z*(loc->x>>8)-dir.x*(loc->z>>8)
+    if (dir.z*(trans->x>>8)-dir.x*(trans->z>>8)
       -(loc->x>>8)*loc_next.z+(loc->z>>8)*loc_next.x < 0) /* cross product */
       obj->misc_c.y = -obj->misc_c.y;
   }
@@ -3466,9 +3458,9 @@ int16_t GoolObjectRotate(int16_t anga, int16_t angb, int32_t speed, gool_object 
   uint32_t abs_delta;
 
 #ifdef PSX
-  scale = max(context.c1_p->ticks_per_frame, 0x66);
+  scale = min(context.c1_p->ticks_per_frame, 0x66);
 #else
-  scale = max(context.ticks_per_frame, 0x66);
+  scale = min(context.ticks_per_frame, 0x66);
 #endif
   velocity = (speed*scale)/1024;
   anga = angle12(anga);
@@ -3507,12 +3499,12 @@ int16_t GoolObjectRotate(int16_t anga, int16_t angb, int32_t speed, gool_object 
   if (delta >= 0) {
     if (obj)
       obj->status_a &= ~GOOL_FLAG_TROT_DIR; /* clear bit 4 (rotating counter-clockwise) */
-    return angle12((int32_t)anga+(int32_t)velocity);
+    return angle12((int32_t)anga+velocity);
   }
   else {
     if (obj)
       obj->status_a |= GOOL_FLAG_TROT_DIR; /* set bit 4 (rotating clockwise) */
-    return angle12(anga-velocity);
+    return angle12((int32_t)anga-velocity);
   }
 }
 
@@ -3523,9 +3515,9 @@ int16_t GoolObjectRotate2(int16_t anga, int16_t angb, int32_t speed, gool_object
   uint32_t abs_delta;
 
 #ifdef PSX
-  scale = max(context.c1_p->ticks_per_frame, 0x66);
+  scale = min(context.c1_p->ticks_per_frame, 0x66);
 #else
-  scale = max(context.ticks_per_frame, 0x66);
+  scale = min(context.ticks_per_frame, 0x66);
 #endif
   velocity = (speed*scale)/1024; /* angular speed */
   anga = angle12(anga);

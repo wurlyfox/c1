@@ -44,9 +44,9 @@ typedef struct {
 
 extern uint32_t SwSqrMagnitude2(int32_t a, int32_t b);
 extern uint32_t SwSqrMagnitude3(int32_t a, int32_t b, int32_t c);
-extern void SwRot(vec *in, vec *out, mat16 *m_rot);
-extern void SwRotTrans(vec *in, vec *out, vec *trans, mat16 *m_rot);
-extern void SwRotTransPers(vec *in, vec *out, vec *trans, mat16 *m_rot,
+extern int SwRot(vec *in, vec *out, mat16 *m_rot);
+extern int SwRotTrans(vec *in, vec *out, vec *trans, mat16 *m_rot);
+extern int SwRotTransPers(vec *in, vec *out, vec *trans, mat16 *m_rot,
   vec2 *offs, uint32_t proj);
 extern void SwTransposeMatrix(mat16 *m);
 extern void SwMulMatrix(mat16 *m_l, mat16 *m_r);

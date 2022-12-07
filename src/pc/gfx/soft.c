@@ -28,8 +28,9 @@ uint32_t SwSqrMagnitude3(int32_t a, int32_t b, int32_t c) {
   return ((int64_t)a*a+b*b+c*c) >> 20;
 }
 
-void SwRot(vec *in, vec *out, mat16 *m_rot) {
+int SwRot(vec *in, vec *out, mat16 *m_rot) {
   vec r_vert;
+  int res;
 
 #define v in
 #define r m_rot->m
@@ -38,11 +39,18 @@ void SwRot(vec *in, vec *out, mat16 *m_rot) {
   r_vert.z=(int64_t)((int64_t)(r[2][0]*v->x)+(r[2][1]*v->y)+(r[2][2]*v->z))>>12;
 #undef v
 #undef r
+  res = 1;
+  if (r_vert.x > 0x7FFF || r_vert.x < -0x8000
+   || r_vert.y > 0x7FFF || r_vert.y < -0x8000
+   || r_vert.z > 0xFFFF || r_vert.z < 0)
+    res = 0;
   *out=r_vert;
+  return res;
 }
 
-void SwRotTrans(vec *in, vec *out, vec *trans, mat16 *m_rot) {
+int SwRotTrans(vec *in, vec *out, vec *trans, mat16 *m_rot) {
   vec r_vert;
+  int res;
 
 #define v in
 #define t trans
@@ -53,20 +61,31 @@ void SwRotTrans(vec *in, vec *out, vec *trans, mat16 *m_rot) {
 #undef v
 #undef t
 #undef r
+  res = 1;
+  if (r_vert.x > 0x7FFF || r_vert.x < -0x8000
+   || r_vert.y > 0x7FFF || r_vert.y < -0x8000
+   || r_vert.z > 0xFFFF || r_vert.z < 0)
+    res = 0;
   *out=r_vert;
+  return res;
 }
 
-/* accuracy here depends on whether GTE division is emulated or straight division is used */
-void SwRotTransPers(vec *in, vec *out, vec *trans, mat16 *m_rot, vec2 *offs, uint32_t proj) {
+/* accuracy here depends on whether GTE division is emulated or normal division is used */
+int SwRotTransPers(vec *in, vec *out, vec *trans, mat16 *m_rot, vec2 *offs, uint32_t proj) {
   vec r_vert;
   vec s_vert;
+  int res;
 
-  SwRotTrans(in, &r_vert, trans, m_rot);
+  res = SwRotTrans(in, &r_vert, trans, m_rot);
   if (r_vert.z == 0) { r_vert.z = 1; }
   s_vert.x = ((int64_t)(offs->x<<16)+(((int64_t)r_vert.x*(proj<<16))/r_vert.z))>>16;
   s_vert.y = ((int64_t)(offs->y<<16)+(((int64_t)r_vert.y*(proj<<16))/r_vert.z))>>16;
   s_vert.z = r_vert.z;
+  if (s_vert.x < -0x400 || s_vert.x > 0x3FF
+   || s_vert.y < -0x400 || s_vert.y > 0x3FF)
+    res = 0;
   *out=s_vert;
+  return res;
 }
 
 #define SwZeroMat(m) \
@@ -325,7 +344,7 @@ void SwTransformSvtx(
   poly3i *prim, *next;
   int32_t ndot;
   int32_t z_min, z_max, z_sum;
-  int i,ii,texid,z_idx;
+  int i,ii,texid,z_idx,res;
 
   SwCopyMat(lm, params->m_light.m);
   SwCopyMat(cm, params->m_color.m);
@@ -344,13 +363,13 @@ void SwTransformSvtx(
       u_vert.y=((frame->y-128)+vert->y)*4;
       u_vert.z=((frame->z-128)+vert->z)*4;
 #ifdef CFLAGS_GFX_SW_PERSP
-      SwRotTransPers(&u_vert, &r_verts[ii], &params->trans, &params->m_rot,
+      res = SwRotTransPers(&u_vert, &r_verts[ii], &params->trans, &params->m_rot,
         &params->screen, params->screen_proj);
 #else
-      SwRotTrans(&u_vert, &r_verts[ii], &params->trans, &params->m_rot);
+      res = SwRotTrans(&u_vert, &r_verts[ii], &params->trans, &params->m_rot);
 #endif
     }
-    // if ($T0 < 0) { continue; } /* TODO!! */
+    if (!res) { continue; }
     if (!info.no_cull) {
       ndot = (r_verts[0].x*r_verts[1].y) + (r_verts[1].x*r_verts[2].y)
            + (r_verts[2].x*r_verts[0].y) - (r_verts[0].x*r_verts[2].y)
@@ -403,7 +422,7 @@ void SwTransformSvtx(
     if (flag) {
       z_min=min(min(r_verts[0].z,r_verts[1].z),r_verts[2].z);
       z_max=max(max(r_verts[0].z,r_verts[1].z),r_verts[2].z);
-      z_sum=(2*(z_min+z_max))/3;
+      z_sum=(3*(z_min+z_max))/2;
     }
     else
       z_sum = r_verts[0].z+r_verts[1].z+r_verts[2].z;
@@ -440,7 +459,7 @@ void SwTransformCvtx(
   int32_t ndot;
   int32_t z_min, z_max, z_sum;
   int32_t t1, t2, t3;
-  int i, ii, texid, z_idx;
+  int i, ii, texid, z_idx, res;
   int idx_adj;
 
   SwCopyMat(lm, params->m_light.m);
@@ -460,13 +479,13 @@ void SwTransformCvtx(
       u_vert.y=((frame->y-128)+vert->y)*4;
       u_vert.z=((frame->z-128)+vert->z)*4;
 #ifdef CFLAGS_GFX_SW_PERSP
-      SwRotTransPers(&u_vert, &r_verts[ii], &params->trans, &params->m_rot,
+      res = SwRotTransPers(&u_vert, &r_verts[ii], &params->trans, &params->m_rot,
         &params->screen, params->screen_proj);
 #else
-      SwRotTrans(&u_vert, &r_verts[ii], &params->trans, &params->m_rot);
+      res = SwRotTrans(&u_vert, &r_verts[ii], &params->trans, &params->m_rot);
 #endif
     }
-    // if ($T0 < 0) { continue; } /* TODO!! */
+    if (!res) { continue; }
     idx_adj = 0;
     ndot = (r_verts[0].x*r_verts[1].y) + (r_verts[1].x*r_verts[2].y)
          + (r_verts[2].x*r_verts[0].y) - (r_verts[0].x*r_verts[2].y)
@@ -525,7 +544,7 @@ void SwTransformSprite(
   vec verts[4], r_verts[4]; /* corners */
   fvec uvs[4];
   int32_t z_sum;
-  int i, texid, z_idx;
+  int i, texid, z_idx, res;
 
   //verts[0].x=-size;verts[0].y= size;verts[0].z=0;
   //verts[1].x= size;verts[1].y= size;verts[1].z=0;
@@ -537,13 +556,13 @@ void SwTransformSprite(
   verts[3].x= size;verts[3].y= size;verts[3].z=0;
   for (i=0;i<4;i++) {
 #ifdef CFLAGS_GFX_SW_PERSP
-    SwRotTransPers(&verts[i], &r_verts[i], &params->trans, &params->m_rot,
+    res = SwRotTransPers(&verts[i], &r_verts[i], &params->trans, &params->m_rot,
       &params->screen, params->screen_proj);
 #else
-    SwRotTrans(&verts[i], &r_verts[i], &params->trans, &params->m_rot);
+    res = SwRotTrans(&verts[i], &r_verts[i], &params->trans, &params->m_rot);
 #endif
   }
-  // if (_$A2 < 0) { return 0; } /* return on fail */ // TODO!
+  if (!res) { return; } /* return on fail */
   prim=(poly4i*)*prims_tail;
   info.colinfo = info2->colinfo;
   info.rgninfo = info2->rgninfo;

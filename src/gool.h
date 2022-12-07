@@ -242,7 +242,7 @@ typedef struct {
   int32_t hotspot_size;
   uint32_t voice_id;
   uint32_t _150;
-  uint32_t _154;
+  int32_t _154;
   uint32_t node;
   uint32_t memory[64];
 } gool_process;

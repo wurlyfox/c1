@@ -11,12 +11,9 @@ The code is designed to compile for both psx and pc. At the moment only pc-speci
 
 At the moment the game is only partially playable. Currently identified issues include:
 
-- path traversing objects are not oriented correctly
 - object phong shading is inaccurate
 - some objects fail to render
-- display list ordering of objects is incorrect
 - transparency has not been implemented
-- object geometry outside of viewing frustum is not rejected as it should be
 - various events (collecting 3 doctor, etc.) cause the game to crash
 - it is sometimes possible to jump in mid-air when beside walls
 - text is not rendered at the correct locations

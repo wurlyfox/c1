@@ -1,5 +1,13 @@
 # Changelog
 
+## 2022-12-7
+
+### Fixed
+
+- path traversing objects are not oriented correctly
+- display list ordering of objects is incorrect
+- object geometry outside of viewing frustum is not rejected as it should be
+
 ## 2022-11-24
 
 ### Fixed
