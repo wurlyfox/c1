@@ -6,8 +6,8 @@
 #include "gool.h"
 #include "level.h"
 
-extern int TransSmoothStopAtSolid(gool_object *obj, vec *velocity, zone_query *query);
-extern void TransPullStopAtSolid(gool_object *obj, 
+extern void TransSmoothStopAtSolid(gool_object *obj, vec *velocity, zone_query *query);
+extern void TransPullStopAtSolid(gool_object *obj,
 	zone_query *query, vec *trans, vec *velocity);
 extern void TransStopAtSolid(gool_object *obj,
 	zone_query *query, vec *trans, vec *delta_trans, vec *next_trans);

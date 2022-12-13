@@ -537,7 +537,7 @@ int CamUpdate() {
         LevelSaveState(crash, &savestate, 1);
       if (!skip) { return 1; }
       /* continue skipping while 1,3 */
-    } while (cur_path->cam_mode == 1 && cur_path->cam_mode == 3);
+    } while (cur_path->cam_mode == 1 || cur_path->cam_mode == 3);
     return 1;
   case 7:
     next_island_cam_state = island_cam_state;

@@ -75,6 +75,10 @@ extern level_state savestate;
 extern zone_query cur_zone_query;
 int draw_octrees = 0;
 #endif
+#ifdef CFLAGS_DRAW_WALLMAP
+extern uint32_t *wall_bitmap;
+int draw_wallmap = 0;
+#endif
 
 #ifdef PSX
 extern gfx_context_db context;
@@ -260,13 +264,19 @@ void CoreLoop(lid_t lid) {
       else
         GfxTransformWorlds(ot);
     }
+    GoolUpdateObjects(!paused);
 #if defined(CFLAGS_DRAW_OCTREES) && !defined(PSX)
     if (pads[0].tapped & 4)
       draw_octrees = !draw_octrees;
     if (draw_octrees)
       SwTransformZoneQuery(&cur_zone_query, ot, GLGetPrimsTail());
 #endif
-    GoolUpdateObjects(!paused);
+#if defined(CFLAGS_DRAW_WALLMAP) & !defined(PSX)
+    if (pads[0].tapped & 8)
+      draw_wallmap = !draw_wallmap;
+    if (draw_wallmap)
+      SwDrawWallMap(wall_bitmap, ot, GLGetPrimsTail());
+#endif
 #ifndef PSX
     GLClear();
 #endif
@@ -277,6 +287,7 @@ void CoreLoop(lid_t lid) {
 #else
     GLUpdate();
 #endif
+
   } while (!done);
   cur_display_flags = 0;
 #ifdef PSX

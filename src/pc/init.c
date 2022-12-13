@@ -12,8 +12,8 @@
 #include "pc/gfx/gl.h"
 #include "pc/time.h"
 
-#define WINDOW_WIDTH  640*2
-#define WINDOW_HEIGHT 448*2
+#define WINDOW_WIDTH  1024
+#define WINDOW_HEIGHT 768
 
 SDL_Window *window = 0;
 SDL_GLContext ogl_context;

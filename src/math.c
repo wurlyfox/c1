@@ -55,7 +55,7 @@ uint32_t EucDist(vec *v1, vec *v2) {
   d.x = (v1->x - v2->x) >> 8;
   d.y = (v1->y - v2->y) >> 8;
   d.z = (v1->z - v2->z) >> 8;
-  return sqrt(d.x*d.x+d.y*d.y+d.z*d.z); /* sqrt */
+  return sqrt(d.x*d.x+d.y*d.y+d.z*d.z) << 8; /* sqrt */
 }
 
 /**
@@ -67,7 +67,7 @@ uint32_t EucDistXZ(vec *v1, vec *v2) {
 
   d.x = (v1->x - v2->x) >> 8;
   d.z = (v1->z - v2->z) >> 8;
-  return sqrt(d.x*d.x+d.z*d.z); /* sqrt */
+  return sqrt(d.x*d.x+d.z*d.z) << 8; /* sqrt */
 }
 
 /**

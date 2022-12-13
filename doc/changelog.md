@@ -1,5 +1,33 @@
 # Changelog
 
+## 2022-12-12
+
+### Fixed
+
+- textures should not use anti-aliasing
+- (partial) object phong shading is inaccurate
+- (partial) transparency has not been implemented
+- screen does not fade out/in after death/before respawn
+- player does not inherit zone brightness levels
+- (some) gool issues
+- timing issue with gool animations
+- no deceleration of player when jumping
+- (partial) it is sometimes possible to jump in mid-air when beside walls
+- auto-cam transition takes multiple button presses to skip
+- (many) solidity check/collision issues
+- ripple shader inaccuracies
+- text is not rendered at the correct locations
+
+### Removed
+
+- vertex buffer based draw code
+- gl extensions dependency
+
+### Added
+
+- immediate mode based draw code
+- toggleable render of wall bitmap image (press <key>d</key> to toggle)
+
 ## 2022-12-7
 
 ### Fixed

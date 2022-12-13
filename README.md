@@ -7,16 +7,15 @@ The code is designed to compile for both psx and pc. At the moment only pc-speci
 ## Status ##
 
 - Code - 100% ported; mostly untested
-- Functionality - 30%
+- Functionality - 38%
 
 At the moment the game is only partially playable. Currently identified issues include:
 
-- object phong shading is inaccurate
+- objects are too dark
 - some objects fail to render
-- transparency has not been implemented
-- various events (collecting 3 doctor, etc.) cause the game to crash
-- it is sometimes possible to jump in mid-air when beside walls
-- text is not rendered at the correct locations
+- transparency has not been completely implemented
+- various events cause the game to crash
+- it is sometimes (though rarely) possible to jump in mid-air when beside walls
 - compiling with optimization flags causes the game to behave differently (aside from performance improvements)
 - various inaccuracies/errors in GOOL subsystem code
 

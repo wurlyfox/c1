@@ -443,6 +443,27 @@ typedef union {
   uint8_t c[4];
 } rgba8;
 
+typedef union {
+  struct {
+    uint16_t r, g, b, a;
+  };
+  uint16_t c[4];
+} rgba16;
+
+typedef union {
+  struct {
+    uint32_t r, g, b, a;
+  };
+  uint32_t c[4];
+} rgba;
+
+typedef union {
+  struct {
+    int32_t r, g, b;
+  };
+  int32_t c[3];
+} srgb;
+
 /* matrix types */
 typedef int16_t mat16_t[3][3];
 typedef int32_t mat_t[3][3];

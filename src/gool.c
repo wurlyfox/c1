@@ -291,9 +291,9 @@ int GoolObjectOrientOnPath(gool_object *obj, int progress, vec *loc) {
        ((A . B) / ||B||) x (B / ||B||)
        to avoid precision errors]
     */
-    proj_part = ((dot.x + dot.z)/dist_xz);
-    x = abs((((proj_part>>4)*(dir.x>>4)) / dist_xz) - dist_obj.x);
-    z = abs((((proj_part>>4)*(dir.z>>4)) / dist_xz) - dist_obj.z);
+    proj_part = ((dot.x + dot.z)/(int32_t)dist_xz);
+    x = abs((((proj_part>>4)*(dir.x>>4))/(int32_t)dist_xz) - dist_obj.x);
+    z = abs((((proj_part>>4)*(dir.z>>4))/(int32_t)dist_xz) - dist_obj.z);
     /* do a sort of manhattan distance calc
        is this moment of inertia? */
     if (z<x)
@@ -723,7 +723,6 @@ gool_object *GoolObjectCreate(void *parent, int exec, int subtype, int argc, uin
   gool_object *_parent, *child;
   entry *zone;
   zone_header *header;
-  uint32_t *src, *dst;
 
   _parent = (gool_object*)parent;
   if (!exec && !subtype) {
@@ -969,7 +968,7 @@ void GoolUpdateObjects(int flag) {
 #ifdef PSX
   frames_elapsed = context.c2_p->draw_stamp / 34;
 #else
-  frames_elapsed = context.draw_stamp / 17;
+  frames_elapsed = context.draw_stamp / 34;
 #endif
   if (!crash) { return; }
   for (i=0;i<8;i++) {
@@ -1088,8 +1087,9 @@ int GoolObjectUpdate(gool_object *obj, int flag) {
   gool_header *header;
   gool_state_ref response;
   uint32_t status_b, category, flags;
+  uint32_t top, timestamp, wait;
   int animate, display;
-  int top, timestamp, wait, elapsed_since;
+  int elapsed_since;
   int res;
 
   if (obj->handle.subtype != 3) { return SUCCESS; }
@@ -1099,9 +1099,9 @@ int GoolObjectUpdate(gool_object *obj, int flag) {
   status_b = obj->status_b;
   if ((cur_display_flags & GOOL_FLAG_ANIMATE) == 0)
     animate = 0;
-  else if ((status_b & GOOL_FLAG_FORCE_UPDATE) ||
-    ((obj->state_flags & GOOL_FLAG_MENUTEXT_STATE)
-     && (cur_display_flags & GOOL_FLAG_FORCE_ANIM_MENUS)))
+  else if (((status_b & GOOL_FLAG_FORCE_UPDATE) ||
+    (obj->state_flags & GOOL_FLAG_MENUTEXT_STATE))
+     && (cur_display_flags & GOOL_FLAG_FORCE_ANIM_MENUS))
     animate = 1;
   else {
     header = (gool_header*)obj->global->items[0];
@@ -1166,8 +1166,8 @@ int GoolObjectUpdate(gool_object *obj, int flag) {
       if (dbg->flags & GOOL_FLAG_PAUSED_CODE) {}
       else
 #endif
-      if (elapsed_since > wait) { /* if more frames have elapsed than the required wait time [since prev switch] */
-        obj->sp--;                /* get rid of the now useless tag */
+      if (elapsed_since >= wait) { /* if the required wait time (or more) has elapsed */
+        obj->sp--;                 /* get rid of the now useless tag */
         res = GoolObjectInterpret(obj, GOOL_FLAG_SUSPEND_ON_ANIM, &response); /* ...and continue execution until another animation instruction is reached */
         if (ISERRORCODE(res)) { return res; } /* return on fail */
       }
@@ -1183,9 +1183,9 @@ int GoolObjectUpdate(gool_object *obj, int flag) {
     cur_obj = 0; /* indicate that there is no 'current object' to display */
     return SUCCESS; /* ...and don't render or display the object */
   }
-  if ((status_b & GOOL_FLAG_FORCE_UPDATE) ||
-      ((obj->state_flags & GOOL_FLAG_MENUTEXT_STATE)
-       && (cur_display_flags & GOOL_FLAG_FORCE_DISP_MENUS)))
+  if (((status_b & GOOL_FLAG_FORCE_UPDATE) ||
+      (obj->state_flags & GOOL_FLAG_MENUTEXT_STATE))
+       && (cur_display_flags & GOOL_FLAG_FORCE_DISP_MENUS))
     display = 1;
   else {
     header = (gool_header*)obj->global->items[0];
@@ -1393,7 +1393,7 @@ static int GoolTextStringTransform(
   gool_glyph *glyph;
   bound2 bound, bound2;
   vec scale;
-  uint32_t y_offs, max_x;
+  int32_t y_offs, max_x;
   char c, c2, buf[16];
   int i, center, flag;
 
@@ -1419,7 +1419,7 @@ static int GoolTextStringTransform(
       case '%':
         c = *(str++);
         bound.p1.x = val;
-        y_offs -= (font->glyphs[0].height << size);
+        y_offs -= (int32_t)(font->glyphs[0].height << size);
         break;
       case 'p':
         c = *(str++);
@@ -1451,9 +1451,9 @@ static int GoolTextStringTransform(
         break;
       }
     }
-    glyph = &font->glyphs[c - 0x1F];
+    glyph = &font->glyphs[c - 0x20];
     bound.p2.x = bound.p1.x + scale.x;
-    bound.p2.y = y_offs + (glyph->height << size);
+    bound.p2.y = y_offs + (int32_t)(glyph->height << size);
     bound.p1.y = bound.p2.y - scale.y;
     if (bound.p2.x > max_x)
       max_x = bound.p2.x;
@@ -1474,7 +1474,7 @@ static int GoolTextStringTransform(
       GfxTransformFontChar(obj, glyph, obj->size, tpag, &bound, prims_tail, flag);
 #endif
     }
-    bound.p1.x += glyph->width << size;
+    bound.p1.x += (int32_t)(glyph->width << size);
   }
   if (center && prims_tail && font->has_backdrop) {
     bound2.p1.x -= 100;
@@ -1537,11 +1537,11 @@ void GoolTextObjectTransform(gool_object *obj, gool_text *text, int terms_skip, 
   while(buf[i++] != 0); /* skip to first null term char */
   i--;
   if (i-- != start) { /* not a zero length str? */
-    while (i!=start) { /* go back until 0x20 is reached */
-      if (buf[i] == 0x20) { break; }
+    while (i!=start) { /* truncate trailing spaces */
+      if (buf[i] != ' ') { break; }
       i--;
     }
-    buf[i+1] = 0; /* place null term after 0x20 or single char */
+    buf[i+1] = 0; /* place null term at end of truncated string */
   }
 #ifdef PSX
   res = (int)NSLookup(&font->tpage);
@@ -1622,7 +1622,7 @@ int GoolObjectColors(gool_object *obj) {
     }
     break;
   default:
-    if (obj == crash && (obj->status_b & 0x400))
+    if (obj == crash && (obj->status_b & 0x4000000))
       GoolObjectColorByZone(obj);
     break;
   }
@@ -1788,10 +1788,10 @@ static inline int32_t GoolObjectControlDir(gool_object *obj, int scale) {
     else { /* fast enough and trying to rotate more than 90deg */
       obj->speed = 0; /* stop */
     }
-    // obj->speed = min(obj->speed, accel_state->max_speed);
-    if (obj->speed > accel_state->max_speed)
-      obj->speed = accel_state->max_speed; /* terminal speed/velocity */
   }
+  // obj->speed = min(obj->speed, accel_state->max_speed);
+  if (obj->speed > accel_state->max_speed)
+    obj->speed = accel_state->max_speed; /* terminal speed/velocity */
   return move_state->speed_scale;
 }
 
@@ -1803,10 +1803,6 @@ int GoolObjectPhysics(gool_object *obj) {
 
   status_a = obj->status_a;
   status_b = obj->status_b;
-  // printf("context.ticks_per_frame: %i\n", context.ticks_per_frame);
-  // printf("rot.y: %04X\n", crash->rot.x);
-  // printf("scale.x: %04X\n", crash->scale.x);
-
 #ifdef PSX
   scale = min(context->c1_p.ticks_per_frame, 0x66);
 #else
@@ -1844,6 +1840,8 @@ int GoolObjectPhysics(gool_object *obj) {
       obj->trans.y += velocity.y;
       obj->trans.z += velocity.z;
     }
+    status_a=obj->status_a;
+    status_b=obj->status_b;
     if (status_b & GOOL_FLAG_ORIENT_ON_PATH) { /* movement restricted to path? */
       GoolObjectOrientOnPath(obj, 0, &trans);
       obj->floor_y = trans.y;
@@ -2571,7 +2569,7 @@ void GoolOpMisc(gool_object *obj, uint32_t instruction) {
       src_trans = &tmp[0];
       dst_trans = &tmp[1];
     }
-    if (sop1 & 1)
+    if (sop2 & 1)
       GoolObjectPush(obj, EucDist(src_trans, dst_trans)); /* eucDist(src_trans, dst_trans)); */
     else
       GoolObjectPush(obj, ApxDist(src_trans, dst_trans)); /* apxDist(srctrans, dsttrans));*/
@@ -2585,7 +2583,7 @@ void GoolOpMisc(gool_object *obj, uint32_t instruction) {
     src_trans = &obj->trans;
     dst_trans = &link->trans;
     ang_xz = AngDistXZ(src_trans, dst_trans); /* angleXZ(src_trans, dst_trans); */
-    lang_xz = ang_xz - angle12(obj->rot.x);
+    lang_xz = (int32_t)ang_xz - angle12(obj->rot.x);
     if (abs(lang_xz) >= 0x800)
       lang_xz = angle12(-lang_xz);
     GoolObjectPush(obj, lang_xz);
@@ -2596,7 +2594,7 @@ void GoolOpMisc(gool_object *obj, uint32_t instruction) {
     link = obj->links[link_idx];
     src_trans = &link->trans;
     dst_trans = (vec*)ptr;
-    if (obj->status_b & 0x00200200)
+    if (obj->status_b & 0x200200)
       GoolObjectPush(obj, AngDistXY(src_trans, dst_trans)); /* angleXY(src_trans, dst_trans)); */
     else
       GoolObjectPush(obj, AngDistXZ(src_trans, dst_trans)); /* angleXZ(src_trans, dst_trans)); */
@@ -2712,6 +2710,7 @@ void GoolOpMisc(gool_object *obj, uint32_t instruction) {
         /* so we can record a list of the objects that have been encountered */
         lid = ns.ldat->lid;
         tag = (uint16_t)((lid << 9) | id);
+        found = 0; free_tag = 0;
         for (i=0;level_spawns[i];i++) {  /* while a tail entry has not been reached */
           if (level_spawns[i] == tag) {  /* if the entry is found */
             found = 1;                   /* mark it as such */
@@ -2745,9 +2744,13 @@ void GoolOpMisc(gool_object *obj, uint32_t instruction) {
   }
   case 11: { /* read spawn bit */
     uint32_t id;
-    if (!ptr) { break; }
+    if (sop2 < 1 || sop2 > 3) { break; }
+    if (!ptr) {
+      GoolObjectPush(obj, 0);
+      break;
+    }
     id = *(ptr) >> 8;
-    if (sop2 == 1) /* read bit 1 */
+    if (sop2 == 1) /* read bit 2 */
       GoolObjectPush(obj, !(spawns[id] & 2));
     else if (sop2 == 2) /* read bit 3 */
       GoolObjectPush(obj, spawns[id] & 4);
@@ -2795,7 +2798,7 @@ void GoolOpMisc(gool_object *obj, uint32_t instruction) {
         neighbor = NSLookup(&header->neighbors[i]);
         for (ii=0;ii<8;ii++)
           GoolObjectHandleTraverseTreePostorder(
-            (gool_object*)&handles[i],
+            (gool_object*)&handles[ii],
             (gool_ifnptr_t)GoolZoneObjectsTerminate,
             (int)neighbor);
       }
@@ -2839,7 +2842,7 @@ void GoolOpMisc(gool_object *obj, uint32_t instruction) {
     int res;
     link_idx = (instruction >> 12) & 7;
     link = ((gool_object**)&obj->self)[link_idx];
-    query.categories = r2.categories; /* bitfield, one bit per object category */
+    query.categories = (instruction >> 15) & 0x1F; /* bitfield, one bit per object category */
     query.obj = link;
     query.nearest_obj = 0;
     query.dist = 0x7FFFFFFF;
@@ -3024,7 +3027,6 @@ void GoolOpTransformVectors(gool_object *obj, uint32_t instruction) {
     break;
   }
   case 1: { /* convert coords to screen coords */
-    /* TODO: broken? fix? */
     int persp_idx, ortho_idx;
     vec *persp, *ortho, *inout;
     int32_t z;
@@ -3043,8 +3045,7 @@ void GoolOpTransformVectors(gool_object *obj, uint32_t instruction) {
   }
   case 2: { /* adjust velocity vector to point in target rot dir */
             /* spin(xz) or flip(xy) angle with input speed */
-    int32_t speed;
-    uint32_t target_rotx;
+    int32_t speed, target_rotx;
     int velocity_idx;
     vec *velocity, target;
 
@@ -3054,7 +3055,7 @@ void GoolOpTransformVectors(gool_object *obj, uint32_t instruction) {
     target_rotx = obj->target_rot.x & 0xFFF; /* xz or xy plane */
     target.x = sin(target_rotx);
     velocity->x = ((target.x/16) * speed) >> 8;
-    if (obj->status_b & 0x00200200) {
+    if (obj->status_b & 0x200200) {
       target.y = cos(target_rotx);
       velocity->y = ((target.y/16) * speed) >> 8;
     }
@@ -3092,13 +3093,13 @@ void GoolOpTransformVectors(gool_object *obj, uint32_t instruction) {
     tgeo_header *header;
     vec in, *out, scale, model_trans, model_scale;
 
-    if (!obj->anim_seq || obj->anim_seq->type != 1) /* no anim or not a vertex anim? */
-      break;
     link_idx = (instruction >> 21) & 7;
-    out_idx = (instruction >> 12) & 7;
     link = obj->links[link_idx];
+    anim = (gool_vertex_anim*)link->anim_seq;
+    if (!anim || anim->type != 1) /* no anim or not a vertex anim? */
+      break;
+    out_idx = (instruction >> 12) & 7;
     out = &obj->vectors_v[out_idx];
-    anim = (gool_vertex_anim*)obj->anim_seq;
     svtx = NSLookup(&anim->eid);
     frame_idx = link->anim_frame >> 8;
     frame = (svtx_frame*)svtx->items[frame_idx];
@@ -3222,7 +3223,7 @@ int GoolOpReturnStateTransition(gool_object *obj,
     }
   }
   else if (ret_type == 0) {
-    offset = (int32_t)((instruction & 0x3FF) << 22) >> 22;
+    offset = ((int32_t)((instruction & 0x3FF) << 22)) >> 22;
     argc = (instruction >> 10) & 0xF;
     obj->pc += offset;
     obj->sp -= argc;
@@ -3319,12 +3320,13 @@ static inline void GoolOpReactSolidSurfaces(gool_object *obj, uint32_t instructi
   zone_header *header;
   vec *v_in, *v_out1, *v_out2, trans, trans2, cv_in;
   int sop, idx1, idx2, flag1, flag2, flags;
+  static vec trans3, trans4; /* persists between instructions */
 
   idx1 = (instruction >> 12) & 7;
   idx2 = (instruction >> 15) & 7;
   sop = (instruction >> 18) & 7;
   v_in = &obj->vectors_v[idx1];
-  v_out1 = (vec*)GoolTranslateInGop(obj, G_OPB(instruction));
+  v_out1 = (vec*)GoolTranslateOutGop(obj, G_OPB(instruction));
   v_out2 = &obj->vectors_v[idx2];
   cv_in = *v_in;
   trans = obj->trans;
@@ -3333,18 +3335,18 @@ static inline void GoolOpReactSolidSurfaces(gool_object *obj, uint32_t instructi
     trans.y += obj->bound.p2.y / 2;
     obj->misc_flag = ZoneReboundVector(&trans, &cv_in);
     if ((uint32_t)v_out1 != 0xBE0)
-      *v_out1 = trans;
-    *v_out2 = cv_in;
+      *v_out1 = cv_in;
+    *v_out2 = trans;
     break;
   case 1:
     trans = obj->trans;
     trans2 = obj->trans;
     if (obj == crash || obj->parent == crash)
-      ZoneFindNearestObjectNode2(obj, &trans);
-    *((gool_objnode*)&obj->misc_node) = ZoneFindNearestObjectNode(obj, &trans2);
+      ZoneFindNearestObjectNode2(obj, &trans2);
+    *((gool_objnode*)&obj->misc_node) = ZoneFindNearestObjectNode(obj, &trans);
     if ((uint32_t)v_out1 != 0xBE0)
-      *v_out1 = trans;
-    *v_out2 = trans2;
+      *v_out1 = trans3;
+    *v_out2 = trans;
     break;
   case 2:
   case 3:
@@ -3353,17 +3355,17 @@ static inline void GoolOpReactSolidSurfaces(gool_object *obj, uint32_t instructi
     flag1 = 0; flag2 = 0;
     if (sop == 3 || sop == 4) { flag1 = 1; }
     if (sop == 3 || sop == 5) { flag2 = 1; }
-    trans = obj->trans;
+    trans3 = obj->trans;
     zone = obj->zone ? obj->zone : cur_zone;
     header = (zone_header*)zone->items[0];
     if (header->flags & 1)
       flags = flag2 ? 6 : 2;  /* flags identify the quadrant to test */
     else
       flags = flag2 ? 5 : 1;
-    ZoneFindNearestObjectNode3(obj, &trans2, flags, !flag1);
+    ZoneFindNearestObjectNode3(obj, &trans3, flags, !flag1);
     if ((uint32_t)v_out1 != 0xBE0)
-      *v_out1 = trans; /* unused? orig impl seems to store garbage if vec_out1 is used */
-    *v_out2 = trans2;
+      *v_out1 = trans4; /* unused? orig impl seems to store garbage if vec_out1 is used */
+    *v_out2 = trans3;
     break;
   case 6:
     ZoneColorsScaleSeekByEntityNode(obj);
@@ -3375,7 +3377,7 @@ int GoolSendEvent(gool_object *sender, gool_object *recipient, uint32_t event, i
   entry *exec;
   gool_header *header;
   gool_state_maps *maps;
-  gool_state *state_desc;
+  gool_state *descs, *desc;
   gool_state_ref transition;
   uint32_t state, state_idx, subtype_map_idx;
   uint32_t offs, status_c;
@@ -3428,18 +3430,16 @@ int GoolSendEvent(gool_object *sender, gool_object *recipient, uint32_t event, i
     }
   }
   if (state != 0xFF) { /* state is non-null? */
+    status_c = recipient->status_c;
     if (event == 0x1800 || event == GOOL_EVENT_SQUASH || event == GOOL_EVENT_BOULDER_SQUASH)
-      status_c = recipient->status_c & 0xFFFFFFFD;
-    else
-      status_c = recipient->status_c;
+      status_c &= ~2;
     exec = recipient->global;
-    state_desc = (gool_state*)exec->items[4];
+    descs = (gool_state*)exec->items[4];
+    desc = &descs[state];
     if ((recipient == crash) &&
         (recipient->invincibility_state >= 2 && recipient->invincibility_state <= 4))
-      test = (status_c | 0x1002) & state_desc->flags;
-    else
-      test = status_c & state_desc->flags;
-    if (!test) {
+      status_c |= 0x1002;
+    if (!(status_c & desc->flags)) {
       recipient->event = event;
       if (event == 0x1800 || event == GOOL_EVENT_SQUASH)
         recipient->status_a |= 0x10000;
@@ -3454,15 +3454,14 @@ int GoolSendEvent(gool_object *sender, gool_object *recipient, uint32_t event, i
 //----- (800243A0) --------------------------------------------------------
 int16_t GoolObjectRotate(int16_t anga, int16_t angb, int32_t speed, gool_object *obj) {
   uint32_t scale;
-  int32_t velocity, delta;
-  uint32_t abs_delta;
+  int32_t velocity, delta, abs_delta;
 
 #ifdef PSX
   scale = min(context.c1_p->ticks_per_frame, 0x66);
 #else
   scale = min(context.ticks_per_frame, 0x66);
 #endif
-  velocity = (speed*scale)/1024;
+  velocity = (speed*(int32_t)scale)/1024;
   anga = angle12(anga);
   angb = angle12(angb);
   delta = angb - anga;
@@ -3511,15 +3510,14 @@ int16_t GoolObjectRotate(int16_t anga, int16_t angb, int32_t speed, gool_object 
 //----- (80024528) --------------------------------------------------------
 int16_t GoolObjectRotate2(int16_t anga, int16_t angb, int32_t speed, gool_object *obj) {
   uint32_t scale;
-  int32_t velocity, delta;
-  uint32_t abs_delta;
+  int32_t velocity, delta, abs_delta;
 
 #ifdef PSX
   scale = min(context.c1_p->ticks_per_frame, 0x66);
 #else
   scale = min(context.ticks_per_frame, 0x66);
 #endif
-  velocity = (speed*scale)/1024; /* angular speed */
+  velocity = (speed*(int32_t)scale)/1024; /* angular speed */
   anga = angle12(anga);
   angb = angle12(angb);
   delta = angb - anga;
@@ -3586,7 +3584,7 @@ int GoolTransform(vec *in, vec *trans, ang *rot, vec *scale, vec *out) {
   mat16 m1, m2;
   int16_t *m;
   int16_t rotx;
-  vec s_in;
+  vec s_in, s_out;
 #ifdef PSX
   m=&m1.m;
   s=sin(-angle12(rot->z));
@@ -3618,22 +3616,23 @@ int GoolTransform(vec *in, vec *trans, ang *rot, vec *scale, vec *out) {
   if (scale)
     SwScaleMatrix(&m1, scale);
 #endif
-  s_in.x = shr_floor(in->x,4); /* 16 bit frac to 12 bit frac */
-  s_in.y = shr_floor(in->y,4);
-  s_in.z = shr_floor(in->z,4);
-  GfxTransform(&s_in, &m1, out);
-  out->x <<= 4; /* 12 bit frac to 16 bit frac */
-  out->y <<= 4;
-  out->z <<= 4;
-  out->x += trans->x;
-  out->y += trans->y;
-  out->z += trans->z;
+  s_in.x = in->x>>4; /* 16 bit frac to 12 bit frac */
+  s_in.y = in->y>>4;
+  s_in.z = in->z>>4;
+  GfxTransform(&s_in, &m1, &s_out);
+  s_out.x <<= 4; /* 12 bit frac to 16 bit frac */
+  s_out.y <<= 4;
+  s_out.z <<= 4;
+  s_out.x += trans->x;
+  s_out.y += trans->y;
+  s_out.z += trans->z;
+  *out = s_out;
 }
 
 //----- (800248A0) --------------------------------------------------------
 int GoolTransform2(vec *in, vec *out, int flag) {
   mat16 *m_rot;
-  vec v_in;
+  vec v_in, v_out;
 
   if (!flag) {
     m_rot = &ms_cam_rot;
@@ -3652,11 +3651,12 @@ int GoolTransform2(vec *in, vec *out, int flag) {
   SetTransMatrix(&m_trans);
   RotTrans(v_in, out, &flag);
 #else
-  SwRotTrans(&v_in, out, &mn_trans.t, m_rot);
+  SwRotTrans(&v_in, &v_out, &mn_trans.t, m_rot);
 #endif
-  out->x <<= 8;
-  out->y = (-out->y) << 8;
-  out->z <<= 8;
+  v_out.x <<= 8;
+  v_out.y = -(out->y << 8);
+  v_out.z <<= 8;
+  *out = v_out;
   return SUCCESS;
 }
 
@@ -3678,6 +3678,7 @@ int GoolProject(vec *in, vec *out) {
 #else
   vec r_out;
   SwRotTransPers(&v_in, &r_out, &mn_trans.t, &ms_cam_rot, &screen, screen_proj);
+  sz2 = r_out.z;
 #endif
   out->x = r_out.x << 8;
   out->y = -(r_out.y << 8);
@@ -3839,10 +3840,9 @@ int GoolSendToColliders2(gool_object *sender, gool_object *recipients, uint32_t 
         child,
         (gool_ifnptr_t)GoolSendIfColliding,
         (int)&query);
-      if (res == ERROR_INVALID_RETURN) {
+      child = child_sibling;
+      if (res == ERROR_INVALID_RETURN)
         GoolObjectKill(obj, 0);
-        child = child_sibling;
-      }
     }
     res = GoolSendIfColliding(obj, &query);
     obj = sibling;

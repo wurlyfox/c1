@@ -20,6 +20,15 @@ static rgb Rgb8To32(rgb8 c) {
   return res;
 }
 
+static rgba Rgb8ToA32(rgb8 c) {
+  rgba res;
+  res.r = c.r*16843009;
+  res.g = c.g*16843009;
+  res.b = c.b*16843009;
+  res.a = ~0;
+  return res;
+}
+
 uint32_t SwSqrMagnitude2(int32_t a, int32_t b) {
   return ((int64_t)a*a+b*b) >> 13;
 }
@@ -245,7 +254,6 @@ void SwCalcObjectRotMatrix(
   ang rot;
   vec scale;
 
-  // vectors->scale.x = -0x1000;
   rot.x = angle12(vectors->rot.x - vectors->rot.z);
   rot.y = angle12(vectors->rot.y);
   rot.z = angle12(vectors->rot.z);
@@ -304,15 +312,9 @@ int SwCalcSpriteRotMatrix(
   scale.x = obj_vectors->scale.x >> shrink;
   scale.y = obj_vectors->scale.y >> shrink;
   scale.z = obj_vectors->scale.z >> shrink;
-  SwCopyMatrix(&m_rot2, m_rot);
   SwRotMatrixZXY(&params->m_rot, &rot);
-  SwMulMatrix(&m_rot2, &params->m_rot);
-  SwCopyMatrix(&params->m_rot, &m_rot2);
   SwDiagMatrix(&m_scale, &scale);
   SwMulMatrix(&params->m_rot, &m_scale);
-  //SwDiagMatrix(&m_scale, &scale);
-  //SwMulMatrix(&m_scale, &params->m_rot);
-  //SwCopyMatrix(&params->m_rot, &m_scale);
   params->m_rot.m[1][0] *= -5; params->m_rot.m[1][0] /= 8;
   params->m_rot.m[1][1] *= -5; params->m_rot.m[1][1] /= 8;
   params->m_rot.m[1][2] *= -5; params->m_rot.m[1][2] /= 8;
@@ -340,7 +342,7 @@ void SwTransformSvtx(
   fvec uvs[4]; /* only first 3 are used */
   mat16_t lm, cm;
   rgb8 color, bc;
-  rgb16 color16;
+  srgb color16;
   poly3i *prim, *next;
   int32_t ndot;
   int32_t z_min, z_max, z_sum;
@@ -381,9 +383,9 @@ void SwTransformSvtx(
       color.r=info.r;
       color.g=info.g;
       color.b=info.b;
-      prim->colors[0]=Rgb8To32(color);
-      prim->colors[1]=Rgb8To32(color);
-      prim->colors[2]=Rgb8To32(color);
+      prim->colors[0]=Rgb8ToA32(color);
+      prim->colors[1]=Rgb8ToA32(color);
+      prim->colors[2]=Rgb8ToA32(color);
     }
     else {
       for (ii=0;ii<3;ii++) {
@@ -394,19 +396,28 @@ void SwTransformSvtx(
         ldir.x=(((int64_t)lm[0][0]*n.x)+((int64_t)lm[0][1]*n.y)+((int64_t)lm[0][2]*n.z))>>12;
         ldir.y=(((int64_t)lm[1][0]*n.x)+((int64_t)lm[1][1]*n.y)+((int64_t)lm[1][2]*n.z))>>12;
         ldir.z=(((int64_t)lm[2][0]*n.x)+((int64_t)lm[2][1]*n.y)+((int64_t)lm[2][2]*n.z))>>12;
+        ldir.x=limit(ldir.x,-0x8000,0x7FFF);
+        ldir.y=limit(ldir.y,-0x8000,0x7FFF);
+        ldir.z=limit(ldir.z,-0x8000,0x7FFF);
         color16.r=((int64_t)((int64_t)(bc.r<<12))
                +(cm[0][0]*ldir.x)+(cm[0][1]*ldir.y)+(cm[0][2]*ldir.z))>>12;
         color16.g=((int64_t)((int64_t)(bc.g<<12))
                +(cm[1][0]*ldir.x)+(cm[1][1]*ldir.y)+(cm[1][2]*ldir.z))>>12;
         color16.b=((int64_t)((int64_t)(bc.b<<12))
                +(cm[2][0]*ldir.x)+(cm[2][1]*ldir.y)+(cm[2][2]*ldir.z))>>12;
-        color16.r=((info.r<<4)*color16.r)>>12;
-        color16.g=((info.g<<4)*color16.g)>>12;
-        color16.b=((info.b<<4)*color16.b)>>12;
-        color.r=color16.r>>4;
-        color.g=color16.g>>4;
-        color.b=color16.b>>4;
-        prim->colors[ii]=Rgb8To32(color);
+        color16.r=limit(color16.r,-0x8000,0x7FFF);
+        color16.g=limit(color16.g,-0x8000,0x7FFF);
+        color16.b=limit(color16.b,-0x8000,0x7FFF);
+        color16.r=((int16_t)(info.r<<4)*color16.r)>>12;
+        color16.g=((int16_t)(info.g<<4)*color16.g)>>12;
+        color16.b=((int16_t)(info.b<<4)*color16.b)>>12;
+        color16.r=limit(color16.r,-0x8000,0x7FFF);
+        color16.g=limit(color16.g,-0x8000,0x7FFF);
+        color16.b=limit(color16.b,-0x8000,0x7FFF);
+        color.r=limit(color16.r>>4,0,0xFF);
+        color.g=limit(color16.g>>4,0,0xFF);
+        color.b=limit(color16.b>>4,0,0xFF);
+        prim->colors[ii]=Rgb8ToA32(color);
       }
     }
     if (info.type == 1) { /* textured poly? */
@@ -507,7 +518,7 @@ void SwTransformCvtx(
       color.b = ((t3>=0 ?
           (127-abs(t3))*0   +     (abs(t3)*vert->b)
         : (128-abs(t3))*255 + ((abs(t3)-1)*vert->b))*32)>>(shamt+12);
-      prim->colors[ii]=Rgb8To32(color);
+      prim->colors[ii]=Rgb8ToA32(color);
     }
     if (info.type == 1) { /* textured poly? */
       texid = TextureLoad((texinfo*)&info, &uvs);
@@ -546,14 +557,10 @@ void SwTransformSprite(
   int32_t z_sum;
   int i, texid, z_idx, res;
 
-  //verts[0].x=-size;verts[0].y= size;verts[0].z=0;
-  //verts[1].x= size;verts[1].y= size;verts[1].z=0;
-  //verts[2].x=-size;verts[2].y=-size;verts[2].z=0;
-  //verts[3].x= size;verts[3].y=-size;verts[3].z=0;
-  verts[0].x=-size;verts[0].y=-size;verts[0].z=0;
-  verts[1].x= size;verts[1].y=-size;verts[1].z=0;
-  verts[2].x=-size;verts[2].y= size;verts[2].z=0;
-  verts[3].x= size;verts[3].y= size;verts[3].z=0;
+  verts[0].x=-size;verts[0].y= size;verts[0].z=0;
+  verts[1].x= size;verts[1].y= size;verts[1].z=0;
+  verts[2].x=-size;verts[2].y=-size;verts[2].z=0;
+  verts[3].x= size;verts[3].y=-size;verts[3].z=0;
   for (i=0;i<4;i++) {
 #ifdef CFLAGS_GFX_SW_PERSP
     res = SwRotTransPers(&verts[i], &r_verts[i], &params->trans, &params->m_rot,
@@ -570,7 +577,7 @@ void SwTransformSprite(
   texid=TextureLoad(&info, &uvs);
   for (i=0;i<4;i++) {
     prim->verts[i]=r_verts[i];
-    prim->colors[i]=Rgb8To32(info.rgb);
+    prim->colors[i]=Rgb8ToA32(info.rgb);
     prim->uvs[i]=uvs[i];
   }
   prim->texid=texid;
@@ -584,6 +591,7 @@ void SwTransformSprite(
   *prims_tail+=sizeof(poly4i);
 }
 
+extern mat16 ms_rot;
 void SwProjectBound(bound *lbound, vec *col, vec *trans, vec *_cam_trans, bound2 *extents) {
   vec vert;
   vec2 *screen;
@@ -593,8 +601,8 @@ void SwProjectBound(bound *lbound, vec *col, vec *trans, vec *_cam_trans, bound2
   int i, j, k;
   extents->p1.x = 0x7FFFFFFF; /* INT_MAX */
   extents->p1.y = 0x7FFFFFFF; /* INT_MAX */
-  extents->p2.x = 0x80000000; /* INT_MIN */
-  extents->p2.y = 0x80000000; /* INT_MIN */
+  extents->p2.x = -0x80000000; /* INT_MIN */
+  extents->p2.y = -0x80000000; /* INT_MIN */
   bound.p1.x=lbound->p1.x+trans->x+(col->x-_cam_trans->x)>>8;
   bound.p1.y=lbound->p1.y+trans->y+(col->y-_cam_trans->y)>>8;
   bound.p1.z=lbound->p1.z+trans->z+(col->z-_cam_trans->z)>>8;
@@ -602,7 +610,7 @@ void SwProjectBound(bound *lbound, vec *col, vec *trans, vec *_cam_trans, bound2
   bound.p2.y=lbound->p2.y+trans->y+(col->y-_cam_trans->y)>>8;
   bound.p2.z=lbound->p2.z+trans->z+(col->z-_cam_trans->z)>>8;
   trans=&params.trans;
-  m_rot=&params.m_rot;
+  //m_rot=&params.m_rot;
   screen=&params.screen;
   for (i=0;i<2;i++) {
     for (j=0;j<2;j++) {
@@ -610,7 +618,7 @@ void SwProjectBound(bound *lbound, vec *col, vec *trans, vec *_cam_trans, bound2
         vert.x=i?bound.p1.x:bound.p2.x;
         vert.y=j?bound.p1.y:bound.p2.y;
         vert.z=k?bound.p1.z:bound.p2.z;
-        SwRotTransPers(&vert, &s_vert, trans, m_rot, screen, params.screen_proj);
+        SwRotTransPers(&vert, &s_vert, trans, &ms_rot, screen, params.screen_proj);
         extents->p1.x=min(extents->p1.x, s_vert.x);
         extents->p1.y=min(extents->p1.y, s_vert.y);
         extents->p2.x=max(extents->p2.x, s_vert.x);
@@ -742,7 +750,7 @@ static void SwTransformAndShadeWorlds(
     prim = (poly3i*)*prims_tail;
     for (ii=0;ii<3;ii++) {
       prim->verts[ii] = r_verts[ii];
-      prim->colors[ii] = Rgb8To32(colors[ii]);
+      prim->colors[ii] = Rgb8ToA32(colors[ii]);
       prim->uvs[ii] = uvs[ii];
     }
     prim->texid = texid;
@@ -801,7 +809,7 @@ static void SwRippleShader(vert_id vert_id, vec *vert, rgb8 *color, sw_transform
 
   world_vert = SwWorldVertex(vert_id);
   if (world_vert->fx) {
-    idx = ((vert->x+vert->y)/8)%16;
+    idx = ((vert->x+vert->y)/8) & 0xF;
     vert->y += params->tri_wave[idx];
   }
 }
@@ -986,9 +994,9 @@ void SwTransformZoneQuery(zone_query *query, void *ot, void **prims_tail) {
     nbound.p1.y = ((int32_t)result->y << 4) + nodes_bound->p1.y;
     nbound.p1.z = ((int32_t)result->z << 4) + nodes_bound->p1.z;
     ++result;
-    nbound.p2.x = nbound.p1.x + (zone_dim.w >> min(level, max_depth.x));
-    nbound.p2.y = nbound.p1.y + (zone_dim.h >> min(level, max_depth.y));
-    nbound.p2.z = nbound.p1.z + (zone_dim.d >> min(level, max_depth.z));
+    nbound.p2.x = nbound.p1.x + (int32_t)(zone_dim.w >> min(level, max_depth.x));
+    nbound.p2.y = nbound.p1.y + (int32_t)(zone_dim.h >> min(level, max_depth.y));
+    nbound.p2.z = nbound.p1.z + (int32_t)(zone_dim.d >> min(level, max_depth.z));
     v_nbound.p1.x = nbound.p1.x >> 8;
     v_nbound.p1.y = nbound.p1.y >> 8;
     v_nbound.p1.z = nbound.p1.z >> 8;
@@ -1014,7 +1022,7 @@ void SwTransformZoneQuery(zone_query *query, void *ot, void **prims_tail) {
       prim=(poly4i*)(*prims_tail);
       for (iii=0;iii<4;iii++) {
         prim->verts[iii]=r_verts[rface_vert_idxes[ii][iii]];
-        prim->colors[iii]=Rgb8To32(color);
+        prim->colors[iii]=Rgb8ToA32(color);
       }
       prim->texid=-1;
       next=((poly4i**)ot)[0x7FE];
@@ -1024,6 +1032,54 @@ void SwTransformZoneQuery(zone_query *query, void *ot, void **prims_tail) {
       *prims_tail+=sizeof(poly4i);
     }
   }
+}
+
+#endif
+
+#ifdef CFLAGS_DRAW_WALLMAP
+
+#include "gl.h"
+int wallmap_image = 0;
+
+void SwDrawWallMap(uint32_t *wall_bitmap, void *ot, void **prims_tail) {
+  poly4i *prim, *next;
+  rect2 rect;
+  uint32_t pixels[32*32], *p;
+  uint32_t bits, tmp;
+  int i,j,idx;
+
+  idx = 32;
+  for (i=0;i<32;i++) {
+    bits = wall_bitmap[i];
+    for (j=0;j<32;j++) {
+      idx = (i*32)+(31-j);
+      p = &pixels[idx];
+      pixels[idx] = bits & 1 ? -1: 0;
+      bits >>= 1;
+    }
+    idx += 64;
+  }
+  rect.w=32;rect.h=32;rect.x=0;rect.y=0;
+  if (wallmap_image == 0)
+    wallmap_image = GLCreateTexture(rect.dim, (uint8_t*)pixels);
+  else
+    GLUpdateTexture(wallmap_image, rect, (uint8_t*)pixels);
+  prim=(poly4i*)(*prims_tail);
+  for (i=0;i<4;i++) {
+    prim->verts[i].x = (i%2)?0:32;
+    prim->verts[i].y = (i/2)?32:0;
+    prim->verts[i].z = -1;
+    prim->uvs[i].x = (i%2)?0:1.0;
+    prim->uvs[i].y = (i/2)?1.0:0;
+    tmp=-1;
+    prim->colors[i] = Rgb8ToA32(*(rgb8*)&tmp);
+  }
+  prim->texid = wallmap_image;
+  next=((poly4i**)ot)[0x7FE];
+  prim->next=next;
+  prim->type=2;
+  ((poly4i**)ot)[0x7FE]=prim;
+  *prims_tail+=sizeof(poly4i);
 }
 
 #endif

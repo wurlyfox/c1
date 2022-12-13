@@ -1,4 +1,4 @@
-/* 
+/*
    c ports of the asm funcs;
    here solely for documentation purposes (sake of readability)
    these can be linked instead of the asm funcs but may not perform as well
@@ -19,7 +19,7 @@ void RGteTransformSvtx(
   svtx_vertex *verts, *vert, *poly_verts[3];
   tgeo_texinfo *texinfos, info;
   rgb8 color;
-  
+
   verts = &frame->vertices;
   texinfos = &header->texinfos;
   for (i=0;i<header->poly_count;i++) {
@@ -99,7 +99,7 @@ void RGteTransformSvtx(
         }
       }
       __asm {
-        cop2    0x118034F
+        cop2    0x118043F
       }
     }
     if (info.type == 1) { /* textured poly? */
@@ -318,7 +318,7 @@ int RPlotQueryWalls(
   int test_y2,
   int trans_x,
   int trans_z) {
-  return PlotQueryWalls(query, nodes_bound, flag, test_y1_t1, 
+  return PlotQueryWalls(query, nodes_bound, flag, test_y1_t1,
     test_y1, test_y2, trans_x, trans_z);
 }
 
@@ -339,9 +339,9 @@ void RFindFloorY(
 }
 
 int RFindCeilY(
-  gool_object *obj, 
-  zone_query *query, 
-  bound *nodes_bound, 
+  gool_object *obj,
+  zone_query *query,
+  bound *nodes_bound,
   bound *collider_bound
   int type_a,
   int type_b,

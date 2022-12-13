@@ -334,20 +334,6 @@ void LevelUpdate(entry *zone, zone_path *path, int32_t progress, uint32_t flags)
   ZonePathProgressToLoc(cur_path, -cur_progress, (gool_vectors*)&cam_trans);
   cam_rot_after = cam_rot;
   ns.level_update_pending = 0;
-
-  header = (zone_header*)cur_zone->items[0];
-  for (i=0;i<header->path_count;i++) {
-    idx = -1;
-    if (cur_path==(zone_path*)cur_zone->items[header->paths_idx+i]) {
-      idx = i;
-      break;
-    }
-  }
-  // printf("cur_zone: %s\n", NSEIDToString(cur_zone->eid));
-  // printf("cur path: %i\n", idx);
-  // printf("cur progress: %04X\n", cur_progress);
-  // printf("cam_trans: ({x = %i, y = %i, z = %i})\n", cam_trans.x, cam_trans.y, cam_trans.z);
-  // printf("cam_rot: ({x = %i, y = %i, z = %i})\n", cam_rot.x, cam_rot.y, cam_rot.z);
 }
 
 //----- (800260AC) --------------------------------------------------------
@@ -587,9 +573,9 @@ static inline int TestPointInRect(rect *r, vec *v) {
   return (v->x >= r->loc.x << 8
        && v->y >= r->loc.y << 8
        && v->z >= r->loc.z << 8
-       && v->x <= (r->loc.x + r->dim.w) << 8
-       && v->y <= (r->loc.y + r->dim.h) << 8
-       && v->z <= (r->loc.z + r->dim.d) << 8);
+       && v->x <= (r->loc.x + (int32_t)r->dim.w) << 8
+       && v->y <= (r->loc.y + (int32_t)r->dim.h) << 8
+       && v->z <= (r->loc.z + (int32_t)r->dim.d) << 8);
 }
 
 /*
@@ -611,9 +597,9 @@ int TestRectIntersectsBound(bound *b, rect *r) {
   return ((r->loc.x << 8) < b->p2.x
        && (r->loc.y << 8) < b->p2.y
        && (r->loc.z << 8) < b->p2.z
-       && ((r->loc.x + r->dim.w) << 8) >= b->p1.x
-       && ((r->loc.y + r->dim.h) << 8) >= b->p1.y
-       && ((r->loc.z + r->dim.d) << 8) >= b->p1.z);
+       && ((r->loc.x + (int32_t)r->dim.w) << 8) >= b->p1.x
+       && ((r->loc.y + (int32_t)r->dim.h) << 8) >= b->p1.y
+       && ((r->loc.z + (int32_t)r->dim.d) << 8) >= b->p1.z);
 }
 
 //----- (80026CA8) --------------------------------------------------------
@@ -685,9 +671,9 @@ uint16_t ZoneFindNode(zone_rect *zone_rect, uint16_t root, rect _rect, vec *va, 
     /* point of intersection is now in -opposite- direction of B from A */
     /* get pt of intersection of N and the ray R2=(A-B)+Bt */
     /* find corner of N nearest to the pt */
-    corner.x = _rect.loc.x + (vb->x<0?_rect.dim.w:0);
-    corner.y = _rect.loc.y + (vb->y<0?_rect.dim.h:0);
-    corner.z = _rect.loc.z + (vb->z<0?_rect.dim.d:0);
+    corner.x = _rect.loc.x + (int32_t)(vb->x<0?_rect.dim.w:0);
+    corner.y = _rect.loc.y + (int32_t)(vb->y<0?_rect.dim.h:0);
+    corner.z = _rect.loc.z + (int32_t)(vb->z<0?_rect.dim.d:0);
     /* plug the ray eq into the plane eqs for nearest 3 faces of N */
     /* and solve for the *furthest* t (nearest in opposite direction) */
     /* i.e. C=(A-B)+Bt => tn=(Cn-(An-Bn))/Bn => t=max(ti) */
@@ -738,9 +724,9 @@ uint16_t ZoneFindNode(zone_rect *zone_rect, uint16_t root, rect _rect, vec *va, 
     for (i=0;i<(level<tree->max_depth_x)?2:1;i++) {
       for (j=0;j<(level<tree->max_depth_y)?2:1;j++) {
         for (k=0;k<(level<tree->max_depth_z)?2:1;k++) {
-          child_rect.loc.x = _rect.loc.x + (i?child_rect.dim.w:0);
-          child_rect.loc.y = _rect.loc.y + (j?child_rect.dim.h:0);
-          child_rect.loc.z = _rect.loc.z + (k?child_rect.dim.d:0);
+          child_rect.loc.x = _rect.loc.x + (int32_t)(i?child_rect.dim.w:0);
+          child_rect.loc.y = _rect.loc.y + (int32_t)(j?child_rect.dim.h:0);
+          child_rect.loc.z = _rect.loc.z + (int32_t)(k?child_rect.dim.d:0);
           child_node = child_nodes[idx++];
           if (TestPointInRect(&child_rect, va)) {
             res = ZoneFindNode(zone_rect, child_node, child_rect, va, vb, level+1);
@@ -755,9 +741,9 @@ uint16_t ZoneFindNode(zone_rect *zone_rect, uint16_t root, rect _rect, vec *va, 
     /* where N is the node rect, A is vector va and B is dir vector vb */
     /* get pt of intersection of N and the ray R=A+Bt */
     /* find the corner of N nearest to the pt */
-    corner.x = _rect.loc.x + (vb->x>0?_rect.dim.w:0);
-    corner.y = _rect.loc.y + (vb->y>0?_rect.dim.h:0);
-    corner.z = _rect.loc.z + (vb->z>0?_rect.dim.d:0);
+    corner.x = _rect.loc.x + (int32_t)(vb->x>0?_rect.dim.w:0);
+    corner.y = _rect.loc.y + (int32_t)(vb->y>0?_rect.dim.h:0);
+    corner.z = _rect.loc.z + (int32_t)(vb->z>0?_rect.dim.d:0);
     /* plug the ray eq into the plane eqs for nearest 3 faces of N */
     /* and solve for the nearest t */
     /* i.e. C=A+Bt => tn=(Cn-An)/Bn => t=min(ti) */
@@ -945,9 +931,7 @@ void ZoneColorsScaleByNode(int subtype, gool_colors *src, gool_colors *dst) {
   }
   if (subtype < 40)
     ZoneColorsScale(src, dst, 100, 100, 100);
-  else if (subtype < 48)
-    return;
-  else {
+  else if (subtype >= 48) {
     pct = percent_map[subtype-48]; /* percentage */
     ZoneColorsScale(src, dst, pct, pct, pct);
   }
@@ -1006,15 +990,15 @@ uint16_t ZoneFindNearestNode(zone_rect *zone_rect, uint16_t root, rect *nrect, v
   int type, subtype, idx;
 
   node = root;
-  if (node & 1 || node == 0) { /* is the node a leaf node or empty? */
+  if ((node & 1) || node == 0) { /* is the node a leaf node or empty? */
     type = (node & 0xE) >> 1;
     subtype = (node & 0x3F0) >> 4;
-    if (node & 1 && (!(flags & 8) || type != 3)
+    if ((node & 1) && (!(flags & 8) || type != 3)
       && type != 4 && subtype != 11) { /* node is a leaf of type != 3,4, subtype != 11, and flag 4 is clear? */
       if (flags & 1)
-        v->y = nrect->loc.y + nrect->dim.h;
+        v->y = nrect->loc.y + (int32_t)nrect->dim.h;
       else if (flags & 2)
-        v->z = nrect->loc.z + nrect->dim.d;
+        v->z = nrect->loc.z + (int32_t)nrect->dim.d;
       return node;
     }
     if (flags & 1)
@@ -1033,24 +1017,24 @@ uint16_t ZoneFindNearestNode(zone_rect *zone_rect, uint16_t root, rect *nrect, v
     if (level < tree->max_depth_x) {
       child_rect.dim.w /= 2;
       fi = 1;
-      if (v->x >= nrect->loc.x + child_rect.dim.w) { /* v is in the right half? */
-        child_rect.loc.x = nrect->loc.x + child_rect.dim.w; /* adjust x loc */
+      if (v->x >= nrect->loc.x + (int32_t)child_rect.dim.w) { /* v is in the right half? */
+        child_rect.loc.x = nrect->loc.x + (int32_t)child_rect.dim.w; /* adjust x loc */
         ii = 1; /* adjust x idx */
       }
     }
     if (level < tree->max_depth_y) {
       child_rect.dim.h /= 2;
       fj = 1;
-      if (v->y >= nrect->loc.y + child_rect.dim.h) { /* v is in the lower half? */
-        child_rect.loc.y = nrect->loc.y + child_rect.dim.h; /* adjust y loc */
+      if (v->y >= nrect->loc.y + (int32_t)child_rect.dim.h) { /* v is in the lower half? */
+        child_rect.loc.y = nrect->loc.y + (int32_t)child_rect.dim.h; /* adjust y loc */
         ij = 1; /* adjust y idx */
       }
     }
     if (level < tree->max_depth_z) {
       child_rect.dim.d /= 2;
       fk = 1;
-      if (v->z >= nrect->loc.z + child_rect.dim.d) { /* v is in the back half? */
-        child_rect.loc.z = nrect->loc.z + child_rect.dim.d; /* adjust z loc */
+      if (v->z >= nrect->loc.z + (int32_t)child_rect.dim.d) { /* v is in the back half? */
+        child_rect.loc.z = nrect->loc.z + (int32_t)child_rect.dim.d; /* adjust z loc */
         ik = 1; /* adjust z idx */
       }
     }
@@ -1110,6 +1094,7 @@ gool_objnode ZoneFindNearestObjectNode(gool_object *obj, vec *v) {
   }
   /* find an object which collides with the input vec
      and which is stopped by some node */
+  found_max = 0;
   for (i=0;i<object_bound_count;i++) {
     bound = &object_bounds[i];
     if (!(bound->obj->status_b & 0x20000)) { continue; }
@@ -1179,7 +1164,7 @@ gool_objnode ZoneFindNearestObjectNode2(gool_object *obj, vec *v) {
   }
   /* find an object (other than obj) which collides with the input vec
      and which is stopped by some node */
-  found = 0;
+  found = 0; found_max = 0;
   for (i=0;i<object_bound_count;i++) {
     bound = &object_bounds[i];
     if (!((bound->obj->status_b & 0x40020000) == 0x20000)) { continue; }
@@ -1229,10 +1214,10 @@ gool_objnode ZoneFindNearestObjectNode3(gool_object *obj, vec *v, int flags, int
   rect _rect;
   vec va, vb;
   uint16_t root, node_val;
-  int i, yz_max, flag2, subtype;
+  int i, yz_max, found, subtype;
 
   res.value = 0;
-  if (!(obj->status_b & 0x4000000) || ((flags & 4) && !(obj->parent->status_b)))
+  if (!(obj->status_b & 0x4000000) || ((flags & 4) && !(obj->parent->status_b & 0x4000000)))
     return res;
   yz_max = -999999999;
   header = (zone_header *)cur_zone->items[0];
@@ -1246,7 +1231,7 @@ gool_objnode ZoneFindNearestObjectNode3(gool_object *obj, vec *v, int flags, int
     for (i=0;i<header->neighbor_count;i++) {
       neighbor = NSLookup(&header->neighbors[i]);
       z_rect = (zone_rect*)neighbor->items[1];
-      if (TestPointInRect((rect*)z_rect, v))
+      if (TestPointInRect((rect*)z_rect, &va))
         break;
     }
     if (i==header->neighbor_count) {
@@ -1263,6 +1248,7 @@ gool_objnode ZoneFindNearestObjectNode3(gool_object *obj, vec *v, int flags, int
   }
   /* find an object (other than obj) which collides with the input vec
      and which is stopped by some node */
+  found = 0; found_max = 0;
   for (i=0;i<object_bound_count;i++) {
     bound = &object_bounds[i];
     if (bound->obj == obj || bound->obj->node == 0xFFFF)
@@ -1273,7 +1259,7 @@ gool_objnode ZoneFindNearestObjectNode3(gool_object *obj, vec *v, int flags, int
         if (va.y >= bound->p1.y && va.y <= bound->p2.y) {
           res.obj = bound->obj;
           va.y = bound->p1.y;
-          flag2 = 1;
+          found = 1;
           break;
         }
         else if (bound->p2.y > yz_max && vb.y >= bound->p2.y) {
@@ -1289,7 +1275,7 @@ gool_objnode ZoneFindNearestObjectNode3(gool_object *obj, vec *v, int flags, int
         if (va.z >= bound->p1.z && va.z < bound->p2.z) {
           res.obj = bound->obj;
           va.z = bound->p1.z;
-          flag2 = 1;
+          found = 1;
           break;
         }
         if (bound->p2.z > yz_max && va.z >= bound->p2.z) {
@@ -1300,17 +1286,19 @@ gool_objnode ZoneFindNearestObjectNode3(gool_object *obj, vec *v, int flags, int
       }
     }
   }
-  if (found_max) { /* a highest below or nearest z-wise object found? */
+  if (!found && found_max) { /* a highest below or nearest z-wise object found? */
     if (flags & 1) {
       if (!res.obj || yz_max >= va.y) { /* no collider found or max object y is nearer to va? */
+        res.obj = found_max;
         va.y = yz_max; /* use the max object y as it is nearest to va */
-        flag2 = 1;
+        found = 1;
       }
     }
     else if (flags & 2) {
       if (!res.obj || yz_max >= va.z) { /* no collider found or max object z is nearer to va? */
+        res.obj = found_max;
         va.z = yz_max; /* use the max object z as it is nearest to va */
-        flag2 = 1;
+        found = 1;
       }
     }
   }
@@ -1324,7 +1312,7 @@ gool_objnode ZoneFindNearestObjectNode3(gool_object *obj, vec *v, int flags, int
     colors = &header->object_colors;
   if (!res.value) /* has nothing been found? */
     subtype = -1;
-  else if (flag2) { /* has an object been found? */
+  else if (found) { /* has an object been found? */
     subtype = res.obj->node; /* get node subtype from the object */
     if (subtype < 0) { /* subtype is negative? ('no seek' bit set) */
       flag = 0; /* clear the seek flag */
@@ -1399,7 +1387,6 @@ int ZoneQueryOctrees(vec *v, gool_object *obj, zone_query *query) {
   }
   count = query->result_count;
   *((int32_t*)(&query->results[count])) = -1;
-  // printf("result count: %i\n", count);
   return count;
 }
 

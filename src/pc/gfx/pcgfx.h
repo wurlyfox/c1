@@ -26,7 +26,7 @@ typedef struct {
 typedef struct {
   prim_struct;
   vec verts[3];
-  rgb colors[3];
+  rgba colors[3];
   fvec uvs[3];
   int texid;
   int flags;
@@ -35,7 +35,7 @@ typedef struct {
 typedef struct {
   prim_struct;
   vec verts[4];
-  rgb colors[4];
+  rgba colors[4];
   fvec uvs[4];
   int texid;
   int flags;

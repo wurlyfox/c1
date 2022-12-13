@@ -90,5 +90,8 @@ extern void SwTransformWorldsDark2(poly_id_list *poly_id_list, void *ot,
 #include "level.h"
 extern void SwTransformZoneQuery(zone_query *query, void *ot, void **prims_tail);
 #endif
+#ifdef CFLAGS_DRAW_WALLMAP
+extern void SwDrawWallMap(uint32_t *wall_bitmap, void *ot, void **prims_tail);
+#endif
 
 #endif /* _SOFT_H_ */

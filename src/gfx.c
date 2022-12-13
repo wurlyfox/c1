@@ -38,6 +38,15 @@ static rgb Rgb8To32(rgb8 c) {
   res.b = c.b*16843009;
   return res;
 }
+
+static rgba Rgb8ToA32(rgb8 c) {
+  rgba res;
+  res.r = c.r*16843009;
+  res.g = c.g*16843009;
+  res.b = c.b*16843009;
+  res.a = ~0;
+  return res;
+}
 #endif
 
 /* .data */
@@ -665,7 +674,7 @@ vec v_unk2;            /* 800578C4 */
 uint32_t screen_proj;  /* 800578D0 */
 mat16 mn_color;        /* 800578D4 */
 mat16 mn_light;        /* 800578F4 */
-uint32_t tri_wave[16]; /* 800567B8 */
+int32_t tri_wave[16];  /* 800567B8 */
 
 extern int32_t cam_rot_xz;
 extern ang cam_rot_after;
@@ -681,7 +690,7 @@ extern int dark_amb_fx0;
 extern int dark_amb_fx1;
 extern int32_t dark_dist;
 extern int32_t ripple_speed;
-extern uint32_t ripple_period;
+extern int32_t ripple_period;
 extern vec dark_illum;
 
 extern int frames_elapsed;
@@ -781,7 +790,7 @@ void GfxUpdateMatrices() {
   mat16_t m, mb;
   zone_header *header;
   rgb8 far_color;
-  uint32_t y_offs;
+  int32_t y_offs;
 
   s=sin(-cam_rot.z);
   c=cos(-cam_rot.z);
@@ -834,7 +843,7 @@ void GfxUpdateMatrices() {
   GfxCopyMatrix((mat16*)mb, &ms_cam_rot);
   GfxCopyMatrix(&ms_cam_rot, &ms_cam_rot2);
   if (header->flags & 0x1000) {
-    /* linearly ramp cam up and down approx. every second or 128 draws */
+    /* linearly ramp cam up and down approx. every 4 seconds or 128 draws */
     y_offs = abs(frames_elapsed % 128 - 64)*800;
     cam_trans_prev.y = y_offs + 901600;
     s = sin(125);
@@ -1016,16 +1025,16 @@ int GfxCalcObjectMatrices(svtx_frame *frame, tgeo_header *t_header,
   if (!(cur_display_flags & 0x10000)) {
     header=(zone_header*)cur_zone->items[0];
     far=header->visibility_depth>>8;
-    if (r_trans->z > (far?far:12000)) { return 0; }
+    //if (r_trans->z > (far?far:12000)) { return 0; }
     status_b = obj->process.status_b;
     colors = &obj->colors;
     if ((status_b & 0x40000) == 0) {
-      if (screen_proj >= r_trans->z) { return 0; }
+      if ((int32_t)screen_proj >= r_trans->z) { return 0; }
       if ((status_b & 0x80000000) == 0) {
         s_trans.x=((int32_t)screen_proj*r_trans->x)/r_trans->z;
         s_trans.y=((int32_t)screen_proj*r_trans->y)/r_trans->z;
-        if (abs(s_trans.x)  > 316) { return 0; }
-        if ((s_trans.y+138) > 326) { return 0; }
+        //if (abs(s_trans.x)  > 316) { return 0; }
+        //if ((s_trans.y+138) > 326) { return 0; }
       }
       else {
         /* weird code in original impl would set col to &frame->col
@@ -1037,10 +1046,10 @@ int GfxCalcObjectMatrices(svtx_frame *frame, tgeo_header *t_header,
 #else
         SwProjectBound(&obj->bound, col, &vectors->trans, &cam_trans_prev, &extents);
 #endif
-        if (extents.p1.x < -256 && extents.p2.x < -256) { return 0; }
-        if (extents.p1.x >  256 && extents.p2.x >  256) { return 0; }
-        if (extents.p1.y < -108 && extents.p2.y < -108) { return 0; }
-        if (extents.p1.y >  108 && extents.p2.y >  108) { return 0; }
+        //if (extents.p1.x < -256 && extents.p2.x < -256) { return 0; }
+        //if (extents.p1.x >  256 && extents.p2.x >  256) { return 0; }
+        //if (extents.p1.y < -108 && extents.p2.y < -108) { return 0; }
+        //if (extents.p1.y >  108 && extents.p2.y >  108) { return 0; }
       }
     }
     if (obj && (status_b & 0x400))
@@ -1355,10 +1364,10 @@ void GfxTransformFragment(gool_frag *frag, int32_t z, eid_t tpag,
   void **prims_tail;
   int i, tinf_idx, z_idx, texid;
 
-  verts[0].x=bound->p1.x;verts[0].y=bound->p2.y;
-  verts[1].x=bound->p2.x;verts[1].y=bound->p2.y;
-  verts[2].x=bound->p1.x;verts[2].y=bound->p1.y;
-  verts[3].x=bound->p2.x;verts[3].y=bound->p1.y;
+  verts[0].x=bound->p1.x;verts[0].y=bound->p1.y;
+  verts[1].x=bound->p2.x;verts[1].y=bound->p1.y;
+  verts[2].x=bound->p1.x;verts[2].y=bound->p2.y;
+  verts[3].x=bound->p2.x;verts[3].y=bound->p2.y;
   for (i=0;i<4;i++) {
     verts[i].z = 0;
 #ifdef GFX_SW_PERSP
@@ -1378,7 +1387,7 @@ void GfxTransformFragment(gool_frag *frag, int32_t z, eid_t tpag,
   for (i=0;i<4;i++) {
     prim->verts[i]=r_verts[i];
     /*prim->colors[i]=info->rgb;*/
-    prim->colors[i]=Rgb8To32(info.rgb);
+    prim->colors[i]=Rgb8ToA32(info.rgb);
     prim->uvs[i]=uvs[i];
   }
   prim->texid=texid;
@@ -1405,10 +1414,10 @@ void GfxTransformFontChar(gool_object *obj, gool_glyph *glyph, int32_t z,
   void **prims_tail;
   int i, idx, z_idx, texid;
 
-  verts[2].x=bound->p1.x;verts[2].y=bound->p2.y;
-  verts[3].x=bound->p2.x;verts[3].y=bound->p2.y;
-  verts[0].x=bound->p1.x;verts[0].y=bound->p1.y;
-  verts[1].x=bound->p2.x;verts[1].y=bound->p1.y;
+  verts[2].x=bound->p1.x;verts[2].y=bound->p1.y;
+  verts[3].x=bound->p2.x;verts[3].y=bound->p1.y;
+  verts[0].x=bound->p1.x;verts[0].y=bound->p2.y;
+  verts[1].x=bound->p2.x;verts[1].y=bound->p2.y;
   for (i=0;i<4;i++) {
     verts[i].z = 0;
 #ifdef GFX_SW_PERSP
@@ -1431,11 +1440,11 @@ void GfxTransformFontChar(gool_object *obj, gool_glyph *glyph, int32_t z,
       rgb.r = (info.r*obj->vert_colors[i].r)>>8;
       rgb.g = (info.g*obj->vert_colors[i].g)>>8;
       rgb.b = (info.b*obj->vert_colors[i].b)>>8;
-      prim->colors[i]=Rgb8To32(rgb);
+      prim->colors[i]=Rgb8ToA32(rgb);
     }
     else {
       // prim->colors[i]=info.rgb;
-      prim->colors[i]=Rgb8To32(info.rgb);
+      prim->colors[i]=Rgb8ToA32(info.rgb);
     }
     prim->uvs[i]=uvs[i];
   }
@@ -1572,7 +1581,7 @@ void GfxTransformWorldsFog(void *ot) {
   RMemcpy((void*)worlds,(void*)scratch.worlds/*0x1F800100*/, size); /* copy worlds to scratch mem */
 #else
   /* no need to copy worlds or set matrices */
-  params.worlds=header->worlds;
+  params.worlds=worlds;
   params.trans=cam_trans;
   params.m_rot=ms_cam_rot;
   params.m_light=mn_light;
@@ -1618,6 +1627,8 @@ void GfxTransformWorldsRipple(void *ot) {
         tri_wave[i]=-(ripple_period-1); /* restart after reaching the peak */
     }
   }
+  header=(zone_header*)cur_zone->items[0];
+  worlds=header->worlds;
 #ifdef PSX
   for (i=0;i<16;i++) {
     // tri_wave[i]=abs(tri_wave[i]);
@@ -1626,12 +1637,13 @@ void GfxTransformWorldsRipple(void *ot) {
   SetRotMatrix(&ms_cam_rot);
   SetLightMatrix(dword_800578F4);
   header=(zone_header*)cur_zone->items[0];
-  worlds=header->worlds;
   RMemcpy((void*)worlds,(void*)scratch.worlds/*0x1F800100*/,256);
   prims_tail=GpuGetPrimsTail();
   RGteTransformWorldsRipple(poly_ids,ot,0x800-(screen_proj/2),draw_count,prims_tail,(quad28*)uv_map);
 #else
-  params.worlds=header->worlds;
+  for (i=0;i<16;i++)
+    params.tri_wave[i] = abs(tri_wave[i]);
+  params.worlds=worlds;
   params.trans=cam_trans;
   params.m_rot=ms_cam_rot;
   params.m_light=mn_light;
@@ -1665,7 +1677,7 @@ void GfxTransformWorldsLightning(void *ot) {
   prims_tail=GpuGetPrimsTail();
   RGteTransformWorldsLightning(poly_ids,ot,0x800-(screen_proj/2),draw_count,prims_tail,(quad28*)uv_map);
 #else
-  params.worlds=header->worlds;
+  params.worlds=worlds;
   params.trans=cam_trans;
   params.m_rot=ms_cam_rot;
   params.m_light=mn_light;
@@ -1709,7 +1721,7 @@ void GfxTransformWorldsDark(void *ot) {
   prims_tail=GpuGetPrimsTail();
   RGteTransformWorldsDark(poly_ids,ot,0x800-(screen_proj/2),draw_count,prims_tail,(quad28*)uv_map,far,shamt);
 #else
-  params.worlds=header->worlds;
+  params.worlds=worlds;
   params.trans=cam_trans;
   params.m_rot=ms_cam_rot;
   params.m_light=mn_light;

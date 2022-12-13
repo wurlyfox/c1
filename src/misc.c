@@ -83,7 +83,7 @@ int dark_amb_fx0 = 0;               /* 80056468; gp[0x1B] */
 int dark_amb_fx1 = 0;               /* 8005646C; gp[0x1C] */
 int32_t dark_dist = 0;              /* 80056470; gp[0x1D] */
 int32_t ripple_speed = 10;          /* 80056474; gp[0x1E] */
-uint32_t ripple_period = 127;       /* 80056478; gp[0x1F] */
+int32_t ripple_period = 127;        /* 80056478; gp[0x1F] */
 int lseq_state = -1;                /* 800564C8; gp[0x33] */
 int lseq_idx = 0;                   /* 800564CC; gp[0x34] */
 /* .sbss */
@@ -169,13 +169,13 @@ void ShaderParamsUpdate(int init) {
       far_color2.r = 255;
       far_color2.g = 43;
       far_color2.b = 11;
-      return;
+      break;
     case LID_GENERATORROOM:
       far_t1 = 0;
       far_color2.r = 238;
       far_color2.g = 255;
       far_color2.b = 60;
-      return;
+      break;
     case LID_PAPUPAPU:
     case LID_TEMPLERUINS:
     case LID_JAWSOFDARKNESS:
@@ -189,7 +189,7 @@ void ShaderParamsUpdate(int init) {
       far_color2.r = 0;
       far_color2.g = 240;
       far_color2.b = 255;
-      return;
+      break;
     case LID_THELOSTCITY:
     case LID_SUNSETVISTA:
       far_t1 = 0;
@@ -203,7 +203,7 @@ void ShaderParamsUpdate(int init) {
       ruins_fc2_0b.r = 255;
       ruins_fc2_0b.g = 75;
       ruins_fc2_0b.b = 0;
-      return;
+      break;
     case LID_KOALAKONG:
       far_t1 = 0;
       far_color2.r = 200;
@@ -219,9 +219,8 @@ void ShaderParamsUpdate(int init) {
       dark_afx0_next = 4095;
       dark_dist_next = 2000;
       break;
-    default:
-      return;
     }
+    return;
   }
   switch (ns.ldat->lid) {
   case LID_CORTEXPOWER:

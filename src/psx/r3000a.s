@@ -7396,10 +7396,23 @@ calc_object_light_matrices_scale_x_gteq0_4:
     mflo    $ra
     sra     $ra, 8                           # $ra = mres >> 8 = (colors->color.b*colors->intensity.b) >> 8
     ctc2    $ra, $15                         # set GTE BBK = (colors->color.b*colors->intensity.b) >> 8
-#               [$s7, $s1, $s5]            [[-]colors->light_mat[0][0], [-]colors->light_mat[1][0], [-]colors->light_mat[2][0]]
-# let m_lrot2 = [$s3, $t2, $s2] = m_lrot * [   colors->light_mat[0][1],    colors->light_mat[1][1],    colors->light_mat[2][1]]
-#               [$t8, $s6, $s9]            [   colors->light_mat[0][2],    colors->light_mat[1][2],    colors->light_mat[2][2]]
-#                               = m_lrot * (colors->light_mat)^T
+#                 [$s7, $s3, $t8]            [[-]colors->light_mat[0][0], [-]colors->light_mat[1][0], [-]colors->light_mat[2][0]]
+# let m_lrot2^T = [$s1, $t2, $s6] = m_lrot * [   colors->light_mat[0][1],    colors->light_mat[1][1],    colors->light_mat[2][1]]
+#                 [$s5, $s2, $s9]            [   colors->light_mat[0][2],    colors->light_mat[1][2],    colors->light_mat[2][2]]
+#                                 = m_lrot * (colors->light_mat)^T
+#
+# so that m_lrot2 = [$s7, $s1, $s5]
+#                   [$s3, $t2, $s2]
+#                   [$t8, $s6, $s9]
+#
+# then (AB)^T = (B^T)(A^T)
+#
+# and m_lrot2^T
+#     = m_lrot * (colors->light_mat)^T
+#     = (m_lrot^T)^T * (colors->light_mat)^T
+#     = (colors->light_mat * m_lrot^T) ^ T
+#     =>
+#     m_lrot2 = colors->light_mat * m_lrot^T
     andi    $at, $s7, 0xFFFF
     sll     $t1, $s1, 16
     or      $t1, $at
@@ -7417,7 +7430,7 @@ calc_object_light_matrices_scale_x_gteq0_4:
     or      $t1, $at
     ctc2    $t1, $11                         # set GTE L31L32 = (m_lrot2_32 << 16) | m_lrot2_31
     ctc2    $t9, $12                         # set GTE L33    = m_lrot2_33
-# GTE L = m_lrot2 = m_lrot * (colors->light_mat)^T
+# GTE L = m_lrot2 = colors->light_mat * m_lrot^T
     lui     $at, 0xFFFF
     and     $t1, $s4, $at                    # $t1 = ((int16_t)colors->color_mat[1][0] << 16)
     andi    $t3, $s0, 0xFFFF                 # $t3 =  (int16_t)colors->color_mat[0][0]

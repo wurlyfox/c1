@@ -102,7 +102,7 @@ extern int object_bound_count;
 extern int frames_elapsed;
 
 //----- (8002BE8C) --------------------------------------------------------
-int TransSmoothStopAtSolid(gool_object *obj, vec *velocity, zone_query *query) {
+void TransSmoothStopAtSolid(gool_object *obj, vec *velocity, zone_query *query) {
   vec cur_trans, cur_velocity;
   vec next_trans, next_velocity;
   vec delta_trans, slope_accel;
@@ -110,7 +110,7 @@ int TransSmoothStopAtSolid(gool_object *obj, vec *velocity, zone_query *query) {
 
   if (!obj) {
     being_stopped = 0;
-    return 0;
+    return;
   }
   if (ns.ldat->lid == LID_HOGWILD || ns.ldat->lid == LID_WHOLEHOG) /* hog wild or whole hog? */
     land_offset = 162500; /* higher land */
@@ -149,9 +149,9 @@ int TransSmoothStopAtSolid(gool_object *obj, vec *velocity, zone_query *query) {
   if (obj->status_a & 0x400) {
     arg = 0x6400;
     if (!(obj->status_a & 1))
-      return GoolSendEvent(0, obj, obj->event, 1, &arg);
-    if (obj->event != GOOL_EVENT_BOX_STACK_BREAK)
-      return GoolSendEvent(0, obj, obj->event, 1, &arg);
+      GoolSendEvent(0, obj, obj->event, 1, &arg);
+    else if (obj->event != GOOL_EVENT_BOX_STACK_BREAK)
+      GoolSendEvent(0, obj, obj->event, 1, &arg);
   }
 }
 
@@ -174,9 +174,9 @@ void TransPullStopAtSolid(gool_object *obj, zone_query *query, vec *trans, vec *
   max_mag = max(max(abs_mag.x, abs_mag.y), abs_mag.z)+1;
   /* calculate upper limit on change in trans;
      either x or z will max out at 25600 or y at 153600 */
-  max_delta_trans.x = velocity->x / max_mag;
-  max_delta_trans.y = velocity->y / max_mag;
-  max_delta_trans.z = velocity->z / max_mag;
+  max_delta_trans.x = velocity->x / (int)max_mag;
+  max_delta_trans.y = velocity->y / (int)max_mag;
+  max_delta_trans.z = velocity->z / (int)max_mag;
   /* velocity from hereon will hold the 'remaining trans' */
   while (velocity->x != 0 || velocity->y != 0 || velocity->z != 0) { /* trans remaining? */
     /* set delta trans initially to velocity (i.e. 'remaining trans') */
@@ -285,39 +285,39 @@ static int StopAtHighestObjectBelow(gool_object *obj, vec *trans, vec *next_tran
   entry *exec;
   gool_header *header;
   gool_bound *bound, *found;
-  int32_t min_y, test_y, delta_y;
+  int32_t max_y, test_y, delta_y;
   int i, colliding;
 
-  min_y = -999999999;
-  if (object_bound_count == 0) { return min_y; }
+  max_y = -999999999;
+  if (object_bound_count == 0) { return max_y; }
   delta_y = trans->y - next_trans->y;
-  test_y = delta_y > 0 ? trans->y : next_trans->y;
+  test_y = (delta_y > 0 ? trans->y : next_trans->y) + 62500;
   GoolCalcBound(&test_bound_obj, next_trans, &query->collider_bound);
-  query->i++;
+  query->i += 16;
   found=0;
   for (i=0;i<object_bound_count;i++) {
     bound = &object_bounds[i];
     colliding = 0;
     if ((test_y >= bound->p2.y || (bound->obj->status_b & 0x400000))
-      && min_y < bound->p2.y
+      && max_y < bound->p2.y
       && TestBoundIntersection(&query->collider_bound, &bound->bound)) {
       found = bound;
-      query->i++;
+      query->i += 4096;
       colliding = 1;
     }
     if (colliding && (bound->obj->status_b & GOOL_FLAG_SOLID_TOP)) {
       exec = bound->obj->global;
       header = (gool_header*)exec->items[0];
-      if (!(obj->state_flags & GOOL_FLAG_FLING_STATE)
-        || obj->invincibility_state != 5
-        || header->category != 0x300
-        || ((bound->obj->status_c & 0x1012) && !(bound->obj->state_flags & 10020)))
-        min_y = bound->p2.y + 1;
+      if ((!(obj->state_flags & GOOL_FLAG_FLING_STATE)
+       && obj->invincibility_state != 5)
+       || header->category != 0x300
+       || ((bound->obj->status_c & 0x1012) && !(bound->obj->state_flags & 10020)))
+        max_y = bound->p2.y + 1;
     }
   }
   if (found)
     GoolCollide(obj, &query->collider_bound, found->obj, &found->bound);
-  return min_y;
+  return max_y;
 }
 
 //----- (8002C8EC) --------------------------------------------------------
@@ -363,26 +363,20 @@ static int StopAtFloor(gool_object *obj, vec *trans, vec *next_trans, zone_query
   flags = 0x40001; /* assume on the floor and hitting the floor */
   if (solid_objs_y != -999999999) { /* solid object below? */
     floor_nodes_y = solid_objs_y; /* overrides the floor */
-    flags &= 0xFFFBFFFF; /* not on the floor (on top of an object) */
+    flags = 0x200001; /* on an object and hitting at the top */
     if (obj->collider) { /* object is set as the collider? */
       if (obj->collider->status_b & 0x400000) /* object beneath us is a box? */
         floor_offset = 0x19000; /* set floor offset to box height */
-      if ((obj->anim_stamp - obj->floor_impact_stamp) < 4) /* at least 4 frames since last hitting floor? */
-        flags |= 0x200000; /* on top of the object */
-      else
-        flags = 0x204001; /* bouncing on and/or breaking the object (box) (?) */
+      if ((obj->anim_stamp - obj->floor_impact_stamp) >= 4) /* more than 4 frames since last hitting floor? */
+        flags |= 0x4000; /* breaking/bouncing(?) */
     }
-    else
-      flags |= 0x200000;
   }
   if (obj->velocity.y > 0) { /* jumping/launching? */
     /* no toggle, no bounce/break box, not on ground, no collide box */
-    obj->status_a &= 0xFFDBBFFE; /* clear bits 1,15,19,22 */
+    obj->status_a &= ~0x244001; /* clear bits 1,15,19,22 */
   }
   if ((floor_nodes_y == -999999999 && solid_nodes_y == -999999999)
-           || obj->velocity.y > 0) { /* not atop the floor or wall? */
-    // printf("no floor\n");
-    // if (obj->velocity.y > 0) { printf("jumping\n"); }
+   || obj->velocity.y > 0) { /* not atop the floor or wall? */
     query->floor = 0; /* not on any kind of floor */
     return -999999999;
   }
@@ -421,11 +415,11 @@ static int StopAtCeil(gool_object *obj, vec *next_trans, zone_query *query) {
   zone_rect *rect;
   gool_bound *bound, *found;
   vec above_zone;
-  int32_t min_y, ceil;
+  int32_t max_y, ceil;
   uint32_t arg;
   int i;
 
-  min_y = -999999999;
+  max_y = -999999999;
   found = 0;
   GoolCalcBound(&test_bound_objtop, next_trans, &query->collider_bound);
   for (i=0;i<object_bound_count;i++) {
@@ -433,10 +427,8 @@ static int StopAtCeil(gool_object *obj, vec *next_trans, zone_query *query) {
     if (!(bound->obj->status_b & GOOL_FLAG_SOLID_BOTTOM)) { continue; } /* skip objects which are not solid at the bottom */
     if (TestBoundIntersection(&query->collider_bound, &bound->bound)) {
       found = bound;
-      if (min_y == -999999999)
-        min_y = bound->p1.y;
-      else if (bound->p1.y < min_y)
-        min_y = bound->p1.y;
+      if (max_y == -999999999 || bound->p1.y >= max_y)
+        max_y = bound->p1.y;
     }
   }
   GoolCalcBound(&test_bound_ceil, next_trans, &query->collider_bound);
@@ -474,11 +466,11 @@ static int StopAtCeil(gool_object *obj, vec *next_trans, zone_query *query) {
   }
   /* found an object that is hit from the bottom
      and either no ceiling found or the object is lower than the ceiling? */
-  if (min_y != -999999999 && (ceil == -999999999 || min_y < ceil)) {
+  if (max_y != -999999999 && (ceil == -999999999 || max_y < ceil)) {
     found->obj->status_a |= GOOL_FLAG_HIT_AT_BOTTOM; /* set flag for 'hit from the bottom' */
     arg = 0x6400;
     GoolSendEvent(obj, found->obj, 0x1700, 1, &arg); /* ...and send the corresponding event */
-    return min_y; /* return y location of the object bottom */
+    return max_y; /* return y location of the object bottom */
   }
   else /* the ceiling is hit */
     return ceil; /* so return that value */
@@ -527,45 +519,46 @@ static int StopAtZone(gool_object *obj, vec *next_trans) {
 
 //----- (8002D384) --------------------------------------------------------
 void TransStopAtSolid(gool_object *obj, zone_query *query, vec *trans, vec *delta_trans, vec *next_trans) {
-  vec bit_idx, adj_bit_idx;
+  vec bit_idx, adj_bit_idx, adj_trans;
   int32_t floor, ceil;
   int found;
 
-  next_trans->x = trans->x + delta_trans->x;
-  next_trans->y = trans->y + delta_trans->y;
-  next_trans->z = trans->z + delta_trans->z;
-  StopAtFloor(obj, trans, next_trans, query, &floor);
+  adj_trans.x = trans->x + delta_trans->x;
+  adj_trans.y = trans->y + delta_trans->y;
+  adj_trans.z = trans->z + delta_trans->z;
+  StopAtFloor(obj, trans, &adj_trans, query, &floor);
   PlotWalls(trans, obj, query); /* 1) */
-  bit_idx.x = (((next_trans->x-trans->x)<<2)/8192) + 16; /* 2) */
-  bit_idx.z = (((next_trans->z-trans->z)<<2)/8192) + 16;
+  bit_idx.x = (((adj_trans.x-trans->x)<<2)/8192) + 16; /* 2) */
+  bit_idx.z = (((adj_trans.z-trans->z)<<2)/8192) + 16;
   found = StopAtWalls(trans, bit_idx.x, bit_idx.z, &adj_bit_idx.x, &adj_bit_idx.z, obj, 0); /* 3) */
   if (found) { /* was a non-solid bit found (in place of or near the desired dest location)? */
     /* convert [adjusted] index back to a relative location and add to trans */
-    next_trans->x = trans->x + (((adj_bit_idx.x - 16)*8192)>>2); /* readjust */
-    next_trans->z = trans->z + (((adj_bit_idx.z - 16)*8192)>>2);
+    adj_trans.x = trans->x + (((adj_bit_idx.x - 16)*8192)>>2); /* readjust */
+    adj_trans.z = trans->z + (((adj_bit_idx.z - 16)*8192)>>2);
   }
   else {
-    next_trans->x = trans->x; /* cannot move in xz plane */
-    next_trans->z = trans->z;
+    adj_trans.x = trans->x; /* cannot move in xz plane */
+    adj_trans.z = trans->z;
   }
   query->i++;
   if ((bit_idx.x != 16 || bit_idx.z != 16) /* does this count as movement at the bitmap scale? 4) */
     && adj_bit_idx.x == bit_idx.x && adj_bit_idx.z == bit_idx.z) /* no readjustment due to solid wall? 5) */
     obj->status_a |= 0x100; /* set flag for 'not stopped by a wall' */
-  ceil = StopAtCeil(obj, next_trans, query); /* check for solids above crash */
+  ceil = StopAtCeil(obj, &adj_trans, query); /* check for solids above crash */
   if (ceil != -999999999) /* was a solid found? */
     query->ceil = ceil; /* record its y location */
   else
     query->ceil = 0;
   /* ceiling y location above bottom of object bound box? */
-  if (ceil != -999999999 && ceil-1 < (next_trans->y+0x29900)) {
-    if (next_trans->y < ceil-0x29900) /* top of object above ceiling? */
-      next_trans->y = ceil-0x29900; /* stop object */
+  if (ceil != -999999999 && ceil-1 < (adj_trans.y+0x29900)) {
+    if (adj_trans.y < ceil-0x29900) /* top of object above ceiling? */
+      adj_trans.y = ceil-0x29900; /* stop object */
     if (obj->velocity.y > 0) /* also clear positive y velocity */
       obj->velocity.y = 0;
     obj->status_b |= 0x80; /* set flag for 'hit the ceiling' */
   }
-  StopAtZone(obj, next_trans); /* stop at solid zone floors */
+  StopAtZone(obj, &adj_trans); /* stop at solid zone floors */
+  *next_trans = adj_trans;
 }
 
 //----- (8002D638) --------------------------------------------------------
@@ -719,10 +712,10 @@ static void PlotObjWalls(vec *next_trans, gool_object *obj, zone_query *query, i
         dist_xz = sqrt((delta.x*delta.x)+(delta.z*delta.z)) << 8;
         if (dist_xz <= 0x19000) { continue; }
       }
-      x1 = shr_floor((node_bound.p1.x-next_trans->x)*4, 13);
-      z1 = shr_floor((node_bound.p1.z-next_trans->z)*4, 13);
-      x2 = shr_floor((node_bound.p2.x-next_trans->x)*4, 13);
-      z2 = shr_floor((node_bound.p2.z-next_trans->z)*4, 13);
+      x1 = ((node_bound.p1.x-next_trans->x)*4) >> 13;
+      z1 = ((node_bound.p1.z-next_trans->z)*4) >> 13;
+      x2 = ((node_bound.p2.x-next_trans->x)*4) >> 13;
+      z2 = ((node_bound.p2.z-next_trans->z)*4) >> 13;
       PlotWallB(x1, z1, x2, z2, 1);
       if (flag) {
         for (ii=x1;ii<x2;ii+=8)
@@ -826,7 +819,7 @@ static int ReplotWalls(int op, int flags, vec *next_trans, gool_object *obj) {
       node_rect.loc.y = result->y << 4; /* recover original scale */
       node_rect.dim.h = zone_dim.h >> min(level, max_depth.y);
       node_bound.p1.y = node_rect.loc.y + query->nodes_bound.p1.y; /* local bound to bound */
-      node_bound.p2.y = node_bound.p1.y + node_rect.dim.h;
+      node_bound.p2.y = node_bound.p1.y + (int32_t)node_rect.dim.h;
       dist.p1.y = node_bound.p1.y - next_trans->y;
       dist.p2.y = node_bound.p2.y - next_trans->y;
       plot = ((flags == 0 && dist.p1.y<=(100<<8) && dist.p2.y>=(-400<<8)))
@@ -842,16 +835,16 @@ static int ReplotWalls(int op, int flags, vec *next_trans, gool_object *obj) {
       node_rect.dim.d = zone_dim.d >> min(level, max_depth.z);
       node_bound.p1.x = node_rect.loc.x + query->nodes_bound.p1.x;
       node_bound.p1.z = node_rect.loc.z + query->nodes_bound.p1.z;
-      node_bound.p2.x = node_bound.p1.x + node_rect.dim.w;
-      node_bound.p2.z = node_bound.p1.z + node_rect.dim.d;
+      node_bound.p2.x = node_bound.p1.x + (int32_t)node_rect.dim.w;
+      node_bound.p2.z = node_bound.p1.z + (int32_t)node_rect.dim.d;
       dist.p1.x = node_bound.p1.x - next_trans->x;
       dist.p2.x = node_bound.p2.x - next_trans->x;
       dist.p1.z = node_bound.p1.z - next_trans->z;
       dist.p2.z = node_bound.p2.z - next_trans->z;
-      x1 = shr_floor((dist.p1.x)*4, 13);
-      z1 = shr_floor((dist.p1.z)*4, 13);
-      x2 = shr_floor((dist.p2.x)*4, 13);
-      z2 = shr_floor((dist.p2.z)*4, 13);
+      x1 = (dist.p1.x*4) >> 13;
+      z1 = (dist.p1.z*4) >> 13;
+      x2 = (dist.p2.x*4) >> 13;
+      z2 = (dist.p2.z*4) >> 13;
       PlotWallB(x1, z1, x2, z2, 1);
       ++result;
       ++result_count;
@@ -1069,7 +1062,7 @@ void PlotQueryWalls(
   dim zone_dim;
   vec max_depth;
   uint16_t node;
-  int i, level, type, subtype;
+  int i, ii, level, type, subtype;
 
   result = &query->results[0];
   for (i=0;i<query->result_count;i++) {
@@ -1089,12 +1082,12 @@ void PlotQueryWalls(
     level = result->level;
     type = (node & 0xE) >> 1;
     subtype = (node & 0x3F0) >> 4;
-    nbound.p1.x = (result->x << 4) + nodes_bound->p1.x; // t6
-    nbound.p1.y = (result->y << 4) + nodes_bound->p1.y; // t7
-    nbound.p1.z = (result->z << 4) + nodes_bound->p1.z; // s0
-    nbound.p2.x = nbound.p1.x + (zone_dim.w >> min(level, max_depth.x)); // s1
-    nbound.p2.y = nbound.p1.y + (zone_dim.h >> min(level, max_depth.y)); // s2
-    nbound.p2.z = nbound.p1.z + (zone_dim.d >> min(level, max_depth.z)); // s3
+    nbound.p1.x = ((int32_t)result->x << 4) + nodes_bound->p1.x; // t6
+    nbound.p1.y = ((int32_t)result->y << 4) + nodes_bound->p1.y; // t7
+    nbound.p1.z = ((int32_t)result->z << 4) + nodes_bound->p1.z; // s0
+    nbound.p2.x = nbound.p1.x + (int32_t)(zone_dim.w >> min(level, max_depth.x)); // s1
+    nbound.p2.y = nbound.p1.y + (int32_t)(zone_dim.h >> min(level, max_depth.y)); // s2
+    nbound.p2.z = nbound.p1.z + (int32_t)(zone_dim.d >> min(level, max_depth.z)); // s3
     ++result;
     if (type == 3 || type == 4) { continue; }
     if (type == 1) {
@@ -1107,26 +1100,26 @@ void PlotQueryWalls(
     }
     else
       continue;
-    nbound.p1.x = ((nbound.p1.x - trans_x) << 2) >> 13;
-    nbound.p2.x = ((nbound.p2.x - trans_x) << 2) >> 13;
-    nbound.p1.z = ((nbound.p1.z - trans_z) << 2) >> 13;
-    nbound.p2.z = ((nbound.p2.z - trans_z) << 2) >> 13;
+    nbound.p1.x = (int)((nbound.p1.x - trans_x) << 2) >> 13;
+    nbound.p2.x = (int)((nbound.p2.x - trans_x) << 2) >> 13;
+    nbound.p1.z = (int)((nbound.p1.z - trans_z) << 2) >> 13;
+    nbound.p2.z = (int)((nbound.p2.z - trans_z) << 2) >> 13;
     if (-32 < nbound.p1.z && nbound.p1.z < 32) {
-      for (i=nbound.p1.x;i<nbound.p2.x;i+=8) {
-        PlotWall(i, nbound.p1.z);
+      for (ii=nbound.p1.x;ii<nbound.p2.x;ii+=8) {
+        PlotWall(ii, nbound.p1.z);
       }
     }
     if (-32 < nbound.p2.x && nbound.p2.x < 32) {
-      for (i=nbound.p1.z;i<nbound.p2.z;i+=8)
-        PlotWall(nbound.p2.x, i);
+      for (ii=nbound.p1.z;ii<nbound.p2.z;ii+=8)
+        PlotWall(nbound.p2.x, ii);
     }
     if (-32 < nbound.p2.z && nbound.p2.z < 32) {
-      for (i=nbound.p2.x;i>nbound.p1.x;i-=8)
-        PlotWall(i, nbound.p2.z);
+      for (ii=nbound.p2.x;ii>nbound.p1.x;ii-=8)
+        PlotWall(ii, nbound.p2.z);
     }
     if (-32 < nbound.p1.x && nbound.p1.x < 32) {
-      for (i=nbound.p2.z;i>nbound.p1.z;i-=8)
-        PlotWall(nbound.p1.x, i);
+      for (ii=nbound.p2.z;ii>nbound.p1.z;ii-=8)
+        PlotWall(nbound.p1.x, ii);
     }
   }
 }
@@ -1180,8 +1173,8 @@ void FindFloorY(
   int32_t default_y,
   int (*func)(gool_object*, uint32_t)) {
 
-  ZZ_FindFloorY(obj,query,nodes_bound,collider_bound,max_y,summary,default_y,func);
-  return;
+  //ZZ_FindFloorY(obj,query,nodes_bound,collider_bound,max_y,summary,default_y,func);
+  //return;
 
   int32_t sum_y2[2];
   int count[2];
@@ -1221,9 +1214,9 @@ void FindFloorY(
       || collider_bound->p2.y < nbound.p1.y
       || collider_bound->p2.z < nbound.p1.z)
       continue;
-    nbound.p2.x = nbound.p1.x + (zone_dim.w >> min(level, max_depth.x));
-    nbound.p2.y = nbound.p1.y + (zone_dim.h >> min(level, max_depth.y));
-    nbound.p2.z = nbound.p1.z + (zone_dim.d >> min(level, max_depth.z));
+    nbound.p2.x = nbound.p1.x + (int32_t)(zone_dim.w >> min(level, max_depth.x));
+    nbound.p2.y = nbound.p1.y + (int32_t)(zone_dim.h >> min(level, max_depth.y));
+    nbound.p2.z = nbound.p1.z + (int32_t)(zone_dim.d >> min(level, max_depth.z));
     if (nbound.p2.x < collider_bound->p1.x
       || nbound.p2.y < collider_bound->p1.y
       || nbound.p2.z < collider_bound->p1.z)
@@ -1297,9 +1290,9 @@ int FindCeilY(
       || collider_bound->p2.y < nbound.p1.y
       || collider_bound->p2.z < nbound.p1.z)
       continue;
-    nbound.p2.x = nbound.p1.x + (zone_dim.w >> min(level, max_depth.x));
-    nbound.p2.y = nbound.p1.y + (zone_dim.h >> min(level, max_depth.y));
-    nbound.p2.z = nbound.p1.z + (zone_dim.d >> min(level, max_depth.z));
+    nbound.p2.x = nbound.p1.x + (int32_t)(zone_dim.w >> min(level, max_depth.x));
+    nbound.p2.y = nbound.p1.y + (int32_t)(zone_dim.h >> min(level, max_depth.y));
+    nbound.p2.z = nbound.p1.z + (int32_t)(zone_dim.d >> min(level, max_depth.z));
     if (nbound.p2.x < collider_bound->p1.x
       || nbound.p2.y < collider_bound->p1.y
       || nbound.p2.z < collider_bound->p2.z)
