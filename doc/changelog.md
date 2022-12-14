@@ -1,5 +1,13 @@
 # Changelog
 
+## 2022-12-13
+
+### Fixed
+
+- (most) transparency has not been implemented
+- (most) semi-transparency/blending behavior is inaccurate
+- incorrect starting location for pickups when moving to hud
+
 ## 2022-12-12
 
 ### Fixed

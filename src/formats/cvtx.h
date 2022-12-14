@@ -19,12 +19,12 @@ typedef struct {
   int32_t x;
   int32_t y;
   int32_t z;
-  uint32_t bound_x1;
-  uint32_t bound_y1;
-  uint32_t bound_z1;
-  uint32_t bound_x2;
-  uint32_t bound_y2;
-  uint32_t bound_z2;
+  int32_t bound_x1;
+  int32_t bound_y1;
+  int32_t bound_z1;
+  int32_t bound_x2;
+  int32_t bound_y2;
+  int32_t bound_z2;
   int32_t col_x;
   int32_t col_y;
   int32_t col_z;

@@ -1364,13 +1364,13 @@ void GfxTransformFragment(gool_frag *frag, int32_t z, eid_t tpag,
   void **prims_tail;
   int i, tinf_idx, z_idx, texid;
 
-  verts[0].x=bound->p1.x;verts[0].y=bound->p1.y;
-  verts[1].x=bound->p2.x;verts[1].y=bound->p1.y;
-  verts[2].x=bound->p1.x;verts[2].y=bound->p2.y;
-  verts[3].x=bound->p2.x;verts[3].y=bound->p2.y;
+  verts[2].x=bound->p1.x;verts[2].y=bound->p1.y;
+  verts[3].x=bound->p2.x;verts[3].y=bound->p1.y;
+  verts[0].x=bound->p1.x;verts[0].y=bound->p2.y;
+  verts[1].x=bound->p2.x;verts[1].y=bound->p2.y;
   for (i=0;i<4;i++) {
     verts[i].z = 0;
-#ifdef GFX_SW_PERSP
+#ifdef CFLAGS_GFX_SW_PERSP
     SwRotTransPers(&verts[i], &r_verts[i], &params.trans, &params.m_rot,
       &params.screen, screen_proj);
 #else
@@ -1391,6 +1391,7 @@ void GfxTransformFragment(gool_frag *frag, int32_t z, eid_t tpag,
     prim->uvs[i]=uvs[i];
   }
   prim->texid=texid;
+  prim->flags=info.semi_trans;
   z_sum=prim->verts[0].z+prim->verts[1].z+prim->verts[2].z;
   z_dist=z+(0x800-screen_proj/2); /* far??? */
   z_idx=z_dist-(z_sum/32);
@@ -1420,7 +1421,7 @@ void GfxTransformFontChar(gool_object *obj, gool_glyph *glyph, int32_t z,
   verts[1].x=bound->p2.x;verts[1].y=bound->p2.y;
   for (i=0;i<4;i++) {
     verts[i].z = 0;
-#ifdef GFX_SW_PERSP
+#ifdef CFLAGS_GFX_SW_PERSP
     SwRotTransPers(&verts[i], &r_verts[i], &params.trans, &params.m_rot,
       &params.screen, screen_proj);
 #else
@@ -1449,6 +1450,7 @@ void GfxTransformFontChar(gool_object *obj, gool_glyph *glyph, int32_t z,
     prim->uvs[i]=uvs[i];
   }
   prim->texid=texid;
+  prim->flags=info.semi_trans;
   z_sum=prim->verts[0].z+prim->verts[1].z+prim->verts[2].z;
   z_dist=z+(0x800-screen_proj/2); /* far??? */
   z_idx=z_dist-(z_sum/32);

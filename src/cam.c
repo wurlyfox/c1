@@ -138,8 +138,8 @@ static int CamGetProgress(vec *trans, zone_path *path, cam_info *cam, int flags,
   }
   entrance = 0; exit = 0;
   if (flag) {
-    if (flags & 1) { entrance = path->entrance_index; }
-    if (flags & 2) { exit = path->exit_index; }
+    if (flags & 1) { entrance = (int)path->entrance_index; }
+    if (flags & 2) { exit = (int)path->exit_index; }
   }
   if (pt_idx >= entrance) { /* at or past the entrance? */
     if (pt_idx >= (path->length - exit)) { /* past or at the exit */
@@ -240,12 +240,12 @@ static int CamGetProgress2(vec *trans, zone_path *path, cam_info *cam, int flags
     cam->next_path = path; /* set the next path */
   entrance = 0; exit = 0;
   if (flag) {
-    if (flags & 1) { entrance = path->entrance_index; }
-    if (flags & 2) { exit = path->exit_index; }
+    if (flags & 1) { entrance = (int)path->entrance_index; }
+    if (flags & 2) { exit = (int)path->exit_index; }
   }
   pt_idx = progress >> 8;
   if (pt_idx >= entrance) { /* at or past the entrance? */
-    if (pt_idx >= (path->length - exit)) { /* past or at the exit */
+    if (pt_idx >= (int32_t)(path->length - exit)) { /* past or at the exit */
       if (exit || (path != cur_path)) /* exit is not at zero or not the current? */
         return 0; /* abandon the camera */
       progress = (path->length << 8) - 1; /* force to end of path */
@@ -586,7 +586,7 @@ int CamUpdate() {
               break;
             }
           }
-          /* orig impl. otherwise errnoneously goes to next code with n_path_idx = -1 */
+          /* orig impl. otherwise erroneously goes to next code with n_path_idx = -1 */
         }
         zone_s1 = path_s1->parent_zone;
         path_s1 = ZoneGetNeighborPath(zone_s1, path_s1, n_path_idx);
@@ -703,8 +703,8 @@ int CamDeath(int *count) {
     if (*count == 0) /* calculate delta xz angle between transformed vertex and camera, for 9 iterations */
       dcam_angvel = GoolAngDiff(cam_rot.x, ang_xz) / 9;
     dcam_trans_z = dist_xz << 8; /* radius of the below circle (this seeks towards 175000 for count >= 9 */
-    dcam_rot_y1 = 0; /* base angular distance around the below circle circumfrence */
-    dcam_rot_y2 = ang_xz; /* angular distance around the below circle circumfrence */
+    dcam_rot_y1 = 0; /* base angular distance around the below circle circumference */
+    dcam_rot_y2 = ang_xz; /* angular distance around the below circle circumference */
     dcam_accel = 22;
     cam_rot.x += dcam_angvel; /* rotate cam in xz plane towards the vertex */
     *(count)++;

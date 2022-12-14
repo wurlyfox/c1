@@ -226,8 +226,8 @@ int GoolObjectOrientOnPath(gool_object *obj, int progress, vec *loc) {
   uint32_t status_a, status_b;
   vec *trans, *zone_loc, loc_next, dist_obj, dot, dir;
   zone_entity_path_point *path_pt, *next_pt; // $a0
-  uint32_t dist_xz, x, z;
-  int32_t proj, proj_part;
+  uint32_t dist_xz;
+  int32_t x, z, proj, proj_part;
 
   entity = obj->entity;
   if (!obj || !entity) { return ERROR; }
@@ -279,7 +279,7 @@ int GoolObjectOrientOnPath(gool_object *obj, int progress, vec *loc) {
     dot.x = (dist_obj.x>>4)*(dir.x>>4);
     dot.z = (dist_obj.z>>4)*(dir.z>>4);
     /* compute the scalar projection: (A . B) / ||B||^2 */
-    proj = (dot.x+dot.z)/(dist_xz*dist_xz);
+    proj = (dot.x+dot.z)/((int32_t)dist_xz*(int32_t)dist_xz);
     if (proj >= 0x100) { /* too far of a corresponding change in progress? */
       idx = progress >> 8;
       idx_next = idx+1;
@@ -289,8 +289,7 @@ int GoolObjectOrientOnPath(gool_object *obj, int progress, vec *loc) {
     /* recompute (A . B) / ||B||;
        [compute the vector projection in the order:
        ((A . B) / ||B||) x (B / ||B||)
-       to avoid precision errors]
-    */
+       to avoid precision errors] */
     proj_part = ((dot.x + dot.z)/(int32_t)dist_xz);
     x = abs((((proj_part>>4)*(dir.x>>4))/(int32_t)dist_xz) - dist_obj.x);
     z = abs((((proj_part>>4)*(dir.z>>4))/(int32_t)dist_xz) - dist_obj.z);
@@ -543,6 +542,7 @@ int GoolFindNearestObject(gool_object *obj, gool_nearest_query *query) {
   if (state_idx & 0x8000) {
     if (query->event == GOOL_EVENT_STATUS) { /* querying for status? */
       arg = 0x100;
+      obj->interrupter = query->obj;
       GoolObjectInterrupt(obj, state_idx, 1, &arg); /* interrupt the object */
       if (obj->ack) { /* request acknowledged? */
         query->nearest_obj = obj; /* set as new nearest obj */
@@ -1230,8 +1230,6 @@ void GoolObjectTransform(gool_object *obj) {
   eid_str = NSEIDToString(obj->external->eid);
   if (strcmp(eid_str, "BeaOC") == 0)
     return;
-  //if (obj->global->eid != 0x7492aacd)
-  //  return;
   status_b = obj->status_b;
   anim = (gool_anim*)obj->anim_seq;
   frame_idx = obj->anim_frame >> 8;
@@ -1265,7 +1263,7 @@ void GoolObjectTransform(gool_object *obj) {
     size = abs(x) / 27279;
     obj_vectors = &obj->vectors;
     cam_vectors = (gool_vectors*)(status_b & 0x200000 ? &cam_trans: &cam_trans_prev);
-    flag = status_b & 0x200;
+    flag = status_b & GOOL_FLAG_2D;
     m_rot = status_b & 0x200000 ? &ms_cam_rot: &ms_rot;
     header = (zone_header*)cur_zone->items[0];
     far = header->visibility_depth >> 8;
@@ -1330,7 +1328,7 @@ void GoolObjectTransform(gool_object *obj) {
     size = abs(x) / 27279;
     obj_vectors = &obj->vectors;
     cam_vectors = (gool_vectors*)(status_b & 0x200000 ? &cam_trans: &cam_trans_prev);
-    flag = status_b & 0x200;
+    flag = status_b & GOOL_FLAG_2D;
     m_rot = status_b & 0x200000 ? &ms_cam_rot: &ms_rot;
     header = (zone_header*)cur_zone->items[0];
     far = header->visibility_depth >> 8;
@@ -2054,7 +2052,7 @@ static inline void GoolOpTransformVectors(gool_object*,uint32_t);
 static inline void GoolOpJumpAndLink(gool_object*,uint32_t,uint32_t*);
 static inline int GoolOpSendEvent(gool_object*,uint32_t,uint32_t*,gool_object*,uint32_t);
 static inline int GoolOpReturnStateTransition(gool_object*,uint32_t,uint32_t*,
-gool_state_ref*,uint32_t);
+                                              gool_state_ref*,uint32_t);
 static inline void GoolOpSpawnChildren(gool_object*,uint32_t,uint32_t);
 static inline void GoolOpPaging(gool_object*,uint32_t);
 static inline void GoolOpAudioVoiceCreate(gool_object*,uint32_t);
@@ -2195,7 +2193,7 @@ int GoolObjectInterpret(gool_object *obj, uint32_t flags, gool_state_ref *transi
       break;
     case 0xF:
       G_TRANS_GOPS(obj,instruction,a,b);
-      GoolObjectPush(obj,!((a&b)^a));
+      GoolObjectPush(obj,(a&b)==a);
       break;
     case 0x10:
       G_TRANS_GOPS(obj,instruction,a,b);
@@ -3012,7 +3010,7 @@ void GoolOpTransformVectors(gool_object *obj, uint32_t instruction) {
   ptr = GoolTranslateInGop(obj, G_OPB(instruction));
   switch (sop) {
   case 0: { /* get nth point on the obj's path */
-    uint32_t progress;
+    int32_t progress;
     int trans_idx;
     vec *trans, trans_new;
     if (ptr && obj->entity) {
@@ -3048,7 +3046,6 @@ void GoolOpTransformVectors(gool_object *obj, uint32_t instruction) {
     int32_t speed, target_rotx;
     int velocity_idx;
     vec *velocity, target;
-
     speed = *(ptr);
     velocity_idx = (instruction >> 12) & 7; /* vector out */
     velocity = &obj->vectors_v[velocity_idx];
@@ -3092,7 +3089,6 @@ void GoolOpTransformVectors(gool_object *obj, uint32_t instruction) {
     svtx_vertex *vert;
     tgeo_header *header;
     vec in, *out, scale, model_trans, model_scale;
-
     link_idx = (instruction >> 21) & 7;
     link = obj->links[link_idx];
     anim = (gool_vertex_anim*)link->anim_seq;
@@ -3531,7 +3527,7 @@ int16_t GoolObjectRotate2(int16_t anga, int16_t angb, int32_t speed, gool_object
   /* delta is non-zero and either abs velocity is smaller than abs delta
      or velocity and delta have different signs? */
   if (delta != 0 && (abs_delta >= abs(velocity) || (delta^velocity)<0))
-    return angle12(anga + velocity); /* approach target angle */
+    return angle12((int32_t)anga + velocity); /* approach target angle */
   else {
     if (obj)
       obj->status_a |= GOOL_FLAG_REACHED_TROT; /* set 'reached target rot' flag */
@@ -3677,11 +3673,13 @@ int GoolProject(vec *in, vec *out) {
   ReadSZfifo3(&sz0, &sz1, &sz2);
 #else
   vec r_out;
-  SwRotTransPers(&v_in, &r_out, &mn_trans.t, &ms_cam_rot, &screen, screen_proj);
+  vec2 offs;
+  offs.x=0;offs.y=0;
+  SwRotTransPers(&v_in, &r_out, &mn_trans.t, &ms_cam_rot, &offs, screen_proj);
   sz2 = r_out.z;
 #endif
-  out->x = r_out.x << 8;
-  out->y = -(r_out.y << 8);
+  out->x = (r_out.x) << 8;
+  out->y = -(r_out.y) << 8;
   out->z = sz2 << 8;
   return SUCCESS;
 }

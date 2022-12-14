@@ -329,7 +329,7 @@ void SwTransformSvtx(
   void *ot,
   tgeo_polygon *polys,
   tgeo_header *header,
-  uint32_t cull_mask,
+  int32_t cull_face,
   uint32_t far,
   void **prims_tail,
   rect28 *regions,
@@ -376,7 +376,7 @@ void SwTransformSvtx(
       ndot = (r_verts[0].x*r_verts[1].y) + (r_verts[1].x*r_verts[2].y)
            + (r_verts[2].x*r_verts[0].y) - (r_verts[0].x*r_verts[2].y)
            - (r_verts[1].x*r_verts[0].y) - (r_verts[2].x*r_verts[1].y);
-      if (ndot == 0 || (ndot ^ cull_mask) < 0) { continue; }
+      if (ndot == 0 || (ndot ^ cull_face) < 0) { continue; }
     }
     prim=(poly3i*)*prims_tail;
     if (poly->is_flat_shaded) {
@@ -430,6 +430,7 @@ void SwTransformSvtx(
       prim->uvs[ii]=uvs[ii];
     }
     prim->texid = texid;
+    prim->flags = info.semi_trans;
     if (flag) {
       z_min=min(min(r_verts[0].z,r_verts[1].z),r_verts[2].z);
       z_max=max(max(r_verts[0].z,r_verts[1].z),r_verts[2].z);
@@ -452,7 +453,7 @@ void SwTransformCvtx(
   void *ot,
   tgeo_polygon *polys,
   tgeo_header *header,
-  uint32_t cull_mask,
+  int32_t cull_face,
   uint32_t far,
   void **prims_tail,
   rect28 *regions,
@@ -501,7 +502,7 @@ void SwTransformCvtx(
     ndot = (r_verts[0].x*r_verts[1].y) + (r_verts[1].x*r_verts[2].y)
          + (r_verts[2].x*r_verts[0].y) - (r_verts[0].x*r_verts[2].y)
          - (r_verts[1].x*r_verts[0].y) - (r_verts[2].x*r_verts[1].y);
-    if (ndot == 0 || (ndot ^ cull_mask) < 0) {
+    if (ndot == 0 || (ndot ^ cull_face) < 0) {
       if (!info.no_cull) { continue; }
       idx_adj = 12;
     }
@@ -510,14 +511,14 @@ void SwTransformCvtx(
     for (ii=0;ii<3;ii++) {
       vert=poly_verts[ii];
       color.r = ((t1>=0 ?
-          (127-abs(t1))*0   +     (abs(t1)*vert->r)
-        : (128-abs(t1))*255 + ((abs(t1)-1)*vert->r))*32)>>(shamt+12);
+          (127-abs(t1))*0   +     (abs(t1)*(int32_t)vert->r)
+        : (128-abs(t1))*255 + ((abs(t1)-1)*(int32_t)vert->r))*32)>>(shamt+12);
       color.g = ((t2>=0 ?
-          (127-abs(t2))*0   +     (abs(t2)*vert->g)
-        : (128-abs(t2))*255 + ((abs(t2)-1)*vert->g))*32)>>(shamt+12);
+          (127-abs(t2))*0   +     (abs(t2)*(int32_t)vert->g)
+        : (128-abs(t2))*255 + ((abs(t2)-1)*(int32_t)vert->g))*32)>>(shamt+12);
       color.b = ((t3>=0 ?
-          (127-abs(t3))*0   +     (abs(t3)*vert->b)
-        : (128-abs(t3))*255 + ((abs(t3)-1)*vert->b))*32)>>(shamt+12);
+          (127-abs(t3))*0   +     (abs(t3)*(int32_t)vert->b)
+        : (128-abs(t3))*255 + ((abs(t3)-1)*(int32_t)vert->b))*32)>>(shamt+12);
       prim->colors[ii]=Rgb8ToA32(color);
     }
     if (info.type == 1) { /* textured poly? */
@@ -530,6 +531,7 @@ void SwTransformCvtx(
       prim->uvs[ii]=uvs[ii];
     }
     prim->texid = texid;
+    prim->flags = info.semi_trans;
     z_sum = r_verts[0].z+r_verts[1].z+r_verts[2].z;
     z_idx = far - ((z_sum/32)+idx_adj);
     z_idx = limit(z_idx, 0, 0x7FF);
@@ -581,6 +583,7 @@ void SwTransformSprite(
     prim->uvs[i]=uvs[i];
   }
   prim->texid=texid;
+  prim->flags=info.semi_trans;
   z_sum=prim->verts[0].z+prim->verts[1].z+prim->verts[2].z;
   z_idx=far-(z_sum/32);
   z_idx=limit(z_idx, 0, 0x7FF);
@@ -754,6 +757,7 @@ static void SwTransformAndShadeWorlds(
       prim->uvs[ii] = uvs[ii];
     }
     prim->texid = texid;
+    prim->flags = info.semi_trans;
     z_sum = prim->verts[0].z+prim->verts[1].z+prim->verts[2].z;
     z_idx = far - (z_sum/32);
     z_idx = limit(z_idx, 0, 0x7FF);
@@ -1025,6 +1029,7 @@ void SwTransformZoneQuery(zone_query *query, void *ot, void **prims_tail) {
         prim->colors[iii]=Rgb8ToA32(color);
       }
       prim->texid=-1;
+      prim->flags=3;
       next=((poly4i**)ot)[0x7FE];
       prim->next=next;
       prim->type=3;
@@ -1074,7 +1079,8 @@ void SwDrawWallMap(uint32_t *wall_bitmap, void *ot, void **prims_tail) {
     tmp=-1;
     prim->colors[i] = Rgb8ToA32(*(rgb8*)&tmp);
   }
-  prim->texid = wallmap_image;
+  prim->texid=wallmap_image;
+  prim->flags=3;
   next=((poly4i**)ot)[0x7FE];
   prim->next=next;
   prim->type=2;

@@ -325,11 +325,11 @@ int32_t matan2(int32_t y, int32_t x) {
   if (x<0) { x=-x; nx=1; }
   if (!(y|x)) { return 0; }
   if (y >= x) {
-    idx = x>>21?x/(y>>10):(x<<10)/y;
+    idx = (x>>21)?x/(y>>10):(x<<10)/y;
     res = 0x400 - atan_table[idx];
   }
   else {
-    idx = y>>21?y/(x>>10):(y<<10)/x;
+    idx = (y>>21)?y/(x>>10):(y<<10)/x;
     res = atan_table[idx];
   }
   if (nx) { res = 0x800 - res; }

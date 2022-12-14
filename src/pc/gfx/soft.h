@@ -61,11 +61,11 @@ extern int SwCalcSpriteRotMatrix(gool_vectors *obj_vectors,
   gool_vectors *cam_vectors, int flag, int shrink, mat16 *m_rot,
   int32_t depth, int32_t max_depth, sw_transform_struct *params);
 extern void SwTransformSvtx(svtx_frame *frame, void *ot,
-  tgeo_polygon *polys, tgeo_header *header, uint32_t cull_mask,
+  tgeo_polygon *polys, tgeo_header *header, int32_t cull_face,
   uint32_t far, void **prims_tail, rect28 *regions, int flag,
   sw_transform_struct *params);
 extern void SwTransformCvtx(cvtx_frame *frame, void *ot,
-  tgeo_polygon *polys, tgeo_header *header, uint32_t cull_mask,
+  tgeo_polygon *polys, tgeo_header *header, int32_t cull_face,
   uint32_t far, void **prims_tail, rect28 *regions, int shamt,
   sw_transform_struct *params);
 extern void SwTransformSprite(void *ot, texinfo2 *info, eid_t tpag,

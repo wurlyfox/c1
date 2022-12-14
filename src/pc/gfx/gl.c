@@ -86,7 +86,6 @@ int GLInit(gl_callbacks *_callbacks) {
   screen.y = -120;
   screen.w = 512;
   screen.h = 240;
-  glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   return SUCCESS;
 }
@@ -147,12 +146,15 @@ void GLDrawOverlay(int brightness) {
     q.p[1].x =  256; q.p[1].y = -120;
     q.p[3].x = -256; q.p[2].y =  120;
     q.p[2].x =  256; q.p[3].y =  120;
+    glEnable(GL_BLEND);
     glColor4ub(0, 0, 0, brightness);
     glBegin(GL_QUADS);
     for (i=0;i<4;i++)
       glVertex3i(q.p[i].x, q.p[i].y, -1);
     glEnd();
+    glDisable(GL_BLEND);
     glColor4ub(255, 255, 255, 255);
+
   }
 }
 
@@ -195,9 +197,10 @@ void GLDrawImage(dim2 *dim, uint8_t *buf, pnt2 *loc) {
 
 void GLDrawPrims(void *data, int count) {
   poly3i *poly;
-  int i, ii, texid;
+  int i, ii, texid, flags;
 
   texid = -1;
+  flags = 3;
   poly = (poly3i*)data;
   glActiveTexture(GL_TEXTURE0);
   glDisable(GL_TEXTURE_2D);
@@ -206,15 +209,33 @@ void GLDrawPrims(void *data, int count) {
       glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     else
       glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    if (poly->flags != flags) {
+      if (poly->flags == 3) { glDisable(GL_BLEND); }
+      else if (flags == 3)  { glEnable(GL_BLEND); }
+      if (poly->flags == 2) { glBlendEquation(GL_FUNC_REVERSE_SUBTRACT); }
+      else if (flags == 2)  { glBlendEquation(GL_FUNC_ADD); }
+      switch (poly->flags) {
+      case 0:
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        break;
+      case 1:
+        glBlendFunc(GL_ONE, GL_ONE);
+        break;
+      case 2:
+        glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_COLOR);
+        break;
+      }
+      flags = poly->flags;
+    }
     if (poly->texid != texid) {
       if (poly->texid == -1) { glDisable(GL_TEXTURE_2D); }
       else {
         if (texid == -1) { glEnable(GL_TEXTURE_2D); }
         glBindTexture(GL_TEXTURE_2D, poly->texid);
-        glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE_EXT);
-        glTexEnvf(GL_TEXTURE_ENV, GL_COMBINE_RGB_EXT, GL_MODULATE);
-        glTexEnvf(GL_TEXTURE_ENV, GL_COMBINE_ALPHA_EXT, GL_MODULATE);
-        glTexEnvf(GL_TEXTURE_ENV, GL_RGB_SCALE_EXT, 2.0f);
+        glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE);
+        glTexEnvf(GL_TEXTURE_ENV, GL_COMBINE_RGB, GL_MODULATE);
+        glTexEnvf(GL_TEXTURE_ENV, GL_COMBINE_ALPHA, GL_MODULATE);
+        glTexEnvf(GL_TEXTURE_ENV, GL_RGB_SCALE, 2.0f);
       }
       texid = poly->texid;
     }
@@ -226,6 +247,9 @@ void GLDrawPrims(void *data, int count) {
     }
     glEnd();
   }
+  glBlendEquation(GL_FUNC_ADD);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  glDisable(GL_BLEND);
   glDisable(GL_TEXTURE_2D);
   glBindTexture(GL_TEXTURE_2D, 0);
 }
@@ -317,6 +341,7 @@ static void GLConvertToTris(void *ot, poly3i **tris, int *count) {
             tri.texid = -1;
             tri.type = 3;
           }
+          tri.flags = ((poly4i*)src)->flags;
           tri.uvs[k] = ((poly4i*)src)->uvs[idx];
         }
         *(poly3i*)dst = tri;
