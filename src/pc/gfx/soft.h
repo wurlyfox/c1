@@ -18,10 +18,7 @@
 
    it does not include poly ids, ordering table, or pointer to tail of primitive memory */
 typedef struct {
-  union {
-    zone_world *worlds;
-    /* etc... */
-  };
+  zone_world worlds[8];
   vec2 screen;
   uint32_t screen_proj;
   vec trans;
@@ -86,12 +83,12 @@ extern void SwTransformWorldsDark(poly_id_list *poly_id_list, void *ot,
 extern void SwTransformWorldsDark2(poly_id_list *poly_id_list, void *ot,
   int32_t proj, int anim_phase, void **prims_tail, sw_transform_struct *params);
 
-#ifdef CFLAGS_DRAW_OCTREES
+#ifdef CFLAGS_DRAW_EXTENSIONS
 #include "level.h"
 extern void SwTransformZoneQuery(zone_query *query, void *ot, void **prims_tail);
-#endif
-#ifdef CFLAGS_DRAW_WALLMAP
 extern void SwDrawWallMap(uint32_t *wall_bitmap, void *ot, void **prims_tail);
+extern void SwTransformObjectBounds(gool_bound *bounds, int count, void *ot,
+  void **prims_tail);
 #endif
 
 #endif /* _SOFT_H_ */

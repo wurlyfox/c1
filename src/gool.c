@@ -244,11 +244,11 @@ int GoolObjectOrientOnPath(gool_object *obj, int progress, vec *loc) {
   path_length = entity->path_length;
   idx = abs(progress) >> 8;
   fractional = progress & 0xFF;
-  if (idx == (path_length - 1) && idx) { /* at last point and more than 1 point? */
-    fractional = (progress & 0xFF) + 0x100;
-    idx = path_length - 2;
-  }
   path_pt = &entity->path_points[idx];
+  if ((idx == (path_length - 1)) && idx) { /* at last point and more than 1 point? */
+    fractional = (progress & 0xFF) + 0x100;
+    path_pt = &entity->path_points[path_length-2];
+  }
   loc->x = ((path_pt->x << scale) + zone_loc->x) << 8;
   loc->y = ((path_pt->y << scale) + zone_loc->y) << 8;
   loc->z = ((path_pt->z << scale) + zone_loc->z) << 8;
@@ -281,7 +281,6 @@ int GoolObjectOrientOnPath(gool_object *obj, int progress, vec *loc) {
     /* compute the scalar projection: (A . B) / ||B||^2 */
     proj = (dot.x+dot.z)/((int32_t)dist_xz*(int32_t)dist_xz);
     if (proj >= 0x100) { /* too far of a corresponding change in progress? */
-      idx = progress >> 8;
       idx_next = idx+1;
       if (idx < path_length-1)
         return GoolObjectOrientOnPath(obj, idx_next<<8, loc); /* see if next pt is closer */
@@ -920,11 +919,14 @@ void GoolObjectLocalBound(gool_object *obj, vec *scale) {
 
   if (!obj->anim_seq) { return; }
   anim = obj->anim_seq;
+  /* below section unnecessary on pc and causes collision issues */
+#ifdef PSX
   if (anim->type != 4) {
-    if (anim->eid & 0xFF800003 != 0x80000000) { return; } /* checking a certain kind of eid...? */
+    if ((anim->eid & 0xFF800003) != 0x80000000) { return; } /* has the eid not been resolved? i.e. is it a non-pointer? */
     res = (int)NSLookup(&anim->eid);
     if (ISERRORCODE(res)) { return; } /* return if unable to resolve */
   }
+#endif
   scale_abs = *scale;
   scale_abs.x = abs(scale_abs.x); /* don't flip in x dir for negative values */
   if (anim->type == 1) { /* vertex anim? */
@@ -954,8 +956,8 @@ void GoolObjectLocalBound(gool_object *obj, vec *scale) {
     obj->bound.p2.x = (scale_abs.x * 200) >> 4;
     obj->bound.p2.y = (scale_abs.y * 200) >> 4;
     obj->bound.p2.z = (scale_abs.z * 200) >> 4;
-    obj->scale = *scale;
   }
+  obj->scale = *scale;
 }
 
 //----- (8001D5EC) --------------------------------------------------------
@@ -1222,14 +1224,11 @@ void GoolObjectTransform(gool_object *obj) {
   mat16 *m_rot;
   gool_vectors *obj_vectors, *cam_vectors;
   int i,frame_idx,status_b,flag,flag2;
-  int res,far,size,x,offs;
+  int res,far,shrink,size,x,offs;
   int *src,*dst;
   void *ot, **prims_tail;
   char *eid_str;
 
-  eid_str = NSEIDToString(obj->external->eid);
-  if (strcmp(eid_str, "BeaOC") == 0)
-    return;
   status_b = obj->status_b;
   anim = (gool_anim*)obj->anim_seq;
   frame_idx = obj->anim_frame >> 8;
@@ -1260,7 +1259,7 @@ void GoolObjectTransform(gool_object *obj) {
   case GOOL_ANIM_TYPE_SPRITE:
     /* 200 * 2^(x/27279) */
     x = obj->scale.x;
-    size = abs(x) / 27279;
+    shrink = abs(x) / 27279;
     obj_vectors = &obj->vectors;
     cam_vectors = (gool_vectors*)(status_b & 0x200000 ? &cam_trans: &cam_trans_prev);
     flag = status_b & GOOL_FLAG_2D;
@@ -1273,7 +1272,7 @@ void GoolObjectTransform(gool_object *obj) {
       obj_vectors,
       cam_vectors,
       flag,
-      size,
+      shrink,
       m_rot,
       screen_proj,
       far);/*,
@@ -1283,7 +1282,7 @@ void GoolObjectTransform(gool_object *obj) {
       obj_vectors,
       cam_vectors,
       flag,
-      size,
+      shrink,
       m_rot,
       screen_proj,
       far,
@@ -1299,7 +1298,7 @@ void GoolObjectTransform(gool_object *obj) {
       context.cur->ot,
       info2,
       pginfo,
-      200 << size,
+      200 << shrink,
       obj->size + 0x800-(screen_proj/2),
       prims_tail,
       (rect28*)uv_map);
@@ -1310,7 +1309,7 @@ void GoolObjectTransform(gool_object *obj) {
       ot,
       info2,
       tpag,
-      200 << size,
+      200 << shrink,
       obj->size + 0x800-(screen_proj/2),
       prims_tail,
       (rect28*)uv_map,
@@ -1325,11 +1324,11 @@ void GoolObjectTransform(gool_object *obj) {
     break;
   case GOOL_ANIM_TYPE_FRAG:
     x = obj->scale.x;
-    size = abs(x) / 27279;
+    shrink = abs(x) / 27279;
     obj_vectors = &obj->vectors;
-    cam_vectors = (gool_vectors*)(status_b & 0x200000 ? &cam_trans: &cam_trans_prev);
+    cam_vectors = (gool_vectors*)&cam_trans_prev;
     flag = status_b & GOOL_FLAG_2D;
-    m_rot = status_b & 0x200000 ? &ms_cam_rot: &ms_rot;
+    m_rot = &ms_rot;
     header = (zone_header*)cur_zone->items[0];
     far = header->visibility_depth >> 8;
     flag2 = (status_b & 0x40000)?0:1;
@@ -1338,7 +1337,7 @@ void GoolObjectTransform(gool_object *obj) {
       obj_vectors,
       cam_vectors,
       flag,
-      size,
+      shrink,
       m_rot,
       screen_proj,
       far);/*,
@@ -1348,7 +1347,7 @@ void GoolObjectTransform(gool_object *obj) {
       obj_vectors,
       cam_vectors,
       flag,
-      size,
+      shrink,
       m_rot,
       screen_proj,
       far,
@@ -1360,16 +1359,18 @@ void GoolObjectTransform(gool_object *obj) {
 #ifdef PSX
     res = (int)NSLookup(&anim->f.tpage);
     pginfo = *(tpageinfo*)&res;
+#else
+    tpag = anim->f.tpage;
 #endif
     for (i=0;i<anim->r.frag_count;i++) {
-      bound.p1.x = frags[i].x1 << size;
-      bound.p1.y = frags[i].y1 << size;
-      bound.p2.x = frags[i].x2 << size;
-      bound.p2.y = frags[i].y2 << size;
+      bound.p1.x = frags[i].x1 << shrink;
+      bound.p1.y = frags[i].y1 << shrink;
+      bound.p2.x = frags[i].x2 << shrink;
+      bound.p2.y = frags[i].y2 << shrink;
 #ifdef PSX
       GfxTransformFragment(&frags[i], obj->size, pginfo, &bound, ot);
 #else
-      GfxTransformFragment(&frags[i], obj->size, anim->f.tpage, &bound, ot);
+      GfxTransformFragment(&frags[i], obj->size, tpag, &bound, ot);
 #endif
     }
   }
@@ -1455,7 +1456,7 @@ static int GoolTextStringTransform(
     bound.p1.y = bound.p2.y - scale.y;
     if (bound.p2.x > max_x)
       max_x = bound.p2.x;
-    if (prims_tail && font->has_backdrop) {
+    if (prims_tail && glyph->has_texture) {
       if (center) {
         if (bound.p1.x < bound2.p1.x)
           bound2.p1.x = bound.p1.x;
@@ -2085,7 +2086,7 @@ G_TRANS_GOPA(obj,ins,a); \
 G_TRANS_GOPB(obj,ins,b)
 #define G_TRANS_REGREF(obj,a) \
 (((a) == 0x1F) ? GoolObjectPop(obj) \
-               : *((uint32_t*)&obj->self+(a)))
+               : obj->regs[a])
 
 #ifdef CFLAGS_GOOL_DEBUG
 gool_debug_cache debug_cache = { 0 };
@@ -2125,7 +2126,9 @@ int GoolObjectInterpret(gool_object *obj, uint32_t flags, gool_state_ref *transi
   if (dbg && ((dbg->flags & GOOL_FLAGS_PAUSED)==GOOL_FLAGS_PAUSED)) { return SUCCESS; } /* paused */
 #endif
   while (1) {
+#ifdef CFLAGS_GOOL_DEBUG
     if (dbg) { dbg->obj_prev = *obj; }
+#endif
     res = 0;
     instruction = *(obj->pc++);
     opcode = G_OPCODE(instruction);
@@ -2482,7 +2485,7 @@ void GoolOp13unnamed(gool_object *obj, uint32_t instruction) {
     if ((rate + p1) < p2)
       prog = rate + p1;
     else
-      prog = (p1*2) - rate;
+      prog = (p1*2) - p2;
     absprog = abs(prog);
   }
   else {
@@ -3296,19 +3299,24 @@ static inline void GoolOpAudioVoiceCreate(gool_object *obj, uint32_t instruction
 
 static inline void GoolOpAudioControl(gool_object *obj, uint32_t instruction) {
   generic *arg;
-  int sop, voice_id;
+  int sop, voice_id, reg_idx;
   uint32_t flags;
 
   arg = (generic*)GoolTranslateInGop(obj, G_OPB(instruction));
-  sop = (instruction >> 18) & 0x3F;
-  voice_id = G_TRANS_REGREF(obj, (instruction >> 12) & 0x3F);
-  if ((sop >> 2) == 15)
-    flags = 0x80000000;
-  if (sop & 0x40000)
-    flags |= 0x40000000;
-  if (sop & 0x80000)
-    flags |= 0x20000000;
-  AudioControl(voice_id, flags, arg, obj);
+  sop = (instruction >> 20) & 0xF;
+  flags = (instruction >> 18) & 0x3;
+  reg_idx = (instruction >> 12) & 0x3F;
+  if (reg_idx == 0)
+    voice_id = 0;
+  else
+    voice_id = G_TRANS_REGREF(obj, reg_idx);
+  if (sop == 15)
+    sop = 0x80000000;
+  if (flags & 1)
+    sop |= 0x40000000;
+  if (flags & 2)
+    sop |= 0x20000000;
+  AudioControl(voice_id, sop, arg, obj);
 }
 
 static inline void GoolOpReactSolidSurfaces(gool_object *obj, uint32_t instruction) {
@@ -3321,6 +3329,7 @@ static inline void GoolOpReactSolidSurfaces(gool_object *obj, uint32_t instructi
   idx1 = (instruction >> 12) & 7;
   idx2 = (instruction >> 15) & 7;
   sop = (instruction >> 18) & 7;
+  GoolTranslateInGop(obj, G_OPB(instruction)); /* do not push or consume the in/out gop */
   v_in = &obj->vectors_v[idx1];
   v_out1 = (vec*)GoolTranslateOutGop(obj, G_OPB(instruction));
   v_out2 = &obj->vectors_v[idx2];
@@ -3330,7 +3339,7 @@ static inline void GoolOpReactSolidSurfaces(gool_object *obj, uint32_t instructi
   case 0:
     trans.y += obj->bound.p2.y / 2;
     obj->misc_flag = ZoneReboundVector(&trans, &cv_in);
-    if ((uint32_t)v_out1 != 0xBE0)
+    if (G_OPB(instruction) != 0xBE0)
       *v_out1 = cv_in;
     *v_out2 = trans;
     break;
@@ -3340,7 +3349,7 @@ static inline void GoolOpReactSolidSurfaces(gool_object *obj, uint32_t instructi
     if (obj == crash || obj->parent == crash)
       ZoneFindNearestObjectNode2(obj, &trans2);
     *((gool_objnode*)&obj->misc_node) = ZoneFindNearestObjectNode(obj, &trans);
-    if ((uint32_t)v_out1 != 0xBE0)
+    if (G_OPB(instruction) != 0xBE0)
       *v_out1 = trans3;
     *v_out2 = trans;
     break;
@@ -3359,7 +3368,7 @@ static inline void GoolOpReactSolidSurfaces(gool_object *obj, uint32_t instructi
     else
       flags = flag2 ? 5 : 1;
     ZoneFindNearestObjectNode3(obj, &trans3, flags, !flag1);
-    if ((uint32_t)v_out1 != 0xBE0)
+    if (G_OPB(instruction) != 0xBE0)
       *v_out1 = trans4; /* unused? orig impl seems to store garbage if vec_out1 is used */
     *v_out2 = trans3;
     break;
@@ -3608,9 +3617,11 @@ int GoolTransform(vec *in, vec *trans, ang *rot, vec *scale, vec *out) {
 #else
   ang rot2;
   rot2.x=rot->x-rot->z;rot2.y=rot->y;rot2.z=rot->z;
-  SwRotMatrixZXY(&m1, &rot2);
-  if (scale)
-    SwScaleMatrix(&m1, scale);
+  SwRotMatrixYXY(&m1, &rot2);
+  if (scale) {
+    SwScaleMatrix(&m2, scale);
+    SwMulMatrix(&m1, &m2);
+  }
 #endif
   s_in.x = in->x>>4; /* 16 bit frac to 12 bit frac */
   s_in.y = in->y>>4;

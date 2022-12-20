@@ -392,7 +392,8 @@ int AudioVoiceCreate(gool_object *obj, eid_t *eid, int vol) {
   voice_params.r_trans.y = 0;
   voice_params.r_trans.z = 0;
   voice_params.flags = (voice_params.flags & 0xFFFFF000) | 0x600;
-  if (voice->obj->status_b & 0x200) { /* no spatialization? */
+  /* bugfix: orig impl did not test voice->obj before accessing it here */
+  if (voice->obj && voice->obj->status_b & 0x200) { /* no spatialization? */
     volume.left  = voice->amplitude;
     volume.right = voice->amplitude;
     voice->flags &= ~0x200;
@@ -705,7 +706,8 @@ void AudioUpdate() {
         flag = 1; /* set flag */
       else
         voice->flags &= ~0x40; /* else clear currently ramping flag */
-      if (voice->obj->status_b & 0x200) { /* no spatialization? */
+      /* bugfix: orig impl did not test voice->obj before accessing it here */
+      if (voice->obj && (voice->obj->status_b & 0x200)) { /* no spatialization? */
         volume.left = voice->amplitude;  /* set volume directly to the amplitude */
         volume.right = voice->amplitude;
       }

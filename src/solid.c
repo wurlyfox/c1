@@ -4,8 +4,6 @@
 #include "gool.h"
 #include "level.h"
 
-#include "patches/zz.h"
-
 /* .data */
 const uint32_t circle_bitmap[32] = {
   0b00000000000011111111000000000000,

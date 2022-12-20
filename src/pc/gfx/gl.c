@@ -19,10 +19,6 @@
 #include "cimgui_impl.h"
 #endif
 
-rect2 screen = { .x = -256, .y = -120, .w = 512, .h = 240 };
-int image_texid = 0;
-prim_struct prim_links[2048];
-
 int GLCreateTexture(dim2 dim, uint8_t *buf) {
   int texid;
 
@@ -52,6 +48,9 @@ void GLUpdateTexture(int texid, rect2 rect, uint8_t *buf) {
 
 gl_context context = { 0 };
 gl_callbacks callbacks = { 0 };
+rect2 screen = { .x = -256, .y = -120, .w = 512, .h = 240 };
+prim_struct prim_links[2048];
+int image_texid = 0;
 
 extern ns_struct ns;
 extern entry *cur_zone;
@@ -73,8 +72,10 @@ void GLKillGui() {
 }
 #endif
 
+int textures_inited=0;
 /* gl */
 int GLInit(gl_callbacks *_callbacks) {
+  rect2 window;
   int i;
 
   callbacks = *_callbacks;
@@ -82,6 +83,7 @@ int GLInit(gl_callbacks *_callbacks) {
   GLInitGui();
 #endif
   TexturesInit(GLCreateTexture, GLDeleteTexture, GLUpdateTexture);
+  textures_inited=1;
   screen.x = -256;
   screen.y = -120;
   screen.w = 512;
@@ -91,22 +93,28 @@ int GLInit(gl_callbacks *_callbacks) {
 }
 
 int GLKill() {
+  glDisable(GL_SCISSOR_TEST);
   if (context.prims_head) {
     free(context.prims_head);
     context.prims_head = 0;
   }
   TexturesKill();
+  textures_inited=0;
   if (image_texid) {
     GLDeleteTexture(image_texid);
     image_texid = 0;
   }
 #ifdef CFLAGS_GUI
-  // GLKillGui(); /* removed for now; may
+  // GLKillGui(); /* removed for now */
 #endif
   return SUCCESS;
 }
 
 int GLSetupPrims() {
+  if (!textures_inited) {
+    TexturesInit(GLCreateTexture, GLDeleteTexture, GLUpdateTexture);
+    textures_inited=1;
+  }
   if (!context.prims_head) // not in orig
     context.prims_head = calloc(1,0x800000);
   GLResetPrims(&context);
@@ -125,12 +133,16 @@ void GLDrawRect(int x, int y, int w, int h, int r, int g, int b) {
   q.p[1].x = x+w; q.p[1].y =   y;
   q.p[3].x =   x; q.p[2].y = y+h;
   q.p[2].x = x+w; q.p[3].y = y+h;
-  glColor3ub(r,g,b);
+  for (i=0;i<4;i++) {
+    q.p[i].x += screen.x;
+    q.p[i].y += screen.y;
+  }
+  glColor4ub(r, g, b, 255);
   glBegin(GL_QUADS);
   for (i=0;i<4;i++)
-    glVertex3i(q.p[i].x, q.p[i].y, -1);
+    glVertex3i(q.p[i].x, -q.p[i].y, -1);
   glEnd();
-  glColor3ub(0,0,0);
+  glColor4ub(255, 255, 255, 255);
 }
 
 void GLDrawOverlay(int brightness) {
@@ -141,7 +153,8 @@ void GLDrawOverlay(int brightness) {
   adj[8] =120; adj[9] =135; adj[10]=151; adj[11]=167;
   adj[12]=185; adj[13]=203; adj[14]=225; adj[15]=255;
   if (brightness) {
-    brightness = limit(adj[brightness >> 4],0,255);
+    brightness = limit(brightness>>4,1,16)-1;
+    brightness = adj[brightness];
     q.p[0].x = -256; q.p[0].y = -120;
     q.p[1].x =  256; q.p[1].y = -120;
     q.p[3].x = -256; q.p[2].y =  120;
@@ -150,11 +163,10 @@ void GLDrawOverlay(int brightness) {
     glColor4ub(0, 0, 0, brightness);
     glBegin(GL_QUADS);
     for (i=0;i<4;i++)
-      glVertex3i(q.p[i].x, q.p[i].y, -1);
+      glVertex3i(q.p[i].x, -q.p[i].y, -1);
     glEnd();
     glDisable(GL_BLEND);
     glColor4ub(255, 255, 255, 255);
-
   }
 }
 
@@ -186,9 +198,10 @@ void GLDrawImage(dim2 *dim, uint8_t *buf, pnt2 *loc) {
   glBindTexture(GL_TEXTURE_2D, image_texid);
   glEnable(GL_TEXTURE_2D);
   glBegin(GL_QUADS);
+  glColor4ub(255, 255, 255, 255);
   for (i=0;i<4;i++) {
-    glTexCoord2f((i%3)?1.0:0, (i/2)?0:1.0);
-    glVertex3i(q.p[i].x, q.p[i].y, -1);
+    glTexCoord2f((i%3)?1.0:0, (i/2)?1.0:0);
+    glVertex3i(q.p[i].x, -q.p[i].y, -1);
   }
   glEnd();
   glDisable(GL_TEXTURE_2D);
@@ -247,11 +260,12 @@ void GLDrawPrims(void *data, int count) {
     }
     glEnd();
   }
-  glBlendEquation(GL_FUNC_ADD);
-  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   glDisable(GL_BLEND);
   glDisable(GL_TEXTURE_2D);
   glBindTexture(GL_TEXTURE_2D, 0);
+  glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+  glBlendEquation(GL_FUNC_ADD);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
 void **GLGetPrimsTail() {
@@ -288,6 +302,7 @@ void GLAddPrim(void *prim, int idx) {
  *    b) perform a glDrawArrays call for each group
  * 2) manually generate tris instead of quads in sw gfx code
  */
+void *trimem=0;
 static void GLConvertToTris(void *ot, poly3i **tris, int *count) {
   prim_struct *prim;
   poly3i tri;
@@ -308,8 +323,9 @@ static void GLConvertToTris(void *ot, poly3i **tris, int *count) {
     else if (prim->type >= 2) { size += sizeof(poly3i)*2; }
     prim = (prim_struct*)PRIM_NEXT(prim);
   }
-  /* allocate tris */
-  *tris = (poly3i*)malloc(size);
+  if (trimem==0)
+    trimem=calloc(1,0x800000);
+  *tris=trimem;
   prim = (prim_struct*)src;
   src = (uint8_t*)prim;
   dst = (uint8_t*)*tris;
@@ -362,18 +378,12 @@ static void GLConvertToTris(void *ot, poly3i **tris, int *count) {
   }
 }
 
-static void GLFreeTris(poly3i **tris) {
-  free(*tris);
-  *tris = 0;
-}
-
 static void GLDraw(void *ot) {
   poly3i *tris;
   int count;
 
   GLConvertToTris(ot, &tris, &count);
   GLDrawPrims(tris, count);
-  GLFreeTris(&tris);
 }
 
 int GLRoundTicks(int ticks) {
@@ -389,6 +399,10 @@ int GLRoundTicks(int ticks) {
 }
 
 void GLClear() {
+  zone_header *header;
+  rgb8 fill;
+  int fh;
+
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glLoadIdentity();
   // glViewport(0, 0, screen.w, screen.h);
@@ -398,6 +412,20 @@ void GLClear() {
             1.0, 100000.0);
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity();
+  if (!(cur_display_flags & 0x80000)) {
+    /* fill bg color(s) */
+    header = (zone_header*)cur_zone->items[0];
+    fh = header->vram_fill_height;
+    if (cur_display_flags & 0x2000) {
+      fill = vram_fill_color;
+      GLDrawRect(0,  12+0, 512,     fh, fill.r, fill.g, fill.b); /* top color */
+      fill = header->vram_fill;
+      GLDrawRect(0, 12+fh, 512, 216-fh, fill.r, fill.g, fill.b); /* bottom color */
+    }
+    else {
+      GLDrawRect(0,  12+0, 512, 216, 0, 0, 0);
+    }
+  }
 }
 
 void GLUpdate() {
@@ -440,11 +468,6 @@ void GLUpdate() {
     ns.draw_skip_counter--;
   if (ns.draw_skip_counter == 0)
     GLDraw(context.ot);
-#ifdef CFLAGS_GUI
-  GuiUpdate();
-  GuiDraw();
-  ImGui_ImplOpenGL2_RenderDrawData(igGetDrawData());
-#endif
   GLResetPrims(&context);
   if (fade_counter != 0) { /* brightness */
     if (fade_counter < -2) {
@@ -462,22 +485,14 @@ void GLUpdate() {
       GLDrawOverlay(fade_counter);
     }
   }
-  if (!(cur_display_flags & 0x80000)) {
-    // border; commented out for now
-    /*
-    header = (zone_header*)cur_zone->items[0];
-    fh = header->vram_fill_height;
-    if (cur_display_flags & 0x2000) {
-      fill = vram_fill_color;
-      GLDrawRect(0,  0, 512,     fh, fill.r, fill.g, fill.b);
-      fill = header->vram_fill;
-      GLDrawRect(0, fh, 512, 216-fh, fill.r, fill.g, fill.b);
-    }
-    else {
-      GLDrawRect(0,  0, 512, 216, 0, 0, 0);
-    }
-    */
-  }
+  /* simulate draw area clipping behavior in orig impl */
+  GLDrawRect(0, 0, 512, 12, 0, 0, 0);
+  GLDrawRect(0, 228, 512, 12, 0, 0, 0);
+#ifdef CFLAGS_GUI
+  GuiUpdate();
+  GuiDraw();
+  ImGui_ImplOpenGL2_RenderDrawData(igGetDrawData());
+#endif
   if (callbacks.post_update)
     (*callbacks.post_update)();
 }

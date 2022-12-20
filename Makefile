@@ -32,9 +32,7 @@ SRC =	src/ns.c \
 	src/ext/lib/refl.c \
 	src/ext/gui.c \
 	src/ext/refl.c \
-	src/ext/disgool.c \
-	src/patches/emu.c \
-	src/patches/zz.c
+	src/ext/disgool.c
 
 OBJ = $(SRC:.c=.o)
 OUT = c1
@@ -43,7 +41,7 @@ OUT = c1
 INCLUDE = -I./src/
 
 # C compiler flags (-g -O3 -Wall)
-DEFS = -DCFLAGS_GFX_SW_PERSP -DCFLAGS_DRAW_OCTREES -DCFLAGS_DRAW_WALLMAP -DCFLAGS_GUI -DCFLAGS_GOOL_DEBUG
+DEFS = -DCFLAGS_GFX_SW_PERSP -DCFLAGS_GUI -DCFLAGS_GOOL_DEBUG -DCFLAGS_DRAW_EXTENSIONS
 LDLIBS = -lSDL2 -lSDL2_mixer -lfluidsynth -lGL -lm -lstdc++
 CFLAGS = -g -fplan9-extensions -m32
 CFLAGS += $(LDLIBS) $(DEFS)
@@ -81,4 +79,3 @@ $(CIMGUI_OBJ):
 
 $(OUT): $(OBJ)
 	$(CC) $(OBJ) -o $(OUT) $(CFLAGS)
-

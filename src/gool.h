@@ -115,6 +115,7 @@
 #define GOOL_FLAG_DISPANIM_ALL      0x3C00F
 #define GOOL_FLAG_DISPANIM_OBJECTS  0xFFFC
 
+
 /* interpreter flags */
 #define GOOL_FLAG_SUSPEND_ON_RET    0x1
 #define GOOL_FLAG_SUSPEND_ON_RETLNK 0x2

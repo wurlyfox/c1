@@ -259,6 +259,7 @@ int TitleKill() {
   if (title)
     free(title);
   cur_lid = 0;
+  title = 0; // not in orig
   return 0;
 }
 

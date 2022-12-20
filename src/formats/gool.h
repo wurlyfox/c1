@@ -54,18 +54,21 @@ typedef struct {
   texinfo2 texinfos[];
 } gool_sprite_anim;
 
-typedef struct {
-  texinfo2 texinfo;
-  uint16_t width;
-  uint16_t height;
+typedef union {
+  struct {
+    texinfo2 texinfo;
+    uint16_t width;
+    uint16_t height;
+  };
+  uint32_t has_texture;
 } gool_glyph;
 
 typedef struct {
   texinfo2 texinfo;
-  uint16_t x1;
-  uint16_t y1;
-  uint16_t x2;
-  uint16_t y2;
+  int16_t x1;
+  int16_t y1;
+  int16_t x2;
+  int16_t y2;
 } gool_frag;
 
 typedef struct {

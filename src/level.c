@@ -173,7 +173,7 @@ void LevelSpawnObjects() {
 // inline code from LevelUpdate
 static inline void ZoneTerminateDifference(entry *zone) {
   entry *cur_neighbor, *neighbor;
-  zone_header *cur_header, *header;
+  zone_header *cur_header, *header, *n_header;
   int i, ii, found;
 
   if (!cur_zone) { return; }
@@ -191,10 +191,10 @@ static inline void ZoneTerminateDifference(entry *zone) {
     }
     if (found) /* neighbor found in new zone? */
       continue; /* skip termination */
-    header = (zone_header*)cur_neighbor->items[0];
-    if (header->display_flags & 1) {
+    n_header = (zone_header*)cur_neighbor->items[0];
+    if (n_header->display_flags & 1) {
       GoolZoneObjectsTerminate(cur_neighbor);
-      header->display_flags &= 0xFFFFFFFC; /* clear bits 1 & 2 */
+      n_header->display_flags &= 0xFFFFFFFC; /* clear bits 1 & 2 */
     }
   }
 }
@@ -677,18 +677,18 @@ uint16_t ZoneFindNode(zone_rect *zone_rect, uint16_t root, rect _rect, vec *va, 
     /* plug the ray eq into the plane eqs for nearest 3 faces of N */
     /* and solve for the *furthest* t (nearest in opposite direction) */
     /* i.e. C=(A-B)+Bt => tn=(Cn-(An-Bn))/Bn => t=max(ti) */
-    t = 0x7FFFFFFF; /* INT_MAX */
+    t = -0x80000000; /* INT_MIN */
     if (vb->x) {
       tx = ((corner.x-(va->x-vb->x))<<8)/vb->x;
-      if (tx>=t) { t = tx; i = 0; }
+      if (tx>t) { t = tx; i = 0; }
     }
     if (vb->z) {
       tz = ((corner.z-(va->z-vb->z))<<8)/vb->z;
-      if (tz>=t || abs(vb->x) < abs(vb->z)) { t = tz; i = 2; }
+      if (tz>t || abs(vb->x) < abs(vb->z)) { t = tz; i = 2; }
     }
     if (vb->y) {
       ty = ((corner.y-(va->y-vb->y))<<8)/vb->y;
-      if (ty>=t
+      if (ty>t
        || (i==0 && abs(vb->x) < abs(vb->y))
        || (i==2 && abs(vb->z) < abs(vb->y))) { t = ty; i = 1; }
     }
@@ -711,7 +711,7 @@ uint16_t ZoneFindNode(zone_rect *zone_rect, uint16_t root, rect _rect, vec *va, 
   }
   else if (node) { /* node is a solid [non-leaf] node? */
     tree = &zone_rect->octree;
-    child_nodes = &tree->nodes[node]; /* TODO: is this relative to the 'nodes' or the octree structure */
+    child_nodes = (uint16_t*)((uint8_t*)zone_rect + node);
     child_rect = _rect;
     /* subdivide each dimension for which level is below max depth */
     if (level < tree->max_depth_x)
@@ -721,9 +721,9 @@ uint16_t ZoneFindNode(zone_rect *zone_rect, uint16_t root, rect _rect, vec *va, 
     if (level < tree->max_depth_z)
       child_rect.dim.d /= 2;
     idx=0;
-    for (i=0;i<(level<tree->max_depth_x)?2:1;i++) {
-      for (j=0;j<(level<tree->max_depth_y)?2:1;j++) {
-        for (k=0;k<(level<tree->max_depth_z)?2:1;k++) {
+    for (i=0;i<((level<tree->max_depth_x)?2:1);i++) {
+      for (j=0;j<((level<tree->max_depth_y)?2:1);j++) {
+        for (k=0;k<((level<tree->max_depth_z)?2:1);k++) {
           child_rect.loc.x = _rect.loc.x + (int32_t)(i?child_rect.dim.w:0);
           child_rect.loc.y = _rect.loc.y + (int32_t)(j?child_rect.dim.h:0);
           child_rect.loc.z = _rect.loc.z + (int32_t)(k?child_rect.dim.d:0);
@@ -1009,7 +1009,7 @@ uint16_t ZoneFindNearestNode(zone_rect *zone_rect, uint16_t root, rect *nrect, v
   }
   else { /* the node is a non-empty non-leaf */
     tree = &zone_rect->octree;
-    child_nodes = (uint16_t*)&(((uint8_t*)zone_rect)[node]);
+    child_nodes = (uint16_t*)((uint8_t*)zone_rect + node);
     child_rect = *nrect;
     ii=0;ij=0;ik=0; /* child [octant] index */
     fi=0;fj=0;fk=0; /* flags set when there is a subdivision */
@@ -1420,6 +1420,7 @@ int ZonePathProgressToLoc(zone_path *path, int progress, gool_vectors *cam) {
   cam->rot.x = point->rot_x;
   cam->rot.z = point->rot_z;
   fractional = abs(progress) & 0xFF;
+  n_path = 0;
   flag = 1; /* flag for 'next point internal to this path' */
   /* progress has a nonzero fractional part and this is the last pt? */
   if (pt_idx == path->length-1 && fractional) {

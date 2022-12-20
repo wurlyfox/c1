@@ -71,13 +71,14 @@ extern gool_handle handles[8];
 extern int bonus_return;
 extern level_state savestate;
 
-#ifdef CFLAGS_DRAW_OCTREES
+#ifdef CFLAGS_DRAW_EXTENSIONS
 extern zone_query cur_zone_query;
-int draw_octrees = 0;
-#endif
-#ifdef CFLAGS_DRAW_WALLMAP
 extern uint32_t *wall_bitmap;
+extern gool_bound object_bounds[96];
+extern int object_bound_count;
+int draw_octrees = 0;
 int draw_wallmap = 0;
+int draw_objbounds = 0;
 #endif
 
 #ifdef PSX
@@ -141,9 +142,9 @@ void CoreLoop(lid_t lid) {
 #endif
 
 #if (LID_BOOTLEVEL!=LID_TITLE)
-  //life_count=3;
-  //init_life_count=3;
-  sfx_vol=255;
+  // life_count=3;
+  // init_life_count=3;
+  // sfx_vol=255;
 #endif
   NSInit(&ns, lid);
   CoreObjectsCreate();
@@ -155,7 +156,7 @@ void CoreLoop(lid_t lid) {
       if (paused = 1 - paused) {
         if (!pause_obj) {
           pause_obj = GoolObjectCreate(&handles[7], 4, 4, 0, 0, 0);
-          if (ISSUCCESSCODE(pause_obj)) {
+          if (!ISERRORCODE(pause_obj)) {
             pause_status = 1;
 #ifndef PSX
             ticks_elapsed = GetTicksElapsed();
@@ -265,17 +266,19 @@ void CoreLoop(lid_t lid) {
         GfxTransformWorlds(ot);
     }
     GoolUpdateObjects(!paused);
-#if defined(CFLAGS_DRAW_OCTREES) && !defined(PSX)
+#if defined(CFLAGS_DRAW_EXTENSIONS) && !defined(PSX)
     if (pads[0].tapped & 4)
       draw_octrees = !draw_octrees;
     if (draw_octrees)
       SwTransformZoneQuery(&cur_zone_query, ot, GLGetPrimsTail());
-#endif
-#if defined(CFLAGS_DRAW_WALLMAP) & !defined(PSX)
     if (pads[0].tapped & 8)
       draw_wallmap = !draw_wallmap;
     if (draw_wallmap)
       SwDrawWallMap(wall_bitmap, ot, GLGetPrimsTail());
+    if (pads[0].tapped & 1)
+      draw_objbounds = !draw_objbounds;
+    if (draw_objbounds)
+      SwTransformObjectBounds(object_bounds, object_bound_count, ot, GLGetPrimsTail());
 #endif
 #ifndef PSX
     GLClear();

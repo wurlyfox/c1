@@ -699,6 +699,7 @@ extern int draw_count;
 extern int paused;
 extern ns_struct ns;
 extern gool_object *player;
+extern gool_object *crash;
 extern lid_t cur_lid;
 extern entry *cur_zone;
 
@@ -903,7 +904,7 @@ int GfxResetCam(vec *trans) {
 }
 
 // not a separate func
-static inline void GfxCalcObjectZoneMatrices(
+static inline int GfxCalcObjectZoneMatrices(
   gool_object *obj,
   int flag,
   int *zdist,
@@ -919,9 +920,8 @@ static inline void GfxCalcObjectZoneMatrices(
   colors=&obj->colors;
   switch (header->unknown_a) { /* TODO: rename 'unknown_a' to 'shader'? */
   case 2:
-    z=limit(r_trans->z-dword_800618B8, 0, 0x7FFF);
-    if (z >= 0x7FFF) { return; }
-
+    z=max((r_trans->z-dword_800618B8)*8, 0);
+    if (z > 0x7FFF) { return 0; }
     /* TODO: add calculated z value to 'ambient' zone colors (at 0x318) */
     for (i=0;i<12;i++) {
       val=header->object_colors.l[i];
@@ -936,8 +936,8 @@ static inline void GfxCalcObjectZoneMatrices(
     break;
   case 3:
     if (flag) {
-      z=limit((far-dword_800618B8)/4, 0, 28001);
-      if (z >= 28001) { return; }
+      z=max((r_trans->z-dword_800618B8)/4, 0);
+      if (z > 28000) { return 0; }
       for (i=0;i<24;i++) {
         val=header->object_colors.a[i];
         val=max(val-z, 0);
@@ -945,7 +945,7 @@ static inline void GfxCalcObjectZoneMatrices(
       }
     }
     else {
-      z=limit((far-dword_800618B8)/200, 0, 8);
+      z=limit((r_trans->z-dword_800618B8)/200, 0, 8);
       *zdist=z;
     }
     break;
@@ -971,12 +971,16 @@ static inline void GfxCalcObjectZoneMatrices(
     dir.y=((obj_trans->y-trans.y)>>8)-800;
     dir.z=(obj_trans->z-trans.z)>>8;
     dist=sqrt((dir.x*dir.x)+(dir.y*dir.y)+(dir.z*dir.z));
-    if (dark_dist <= 0) { dark_dist=1; }
+    dark_dist=max(dark_dist, 1);
     dist=max(dist, 1); /* avoid division by 0 */
     dir.x=((trans.x-obj_trans->x)<<8)/dist; /* recalc and normalize */
     dir.y=((trans.y-obj_trans->y)<<8)/dist;
     dir.z=((trans.z-obj_trans->z)<<8)/dist;
     cdist=6000-dist; /* complementary distance */
+    if (cdist < 0) {
+      dir.x = 0;
+      dir.z = 0;
+    }
     cdir.x=((dir.x*cdist)>>8)/dark_dist; /* reversed direction, repositioned 6000 units away */
     cdir.y=((dir.y*cdist)>>8)/dark_dist;
     cdir.z=((dir.z*cdist)>>8)/dark_dist;
@@ -993,6 +997,7 @@ static inline void GfxCalcObjectZoneMatrices(
     colors->color.b=val;
     break;
   }
+  return 1;
 }
 
 //----- (800180CC) --------------------------------------------------------
@@ -1031,6 +1036,7 @@ int GfxCalcObjectMatrices(svtx_frame *frame, tgeo_header *t_header,
     if ((status_b & 0x40000) == 0) {
       if ((int32_t)screen_proj >= r_trans->z) { return 0; }
       if ((status_b & 0x80000000) == 0) {
+        if (r_trans->z == 0) { return 0; }
         s_trans.x=((int32_t)screen_proj*r_trans->x)/r_trans->z;
         s_trans.y=((int32_t)screen_proj*r_trans->y)/r_trans->z;
         //if (abs(s_trans.x)  > 316) { return 0; }
@@ -1052,8 +1058,10 @@ int GfxCalcObjectMatrices(svtx_frame *frame, tgeo_header *t_header,
         //if (extents.p1.y >  108 && extents.p2.y >  108) { return 0; }
       }
     }
-    if (obj && (status_b & 0x400))
-      GfxCalcObjectZoneMatrices(obj, flag, zdist, r_trans);
+    if (obj != crash && !(status_b & 0x400)) {
+      if (!GfxCalcObjectZoneMatrices(obj, flag, zdist, r_trans))
+        return 0;
+    }
   }
 #ifdef PSX
   if (flag)
@@ -1467,9 +1475,9 @@ void GfxTransformFontChar(gool_object *obj, gool_glyph *glyph, int32_t z,
 //----- (80019144) --------------------------------------------------------
 void GfxTransform(vec *in, mat16 *mat, vec *out) {
 #define m mat->m
-  out->x=(m[0][0]*in->x+m[0][1]*in->y+m[0][2]*in->z)>>12;
-  out->y=(m[1][0]*in->x+m[1][1]*in->y+m[1][2]*in->z)>>12;
-  out->z=(m[2][0]*in->x+m[2][1]*in->y+m[2][2]*in->z)>>12;
+  out->x=((int64_t)m[0][0]*in->x+m[0][1]*in->y+m[0][2]*in->z)>>12;
+  out->y=((int64_t)m[1][0]*in->x+m[1][1]*in->y+m[1][2]*in->z)>>12;
+  out->z=((int64_t)m[2][0]*in->x+m[2][1]*in->y+m[2][2]*in->z)>>12;
 #undef m
 }
 
@@ -1514,21 +1522,21 @@ void GfxLoadWorlds(zone_header *header) {
 void GfxTransformWorlds(void *ot) {
   zone_header *header;
   zone_world *worlds;
+  size_t size;
   void **prims_tail;
 
   if (!cur_poly_ids->len) { return; }
   header=(zone_header*)cur_zone->items[0];
   worlds=(zone_world*)header->worlds;
+  size=sizeof(header->worlds);
 #ifdef PSX
   SetRotMatrix(&ms_cam_rot);
   SetLightMatrix(&mn_light);
-  size=sizeof(header->worlds);
   RMemcpy((void*)worlds, (void*)scratch.worlds/*0x1F800100*/, size); /* copy worlds to scratch mem */
   prims_tail=GpuGetPrimsTail();
   RGteTransformWorlds(poly_ids,ot,0x800-(screen_proj/2),draw_count,prims_tail,(quad28*)uv_map);
 #else
-  /* no need to copy worlds or set matrices */
-  params.worlds=worlds;
+  memcpy((void*)params.worlds,(void*)worlds,size);
   params.trans=cam_trans;
   params.m_rot=ms_cam_rot;
   params.m_light=mn_light;
@@ -1549,7 +1557,7 @@ static inline void GfxGetFar(int *far, int *shamt) {
   visibility_depth=header->visibility_depth;
   lid=ns.ldat->lid;
   if (lid == LID_ROADTONOWHERE || lid == LID_THEHIGHROAD) {
-    _far=((visibility_depth-(3200*dword_80061898))>>8)-1600;
+    _far=((visibility_depth-(3200*fog_z))>>8)-1600;
     _shamt=header->unknown_b;
     dword_800618B8=_far+2000;
   }
@@ -1576,14 +1584,13 @@ void GfxTransformWorldsFog(void *ot) {
   if (!cur_poly_ids) { return; }
   header=(zone_header*)cur_zone->items[0];
   worlds=header->worlds;
+  size=sizeof(zone_world)*header->world_count;
 #ifdef PSX
   SetRotMatrix(&ms_cam_rot);
   SetLightMatrix(dword_800578F4);
-  size=sizeof(zone_world)*header->world_count;
   RMemcpy((void*)worlds,(void*)scratch.worlds/*0x1F800100*/, size); /* copy worlds to scratch mem */
 #else
-  /* no need to copy worlds or set matrices */
-  params.worlds=worlds;
+  memcpy((void*)params.worlds,(void*)worlds,size);
   params.trans=cam_trans;
   params.m_rot=ms_cam_rot;
   params.m_light=mn_light;
@@ -1591,7 +1598,7 @@ void GfxTransformWorldsFog(void *ot) {
 #endif
   GfxGetFar(&far, &shamt);
   for (i=0;i<header->world_count;i++) {
-    world=&worlds[i];
+    world=&params.worlds[i];
     w_header=world->header;
     is_backdrop=w_header->is_backdrop;
     val=is_backdrop?0xFFFF:far;
@@ -1610,14 +1617,15 @@ void GfxTransformWorldsFog(void *ot) {
 void GfxTransformWorldsRipple(void *ot) {
   zone_header *header;
   zone_world *worlds;
+  size_t size;
   void **prims_tail;
   int i, val;
 
   /* ripple_speed, ripple_period */
   if (!ot) {
     for (i=0;i<16;i++) {
-      val=ripple_period+1>=0?1:8;
-      tri_wave[i]=-(ripple_period-((ripple_period+val)/8));
+      val=(ripple_period+1)/8;
+      tri_wave[i]=-(ripple_period-i*val);
     }
     return;
   }
@@ -1631,6 +1639,7 @@ void GfxTransformWorldsRipple(void *ot) {
   }
   header=(zone_header*)cur_zone->items[0];
   worlds=header->worlds;
+  size=sizeof(header->worlds);
 #ifdef PSX
   for (i=0;i<16;i++) {
     // tri_wave[i]=abs(tri_wave[i]);
@@ -1645,7 +1654,7 @@ void GfxTransformWorldsRipple(void *ot) {
 #else
   for (i=0;i<16;i++)
     params.tri_wave[i] = abs(tri_wave[i]);
-  params.worlds=worlds;
+  memcpy((void*)params.worlds,(void*)worlds,size);
   params.trans=cam_trans;
   params.m_rot=ms_cam_rot;
   params.m_light=mn_light;
@@ -1659,11 +1668,13 @@ void GfxTransformWorldsRipple(void *ot) {
 void GfxTransformWorldsLightning(void *ot) {
   zone_header *header;
   zone_world *worlds;
+  size_t size;
   void **prims_tail;
 
   if (!cur_poly_ids->len) { return; }
   header=(zone_header*)cur_zone->items[0];
   worlds=header->worlds;
+  size=sizeof(header->worlds);
 #ifdef PSX
   SetRotMatrix(&ms_cam_rot);
   SetLightMatrix(dword_800578F4);
@@ -1679,7 +1690,7 @@ void GfxTransformWorldsLightning(void *ot) {
   prims_tail=GpuGetPrimsTail();
   RGteTransformWorldsLightning(poly_ids,ot,0x800-(screen_proj/2),draw_count,prims_tail,(quad28*)uv_map);
 #else
-  params.worlds=worlds;
+  memcpy((void*)params.worlds,(void*)worlds,size);
   params.trans=cam_trans;
   params.m_rot=ms_cam_rot;
   params.m_light=mn_light;
@@ -1700,6 +1711,7 @@ void GfxTransformWorldsLightning(void *ot) {
 void GfxTransformWorldsDark(void *ot) {
   zone_header *header;
   zone_world *worlds,*world;
+  size_t size;
   void **prims_tail;
   int32_t far;
   int i,shamt;
@@ -1707,6 +1719,7 @@ void GfxTransformWorldsDark(void *ot) {
   if (!cur_poly_ids->len) { return; }
   header=(zone_header*)cur_zone->items[0];
   worlds=header->worlds;
+  size=sizeof(header->worlds);
   GfxGetFar(&far, &shamt);
 #ifdef PSX
   SetRotMatrix(&ms_cam_rot);
@@ -1723,7 +1736,7 @@ void GfxTransformWorldsDark(void *ot) {
   prims_tail=GpuGetPrimsTail();
   RGteTransformWorldsDark(poly_ids,ot,0x800-(screen_proj/2),draw_count,prims_tail,(quad28*)uv_map,far,shamt);
 #else
-  params.worlds=worlds;
+  memcpy((void*)params.worlds,(void*)worlds,size);
   params.trans=cam_trans;
   params.m_rot=ms_cam_rot;
   params.m_light=mn_light;
@@ -1737,7 +1750,7 @@ void GfxTransformWorldsDark(void *ot) {
   params.far_t2 = far_t2*16;
   /* note: psx impl passes these as arguments instead of putting them in the tag */
   for (i=0;i<header->world_count;i++) {
-    world=&header->worlds[i];
+    world=&params.worlds[i];
     world->tag=(shamt<<16)|far; /* tag is unioned with wgeo */
   }
   prims_tail=GLGetPrimsTail();
@@ -1749,12 +1762,14 @@ void GfxTransformWorldsDark(void *ot) {
 void GfxTransformWorldsDark2(void *ot) {
   zone_header *header;
   zone_world *worlds,*world;
+  size_t size;
   void **prims_tail,*dst;
   int i;
 
   if (!cur_poly_ids->len) { return; }
   header=(zone_header*)cur_zone->items[0];
   worlds=header->worlds;
+  size=sizeof(header->worlds);
 #ifdef PSX
   SetRotMatrix(&ms_cam_rot);
   SetLightMatrix(&mn_light);
@@ -1775,7 +1790,7 @@ void GfxTransformWorldsDark2(void *ot) {
   prims_tail=GpuGetPrimsTail();
   RGteTransformWorldsDark2(poly_ids,ot,0x800-(screen_proj/2),draw_count,prims_tail,(quad28*)uv_map);
 #else
-  params.worlds=header->worlds;
+  memcpy((void*)params.worlds,(void*)worlds,size);
   params.trans=cam_trans;
   params.m_rot=ms_cam_rot;
   params.m_light=mn_light;

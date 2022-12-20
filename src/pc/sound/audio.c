@@ -179,7 +179,7 @@ void SwUnloadSample(int voice_idx) {
 void SwNoteOn(int voice_idx) {
   if (keys_on[voice_idx]) { return; }
   keys_on[voice_idx] = sample_lengths[voice_idx];
-  fluid_synth_noteon(synth, voice_idx, 1, 127);
+  fluid_synth_noteon(synth, voice_idx, 2, 127);
 }
 
 void SwNoteOff(int voice_idx) {

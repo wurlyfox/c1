@@ -13,7 +13,7 @@ uint32_t pixel_5551_8888(uint16_t p, int mode) {
   r = (p >> 0) & 0x1F;
   g = (p >> 5) & 0x1F;
   b = (p >> 10) & 0x1F;
-  a = ((p>>15));
+  a = (p >> 15);
 
   r = ((r*510)+31)/62;
   g = ((g*510)+31)/62;
@@ -28,12 +28,18 @@ uint32_t pixel_5551_8888(uint16_t p, int mode) {
   return (a << 24) | (b << 16) | (g << 8) | r;
 }
 
+#define TEX_TPAGE_LOCAL_COUNT  8
+#define TEX_TPAGE_GLOBAL_COUNT 8
+#define TEX_TPAGE_COUNT        (TEX_TPAGE_LOCAL_COUNT+TEX_TPAGE_GLOBAL_COUNT)
+#define TEX_TPAGE_MEMSIZE      TEX_TPAGE_COUNT*((1024+512+256)*128)*2*sizeof(uint32_t)
+#define TEX_CACHE_BUCKETSIZE   0x100
+
 typedef struct _tex_cache_entry {
-  struct _tex_cache_entry *next;
+  int valid;
   texinfo texinfo;
   int texid;
   fvec uvs[4];
-  rect2 rect;
+  uint32_t hash;
 } tex_cache_entry;
 
 typedef struct {
@@ -44,26 +50,19 @@ typedef struct {
   int texid;
 } tex_atlas;
 
-#define TEX_TPAGE_LOCAL_COUNT  8
-#define TEX_TPAGE_GLOBAL_COUNT 8
-#define TEX_TPAGE_COUNT        TEX_TPAGE_LOCAL_COUNT+TEX_TPAGE_GLOBAL_COUNT
-
 typedef struct {
-  tex_cache_entry *table[0x40000];
-  int entry_count;
-  tex_cache_entry entries[0x10000];
-  int tpage_count;
-  tpage *tpages[TEX_TPAGE_COUNT];
+  eid_t eids[TEX_TPAGE_COUNT];
+  tex_cache_entry table[TEX_TPAGE_COUNT][0x8000];
   tex_atlas atlases[TEX_TPAGE_COUNT*6];
-  uint8_t data[TEX_TPAGE_COUNT*((1024+512+256)*128)*2*sizeof(uint32_t)];
-  dim2 dim;  /* dim of the atlas group texture */
-  int texid; /* hw texture id for the atlas group */
+  uint8_t data[TEX_TPAGE_MEMSIZE];
   tex_create_callback_t create;
   tex_delete_callback_t delete;
   tex_subimage_callback_t subimage;
+  /*
   int global_count;
   eid_t global_eids[TEX_TPAGE_GLOBAL_COUNT];
   tpage *global_tpages[TEX_TPAGE_GLOBAL_COUNT];
+  */
 } tex_cache;
 
 tex_cache cache;
@@ -75,44 +74,41 @@ void TexturesInit(
   tex_delete_callback_t delete,
   tex_subimage_callback_t subimage) {
   tex_atlas *atlas;
-  rect2 rect;
+  uint32_t w;
   uint8_t *data;
   int idx, i, j;
 
   cache.create = create;
   cache.delete = delete;
   cache.subimage = subimage;
-  memset(cache.table, sizeof(cache.table), 0);
-  // AvlTreeInit(&cache.tree);
-  cache.entry_count = 0;
-  cache.tpage_count = 0;
-  cache.dim.w = 2048; cache.dim.h = 2048;
+  memset(cache.table, 0, sizeof(cache.table));
+  memset(cache.eids, 0, sizeof(cache.eids));
   data = cache.data;
   for (i=0;i<TEX_TPAGE_COUNT;i++) {
     for (j=0;j<6;j++) {
       idx = (i*6)+j;
+      w = 1 << (10 - (j%3));
       atlas = &cache.atlases[idx];
-      rect.w = 1 << (10 - (j%3));
-      rect.h = 128;
-      //rect.x = 2048 - rect.w*2;
-      //rect.y = rect.h*((i*2)+(j/3));
       atlas->data = data;
-      atlas->rect = rect;
+      atlas->rect.w = w;
+      atlas->rect.h = 128;
       atlas->invalid = 0;
       atlas->tpage_id = -1; /* not associated with a tpage yet...*/
-      data += 1 << (19 - (j%3));
       atlas->texid = (*cache.create)(atlas->rect.dim, 0);
+      data += w*128*sizeof(uint32_t);
     }
   }
-  // cache.texid = (*cache.create)(cache.dim, 0);
-  cache.global_count = 0;
+  // cache.global_count = 0;
 }
 
 void TexturesKill() {
   tex_atlas *atlas;
   int i;
 
-  (*cache.delete)(cache.texid);
+  for (i=0;i<TEX_TPAGE_COUNT*6;i++) {
+    atlas = &cache.atlases[i];
+    (*cache.delete)(atlas->texid);
+  }
 }
 
 void TexturesUpdate() {
@@ -120,6 +116,12 @@ void TexturesUpdate() {
   rect2 rect;
   int i;
 
+  for (i=0;i<TEX_TPAGE_COUNT;i++) {
+    /* clear cache entries for any texture pages that are replaced */
+    if (texture_pages[i].eid == cache.eids[i]) { continue; }
+    memset(cache.table[i], 0, sizeof(cache.table[i]));
+    cache.eids[i] = texture_pages[i].eid;
+  }
   for (i=0;i<TEX_TPAGE_COUNT*6;i++) {
     atlas = &cache.atlases[i];
     if (atlas->invalid) {
@@ -129,6 +131,7 @@ void TexturesUpdate() {
     }
   }
 }
+
 
 /**
  * copies a rect of pixels inside a texture into a 32-bit color texture
@@ -156,27 +159,26 @@ void TextureCopy(uint8_t *src, uint8_t *dst, dim2 *sdim, dim2 *ddim,
   void *clut, int clut_type, int color_mode, int semi_trans) {
   uint32_t *data, palette[256], *dst32;
   uint16_t *clut_data, *src16;
-  pnt2 *clut_loc;
+  pnt2 pnt, *clut_loc;
+  dim2 dim;
+  rect2 rect;
   int i, idx, si, di, x, y;
-  dim2 _dim;
-  rect2 _rect;
-  pnt2 _pnt;
 
   src16 = (uint16_t*)src;
   dst32 = (uint32_t*)dst;
   if (!sdim) { /* use the defaults if no source dimensions specified */
-    sdim = &_dim;
+    sdim = &dim;
     sdim->w = 1024 >> color_mode;
     sdim->h = 128;
   }
   if (!ddim) { ddim = sdim; }
   if (!srect) {
-    srect = &_rect;
+    srect = &rect;
     srect->x = 0; srect->y = 0;
     srect->dim = *sdim;
   }
   if (!dloc) {
-    dloc = &_pnt;
+    dloc = &pnt;
     dloc->x = 0; dloc->y = 0;
   }
   if (clut_type == 0) {
@@ -237,7 +239,7 @@ static int TexturePageIdx(entry_ref *tpag) {
   if (tpag->is_eid) { eid = tpag->eid; }
   else { eid = tpag->en->eid; }
   for (i=0;i<16;i++) {
-    if (i<cache.global_count && cache.global_eids[i] == eid) { break; }
+    //if (i<cache.global_count && cache.global_eids[i] == eid) { break; }
     if (texture_pages[i].eid == eid) { break; }
   }
   return i < 16 ? i : -1;
@@ -251,10 +253,9 @@ static tpage *TexturePage(entry_ref *tpag) {
   int i, idx;
 
   eid = tpag->is_eid ? tpag->eid : tpag->en->eid;
-  idx = TexturePageIdx(tpag);
+  idx = TexturePageIdx((entry_ref*)&eid);
   if (idx == -1) { return 0; }
-  if (idx < cache.global_count)
-    return cache.global_tpages[idx];
+  //if (idx < cache.global_count) { return cache.global_tpages[idx]; }
   return (tpage*)texture_pages[idx].page;
 }
 
@@ -265,23 +266,18 @@ static tex_atlas *TextureAtlas(tpage *tpage, int color_mode, int semi_trans) {
   tex_atlas *atlas;
   int i, idx;
 
-  for (i=0;i<cache.tpage_count;i++)
-    if (cache.tpages[i] == tpage) break;
-  if (i == cache.tpage_count && i < TEX_TPAGE_COUNT) {
-    cache.tpages[i] = tpage;
-    ++cache.tpage_count;
-  }
+  i = TexturePageIdx((entry_ref*)&tpage->eid);
   idx = i*6 + (color_mode + (semi_trans == 0 ? 3 : 0));
   atlas = &cache.atlases[idx];
   if (atlas->tpage_id == -1)
-    atlas->tpage_id = TexturePageIdx((entry_ref*)&tpage->eid);
+    atlas->tpage_id = i;
   return atlas;
 }
 
 /**
  * copies a rect of pixels inside a texture page into the texture cache
  *
- * returns id of the main atlas group texture
+ * returns id of the corresponding atlas
  */
 static int TextureData(tpage *tpage, rect2 rect, pnt2 clut,
   int color_mode, int semi_trans) {
@@ -294,21 +290,18 @@ static int TextureData(tpage *tpage, rect2 rect, pnt2 clut,
     &clut, 1, color_mode, semi_trans);
   atlas->invalid = 1;
   return atlas->texid;
-  // return cache.texid;
 }
 
 /**
 * creates a new texture for the given texinfo
 * this may require creating a parent atlas for the texture
 *
-* returns the index of main atlas group texture
-* and the uv coordinates of the texture within the main atlas group
-* (OLD: returns the index of the parent atlas
-*       and the uv coordinates of the texture within the parent atlas)
+* returns the id of the parent atlas
+* and the uv coordinates of the texture within that atlas
 */
 static int TextureNew(texinfo *texinfo, fvec (*uvs)[4]) {
-  tex_cache_entry *entry, *prev;
   tex_atlas *atlas;
+  tex_cache_entry *table, *entry;
   tpage *tpage;
   quad28 quad;
   vec2 offs;
@@ -344,82 +337,63 @@ static int TextureNew(texinfo *texinfo, fvec (*uvs)[4]) {
   }
   clut.x = texinfo->clut_x;
   clut.y = texinfo->clut_y;
-  /* tpage = NSLookup(&texinfo->tpage); */
   tpage = TexturePage((entry_ref*)&texinfo->tpage);
-  /* change here */
+  if (tpage == 0) { return -1; }
   atlas = TextureAtlas(tpage, texinfo->color_mode, texinfo->semi_trans);
   for (i=0;i<4;i++) {
-    //(*uvs)[i].x += atlas->rect.x;
-    //(*uvs)[i].y += atlas->rect.y;
-    //(*uvs)[i].x /= 2048;
-    //(*uvs)[i].y /= 2048;
-    (*uvs)[i].y = (*uvs)[i].y;
     (*uvs)[i].x /= atlas->rect.w;
     (*uvs)[i].y /= atlas->rect.h;
   }
-  /* ----------- */
   texid = TextureData(tpage, rect, clut,
     texinfo->color_mode, texinfo->semi_trans);
-  entry = &cache.entries[cache.entry_count++];
+  hash = texinfo->color_mode<<12|texinfo->segment<<10
+        |texinfo->offs_x<<5|texinfo->offs_y;
+  table = cache.table[atlas->tpage_id];
+  for (i=hash;i<hash+TEX_CACHE_BUCKETSIZE;i++) {
+    entry = &table[i%0x8000];
+    if (!entry->valid) { break; }
+  }
+  if (i==hash+TEX_CACHE_BUCKETSIZE) { return -1; }
+  entry->valid = 1;
+  entry->hash = hash;
   entry->texinfo = *texinfo;
   entry->texid = texid;
   for (i=0;i<4;i++)
     entry->uvs[i] = (*uvs)[i];
-  entry->rect.x = rect.x;
-  entry->rect.y = rect.y;
-  entry->rect.w = rect.w;
-  entry->rect.h = rect.h;
-  entry->next = 0;
-  hash = atlas->tpage_id<<14|texinfo->color_mode<<12|texinfo->segment<<10
-       |texinfo->offs_x<<5|texinfo->offs_y;
-  if (cache.table[hash]) {
-    prev = cache.table[hash];
-    entry->next = prev;
-  }
-  cache.table[hash] = entry;
-  return entry->texid;
-  // return cache.texid;
+  return texid;
 }
 
 /**
-* retrieves the uv coordinates for the texture referenced by the given texinfo
-* these coordinates are relative to the main atlas group texture
-*
-* returns id of the main atlas group
-* and the uv coordinates of the texture within the main atlas group
-* (OLD: retrieves the index of the atlas
-*       which contains the texture referenced by the given texinfo)
+* returns the id of the atlas
+* which contains the texture referenced by the given texinfo
+* and the uv coordinates of the texture within that atlas
 */
 static int TextureLookup(texinfo *texinfo, fvec(*uvs)[4]) {
-  tex_cache_entry *entry;
-  entry_ref *tpag;
-  eid_t eid;
+  tex_cache_entry *table, *entry;
   uint32_t hash;
   int i, idx;
 
   idx = TexturePageIdx((entry_ref*)&texinfo->tpage);
-  hash = idx<<14|texinfo->color_mode<<12|texinfo->segment<<10
-       |texinfo->offs_x<<5|texinfo->offs_y;
-  entry = cache.table[hash];
-  while (entry && texinfo->uv_idx != entry->texinfo.uv_idx)
-    entry = entry->next;
-  if (!entry) { return -1; }
+  if (idx == -1) { return -1; }
+  hash = texinfo->color_mode<<12|texinfo->segment<<10
+        |texinfo->offs_x<<5|texinfo->offs_y;
+  table = cache.table[idx];
+  for (i=hash;i<hash+TEX_CACHE_BUCKETSIZE;i++) {
+    entry = &table[i%0x8000];
+    if (!entry->valid) { return -1; }
+    if (hash==entry->hash && texinfo->uv_idx==entry->texinfo.uv_idx) { break; }
+  }
+  if (i==hash+TEX_CACHE_BUCKETSIZE) { return -1; }
   for (i=0;i<4;i++)
     (*uvs)[i] = entry->uvs[i];
   return entry->texid;
-  // return cache.texid;
-}
-
-int TextureId() {
-  return cache.texid;
 }
 
 /**
 * creates a new texture for the given texinfo if one does not exist
 *
-* returns id of the main atlas group
-* and the uv coordinates of the texture within the main atlas group
-* (OLD: returns the index of the texture's parent atlas)
+* returns the id of the texture's parent atlas
+* and the uv coordinates of the texture within that atlas
 */
 int TextureLoad(texinfo *texinfo, fvec(*uvs)[4]) {
   int texid;
@@ -436,7 +410,6 @@ int TextureLoad(texinfo *texinfo, fvec(*uvs)[4]) {
 * this page will be chosen over ones which are dynamically loaded/unloaded
 * by the game
 */
-
 /*
 int TexturePageGlobal(tpage *tpage) {
   int idx;

@@ -595,7 +595,10 @@ typedef struct {
 
 typedef struct {
   colinfo;
-  rgninfo;
+  union {
+    rgninfo;
+    rgninfo rgninfos[0];
+  };
 } texinfo2;
 
 /* vector operations */

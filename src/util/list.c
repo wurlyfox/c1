@@ -63,7 +63,12 @@ void list_insert_node(list_t *list, list_node_t *prev, list_node_t *node) {
       list->tail = node;
     prev->next = node;
   }
-  else if (!list->head) {
+  else if (list->head) {
+    node->next = list->head;
+    node->next->prev = node;
+    list->head = node;
+  }
+  else {
     list->head = node;
     list->tail = node;
   }
@@ -148,7 +153,7 @@ list_node_t *list_append(list_t *list, void *data) {
 
   n = list_node_alloc();
   n->data = data;
-  n->next = 0;
+  n->next = 0; n->prev = 0;
   list_append_node(list, n);
   return n;
 }
@@ -159,7 +164,7 @@ list_node_t *list_insert(list_t *list, void *prev, void *data) {
   list_first_node(list, p, p->data == prev);
   n = list_node_alloc();
   n->data = data;
-  n->next = 0;
+  n->next = 0; n->prev = 0;
   list_insert_node(list, p, n);
   return n;
 }
@@ -170,7 +175,7 @@ list_node_t *list_insert_before(list_t *list, void *next, void *data) {
   list_first_node(list, x, x->data == next);
   n = list_node_alloc();
   n->data = data;
-  n->prev = 0;
+  n->prev = 0; n->next = 0;
   list_insert_node_before(list, x, n);
   return n;
 }
@@ -195,6 +200,13 @@ void *list_pop(list_t *list, int idx) {
   list_remove_node(list, n);
   list_node_free(n, 0);
   return d;
+}
+
+void list_clear(list_t *list, int flags) {
+  list_node_t *node, *next;
+
+  list_for_each_node_safe(list, node, next) { list_node_free(node, flags&1); }
+  list_init(list);
 }
 
 int list_contains(list_t *list, void *data) {

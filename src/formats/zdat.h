@@ -56,10 +56,11 @@ typedef struct {
   eid_t midi;
   uint32_t unknown_g;
   rgb8 unknown_h;
-  rgb8 vram_fill;
   uint8_t unused_a;
-  rgb8 far_color;
+  rgb8 vram_fill;
   uint8_t unused_b;
+  rgb8 far_color;
+  uint8_t unused_c;
   gool_colors object_colors;
   gool_colors player_colors;
 } zone_gfx;

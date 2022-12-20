@@ -281,7 +281,10 @@ gui_item *GuiTreeNew(gui_handler_t select, gui_tree_sync *sync) {
      as the root gui_item must be tree type for this to constitute a tree
      allocate a gui_tree for the item to store information about the tree */
   root->type = tree;
-  tr = root->tr = realloc(root->tr, sizeof(gui_tree));
+  if (root->tr)
+    tr = root->tr = realloc(root->tr, sizeof(gui_tree));
+  else
+    tr = root->tr = malloc(sizeof(gui_tree));
   tr->sync = def_tree_sync;
   if (sync) {
     tr->sync = *sync;
@@ -408,6 +411,7 @@ static void GuiTreeSync(gui_item *item) {
     case 4: // swap
       l = GuiTreeNode(item, delta->v1);
       r = GuiTreeNode(item, delta->v2);
+      if (l==0 || r==0) continue;
       tree_swap_nodes(&l->node, &r->node);
       break;
     case 5:

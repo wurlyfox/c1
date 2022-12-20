@@ -76,23 +76,23 @@ static inline void SlstRemNext(slst_context *rem, uint16_t *nodes) {
     }
     else {
       rem->idx = 0xFFFF00; /* null index */
-      rem->len = 0;        /* no removal */
+      rem->len = 0; /* no removal */
     }
-    if (rem->len > 0) /* preparative step */
+    if (rem->len > 0)
       rem->poly = *(poly_id*)&nodes[rem->i++];
   }
 }
 
 static inline void SlstAddNext(slst_context *add, uint16_t *nodes) {
   if (add->len > 0) {
-    add->poly = *(poly_id*)&nodes[add->i++]; /* grab next polygon id in seq */
-    add->idx += add->poly.flag;  /* advances by 1 */
+    add->poly = *(poly_id*)&nodes[add->i++];
+    add->idx += add->poly.flag; /* advances by 1 if set */
   }
-  else { /* process the next adding node */
+  else { /* all add.len ids specified by the node have been added */
     add->node = nodes[add->i++];
-    if (add->i < add->end && add->node != 0xFFFF) {
+    if (add->i < add->end && add->node != 0xFFFF) { /* process the next adding node */
       add->idx = add->node & 0xFFF;
-      add->len = ((add->node & 0xF000) >> 12) + 1;  /* min 1 */
+      add->len = ((add->node & 0xF000) >> 12) + 1; /* min 1 */
     }
     else {
       add->idx = 0xFFFF00;
@@ -172,7 +172,7 @@ static void SlstDecodeForward(slst_item *item, poly_id_list *src, poly_id_list *
       swap.len = ((slst_swap_fmtc*)&nodes[swap.i])->offset + 16;
       node_len = sizeof(slst_swap_fmtc)/sizeof(uint16_t);
     }
-    else { /* fmt B: 0000AAAA AAAAAAAA 0000BBBB BBBBBBBB      */
+    else { /* fmt B: 0000AAAA AAAAAAAA 0000BBBB BBBBBBBB */
       swap.idx = ((slst_swap_fmtb*)&nodes[swap.i])->idx;
       swap.len = ((slst_swap_fmtb*)&nodes[swap.i])->offset;
       node_len = sizeof(slst_swap_fmtb)/sizeof(uint16_t);
@@ -219,7 +219,7 @@ static void SlstDecodeBackward(slst_item *item, poly_id_list *src, poly_id_list 
       else
         swap.idx += (((slst_swap_fmtb*)&nodes[swap.i-2]))->idx;
     }
-    else { /* fmt B: 0000AAAA AAAAAAAA 0000BBBB BBBBBBBB      */
+    else { /* fmt B: 0000AAAA AAAAAAAA 0000BBBB BBBBBBBB */
       swap.i -= sizeof(slst_swap_fmtb)/sizeof(uint16_t)-1;
       swap.idx = ((slst_swap_fmtb*)&nodes[swap.i])->idx;
       swap.len = ((slst_swap_fmtb*)&nodes[swap.i])->offset;
@@ -231,7 +231,7 @@ static void SlstDecodeBackward(slst_item *item, poly_id_list *src, poly_id_list 
   }
   rem.i = rem.start;
   add.i = add.start;
-  rem.len = 0; /* done so the initial calls to add/rem_next  */
+  rem.len = 0; /* done so the initial calls to add/rem_next */
   add.len = 0; /* run only the else block */
   SlstRemNext(&rem, nodes);
   SlstAddNext(&add, nodes);
@@ -271,11 +271,6 @@ static void SlstDecodeBackward(slst_item *item, poly_id_list *src, poly_id_list 
   dst->len = idst;
 }
 
-#include "level.h"
-extern entry *cur_zone;
-extern zone_path *cur_path;
-extern uint32_t cur_progress;
-
 //----- (80029B0C) --------------------------------------------------------
 poly_id_list *SlstUpdate(slst_item *item, poly_id_list *src, poly_id_list *dst, int dir) {
   if (item->type & 1) {
@@ -290,4 +285,3 @@ poly_id_list *SlstUpdate(slst_item *item, poly_id_list *src, poly_id_list *dst, 
   return dst;
 }
 #endif
-

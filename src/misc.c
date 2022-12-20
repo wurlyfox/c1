@@ -137,7 +137,7 @@ void ShaderParamsUpdateRipple(int init) {
 
 //----- (8002EC68) --------------------------------------------------------
 void ShaderParamsUpdate(int init) {
-  eid_t *eid;
+  eid_t eid;
   lid_t lid;
   char buf[6];
   rgb c, ca, cb;
@@ -281,14 +281,14 @@ void ShaderParamsUpdate(int init) {
 #endif
       lightning_stamp = ticks_elapsed;
       buf[2] += randb(3);
-      *eid = NSStringToEID(buf);
+      eid = NSStringToEID(buf);
       pitch = (randb(0x4CC) + 0xD99) >> 3;
       AudioControl(0, 1, (generic*)&pitch, 0); /* set pitch */
       val = randb(15) + 1;
       AudioControl(0, 7, (generic*)&val, 0); /* trigger note on create */
       vol = randb(100);
       if (vol > 20) { vol += randb(50); }
-      AudioVoiceCreate(0, eid, 0x3FFF*vol/100);
+      AudioVoiceCreate(0, &eid, 0x3FFF*vol/100);
     }
     else {
       t = t_table2[lseq_state][lseq_idx];

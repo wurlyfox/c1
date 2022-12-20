@@ -1,5 +1,36 @@
 # Changelog
 
+## 2022-12-19
+
+### Fixed
+
+- flickering colors during intro sequence
+- rot matrix calc errors
+- some text does not render
+- issues preventing level transitions
+- more ripple shader inaccuracies
+- fog shader inaccuracies
+- lightning shader inaccuracies
+- dark shader inaccuracies
+- background color not visible in levels that have one
+- animated textures do not animate
+- some objects randomly respawn
+- some object collisions do not register (namely collisions with wumpa fruit)
+- some objects appear to not complete their paths
+- pausing the game does not work correctly
+- beach does not display in N. Sanity Beach
+- boot level is N. Sanity Beach instead of title
+
+### Added
+
+- top and bottom screen borders present in original
+- toggleable render of object bounds (press <key>q</key> to toggle)
+- issue tracking document
+
+### Removed
+
+- patches code (no longer used)
+
 ## 2022-12-13
 
 ### Fixed

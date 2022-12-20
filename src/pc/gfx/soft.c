@@ -266,9 +266,9 @@ void SwCalcObjectRotMatrix(
   SwCopyMatrix(&params->m_rot, &m_rot2);
   SwDiagMatrix(&m_scale, &scale);
   SwMulMatrix(&params->m_rot, &m_scale);
-  params->m_rot.m[1][0] *= -5; params->m_rot.m[1][0] /= 8;
-  params->m_rot.m[1][1] *= -5; params->m_rot.m[1][1] /= 8;
-  params->m_rot.m[1][2] *= -5; params->m_rot.m[1][2] /= 8;
+  params->m_rot.m[1][0] /= 8; params->m_rot.m[1][0] *= -5;
+  params->m_rot.m[1][1] /= 8; params->m_rot.m[1][1] *= -5;
+  params->m_rot.m[1][2] /= 8; params->m_rot.m[1][2] *= -5;
   params->m_rot.m[2][0] = -params->m_rot.m[2][0];
   params->m_rot.m[2][1] = -params->m_rot.m[2][1];
   params->m_rot.m[2][2] = -params->m_rot.m[2][2];
@@ -315,9 +315,9 @@ int SwCalcSpriteRotMatrix(
   SwRotMatrixZXY(&params->m_rot, &rot);
   SwDiagMatrix(&m_scale, &scale);
   SwMulMatrix(&params->m_rot, &m_scale);
-  params->m_rot.m[1][0] *= -5; params->m_rot.m[1][0] /= 8;
-  params->m_rot.m[1][1] *= -5; params->m_rot.m[1][1] /= 8;
-  params->m_rot.m[1][2] *= -5; params->m_rot.m[1][2] /= 8;
+  params->m_rot.m[1][0] /= 8; params->m_rot.m[1][0] *= -5;
+  params->m_rot.m[1][1] /= 8; params->m_rot.m[1][1] *= -5;
+  params->m_rot.m[1][2] /= 8; params->m_rot.m[1][2] *= -5;
   params->m_rot.m[2][0] = 0; /* limit rotation to xy plane */
   params->m_rot.m[2][1] = 0;
   params->m_rot.m[2][2] = 0;
@@ -370,6 +370,7 @@ void SwTransformSvtx(
 #else
       res = SwRotTrans(&u_vert, &r_verts[ii], &params->trans, &params->m_rot);
 #endif
+      if (!res) { break; }
     }
     if (!res) { continue; }
     if (!info.no_cull) {
@@ -496,6 +497,7 @@ void SwTransformCvtx(
 #else
       res = SwRotTrans(&u_vert, &r_verts[ii], &params->trans, &params->m_rot);
 #endif
+      if (!res) { break; }
     }
     if (!res) { continue; }
     idx_adj = 0;
@@ -690,8 +692,7 @@ static void SwTransformAndShadeWorlds(
   int texid, z_idx, min_z_idx, offs;
   int i, ii, world_idx, poly_idx, info_idx;
 
-  header = (zone_header*)cur_zone->items[0];
-  worlds = (zone_world*)header->worlds;
+  worlds = params->worlds;
   poly_ids = poly_id_list->ids;
   min_z_idx = 0x7FF;
   for (i=poly_id_list->len-1;i>=0;i--) {
@@ -736,16 +737,17 @@ static void SwTransformAndShadeWorlds(
       }
     }
     info_idx = poly->tinf_idx;
-    if (poly->anim_mask) {
-      offs = anim_counter >> poly->anim_period;
-      offs = (poly->anim_phase+offs) & ((poly->anim_mask<<1)|1);
-      info_idx += offs;
-    }
     tpag = tpags[poly->tpag_idx];
     wgeo_info = (wgeo_texinfo*)(&((uint32_t*)texinfos)[info_idx]);
     info.colinfo = wgeo_info->colinfo; /* convert to generic texinfo */
     if (info.type == 1) {
-       info.rgninfo = wgeo_info->rgninfo;
+       if (poly->anim_mask) {
+         info_idx = anim_counter >> poly->anim_period;
+         info_idx = (poly->anim_phase+info_idx) & ((poly->anim_mask<<1)|1);
+         info.rgninfo = wgeo_info->rgninfos[info_idx];
+       }
+       else
+         info.rgninfo = wgeo_info->rgninfo;
        info.tpage = tpag;
        texid = TextureLoad(&info, &uvs);
     }
@@ -776,34 +778,35 @@ static void SwTransformAndShadeWorlds(
 static void SwFogShader(vert_id vert_id, vec *vert, rgb8 *color, sw_transform_struct *params) {
   zone_header *header;
   zone_world *world;
-  int32_t t;
-  rgb c1, c2;
-  int16_t far;
+  srgb c1, c2, cd;
+  int32_t t, far;
   int world_idx, shamt;
 
   world_idx=vert_id.world_idx;
-  header=(zone_header*)cur_zone->items[0];
-  world=&header->worlds[world_idx];
+  world=&params->worlds[world_idx];
   far=world->tag & 0xFFFF;
-  shamt=world->tag >> 16;
-  if (vert->z < far) { /* transformed z is less than far value in world tag? */
+  shamt=(world->tag >> 16) & 0xFFFF;
+  if (vert->z > far) { /* transformed z is greater than far value in world tag? */
     /* compute t value for interpolation as distance from far, shifted left by shamt */
     t = (vert->z - far) << shamt; /* 12 bit fractional fixed point */
     /* convert integer-valued color components
        to normalized 12 bit fractional fixed point */
-    c1.r = color->r<<4;
-    c1.g = color->g<<4;
-    c1.b = color->b<<4;
-    c2.r = params->far_color1.r<<4;
-    c2.g = params->far_color1.g<<4;
-    c2.b = params->far_color1.b<<4;
+    c1.r = ((int32_t)color->r)<<4;
+    c1.g = ((int32_t)color->g)<<4;
+    c1.b = ((int32_t)color->b)<<4;
+    c2.r = ((int32_t)params->far_color1.r)<<4;
+    c2.g = ((int32_t)params->far_color1.g)<<4;
+    c2.b = ((int32_t)params->far_color1.b)<<4;
+    cd.r = limit((c2.r-c1.r), -0x800, 0x7FF);
+    cd.g = limit((c2.g-c1.g), -0x800, 0x7FF);
+    cd.b = limit((c2.b-c1.b), -0x800, 0x7FF);
     /* interpolate between vert color and far color using t value
        (multiplication of 2 12 bit fractional fixed point values
-       produces a 24 bit fixed point value, so shift right to
-       convert back to 12) */
-    color->r = ((c1.r<<12)+(t*(c2.r-c1.r)))>>12;
-    color->g = ((c1.g<<12)+(t*(c2.g-c1.g)))>>12;
-    color->b = ((c1.b<<12)+(t*(c2.b-c1.b)))>>12;
+       produces a 24 bit fixed point value, so shift right by 16
+       to convert back to the 0 to 255 range) */
+    color->r = limit(((c1.r<<12)+(t*cd.r))>>16,0,255);
+    color->g = limit(((c1.g<<12)+(t*cd.g))>>16,0,255);
+    color->b = limit(((c1.b<<12)+(t*cd.b))>>16,0,255);
   }
 }
 
@@ -820,8 +823,9 @@ static void SwRippleShader(vert_id vert_id, vec *vert, rgb8 *color, sw_transform
 
 static void SwLightningShader(vert_id vert_id, vec *vert, rgb8 *color, sw_transform_struct *params) {
   wgeo_vertex *world_vert;
+  rgb8 *far_color;
+  srgb c1, c2, cd;
   int32_t t;
-  rgb8 *far_color, c1, c2;
 
   world_vert = SwWorldVertex(vert_id);
   if (!world_vert->fx) {
@@ -833,20 +837,23 @@ static void SwLightningShader(vert_id vert_id, vec *vert, rgb8 *color, sw_transf
     far_color = &params->far_color2;
   }
   /* convert integer-valued color components
-     to normalized 12 bit fractional fixed point */
-  c1.r = color->r<<4;
-  c1.g = color->g<<4;
-  c1.b = color->b<<4;
-  c2.r = far_color->r<<4;
-  c2.g = far_color->g<<4;
-  c2.b = far_color->b<<4;
+  to normalized 12 bit fractional fixed point */
+  c1.r = ((int32_t)color->r)<<4;
+  c1.g = ((int32_t)color->g)<<4;
+  c1.b = ((int32_t)color->b)<<4;
+  c2.r = ((int32_t)params->far_color1.r)<<4;
+  c2.g = ((int32_t)params->far_color1.g)<<4;
+  c2.b = ((int32_t)params->far_color1.b)<<4;
+  cd.r = limit((c2.r-c1.r), -0x800, 0x7FF);
+  cd.g = limit((c2.g-c1.g), -0x800, 0x7FF);
+  cd.b = limit((c2.b-c1.b), -0x800, 0x7FF);
   /* interpolate between vert color and far color using t value
      (multiplication of 2 12 bit fractional fixed point values
-     produces a 24 bit fixed point value, so shift right to
-     convert back to 12) */
-  color->r = ((c1.r<<12)+(t*(c2.r-c1.r)))>>12;
-  color->g = ((c1.g<<12)+(t*(c2.g-c1.g)))>>12;
-  color->b = ((c1.b<<12)+(t*(c2.b-c1.b)))>>12;
+     produces a 24 bit fixed point value, so shift right by 16
+     to convert back to the 0 to 255 range) */
+  color->r = limit(((c1.r<<12)+(t*cd.r))>>16,0,255);
+  color->g = limit(((c1.g<<12)+(t*cd.g))>>16,0,255);
+  color->b = limit(((c1.b<<12)+(t*cd.b))>>16,0,255);
 }
 
 static void SwDarkShader(vert_id vert_id, vec *vert, rgb8 *color, sw_transform_struct *params) {
@@ -859,8 +866,8 @@ static void SwDark2Shader(vert_id vert_id, vec *vert, rgb8 *color, sw_transform_
   zone_world *world;
   wgeo_vertex *world_vert;
   vec delta;
+  srgb c1, c2, cd;
   int32_t t;
-  rgb8 c1, c2;
   int world_idx;
 
   world_idx=vert_id.world_idx;
@@ -875,20 +882,23 @@ static void SwDark2Shader(vert_id vert_id, vec *vert, rgb8 *color, sw_transform_
   t += !world_vert->fx ? params->amb_fx0 : params->amb_fx1;
   t = limit(t, 0, 4096);
   /* convert integer-valued color components
-     to normalized 12 bit fractional fixed point */
-  c1.r = color->r<<4;
-  c1.g = color->g<<4;
-  c1.b = color->b<<4;
-  c2.r = params->far_color1.r<<4;
-  c2.g = params->far_color1.g<<4;
-  c2.b = params->far_color1.b<<4;
+  to normalized 12 bit fractional fixed point */
+  c1.r = ((int32_t)color->r)<<4;
+  c1.g = ((int32_t)color->g)<<4;
+  c1.b = ((int32_t)color->b)<<4;
+  c2.r = ((int32_t)params->far_color1.r)<<4;
+  c2.g = ((int32_t)params->far_color1.g)<<4;
+  c2.b = ((int32_t)params->far_color1.b)<<4;
+  cd.r = limit((c2.r-c1.r), -0x800, 0x7FF);
+  cd.g = limit((c2.g-c1.g), -0x800, 0x7FF);
+  cd.b = limit((c2.b-c1.b), -0x800, 0x7FF);
   /* interpolate between vert color and far color using t value
      (multiplication of 2 12 bit fractional fixed point values
-     produces a 24 bit fixed point value, so shift right to
-     convert back to 12) */
-  color->r = ((c1.r<<12)+(t*(c2.r-c1.r)))>>12;
-  color->g = ((c1.g<<12)+(t*(c2.g-c1.g)))>>12;
-  color->b = ((c1.b<<12)+(t*(c2.b-c1.b)))>>12;
+     produces a 24 bit fixed point value, so shift right by 16
+     to convert back to the 0 to 255 range) */
+  color->r = limit(((c1.r<<12)+(t*cd.r))>>16,0,255);
+  color->g = limit(((c1.g<<12)+(t*cd.g))>>16,0,255);
+  color->b = limit(((c1.b<<12)+(t*cd.b))>>16,0,255);
 }
 
 void SwTransformWorlds(
@@ -951,7 +961,7 @@ void SwTransformWorldsDark2(
   SwTransformAndShadeWorlds(poly_id_list,ot,proj,anim_phase,prims_tail,params,0,SwDark2Shader);
 }
 
-#ifdef CFLAGS_DRAW_OCTREES
+#ifdef CFLAGS_DRAW_EXTENSIONS
 
 #include "level.h"
 extern vec cam_trans;
@@ -1039,10 +1049,6 @@ void SwTransformZoneQuery(zone_query *query, void *ot, void **prims_tail) {
   }
 }
 
-#endif
-
-#ifdef CFLAGS_DRAW_WALLMAP
-
 #include "gl.h"
 int wallmap_image = 0;
 
@@ -1086,6 +1092,48 @@ void SwDrawWallMap(uint32_t *wall_bitmap, void *ot, void **prims_tail) {
   prim->type=2;
   ((poly4i**)ot)[0x7FE]=prim;
   *prims_tail+=sizeof(poly4i);
+}
+
+void SwTransformObjectBounds(gool_bound *bounds, int count, void *ot, void **prims_tail) {
+  gool_bound *bound;
+  vec max_depth, u_vert, r_verts[8], zero;
+  rgb8 color;
+  poly4i *prim, *next;
+  int i, ii, iii;
+
+  zero.x = 0; zero.y = 0; zero.z = 0;
+  for (i=0;i<count;i++) {
+    bound = &bounds[i];
+    for (ii=0;ii<8;ii++) {
+      if (ii%2) { u_vert.x = bound->p1.x >> 8; }
+      else { u_vert.x = bound->p2.x >> 8; }
+      if ((ii/2)%2) { u_vert.y = bound->p1.y >> 8; }
+      else { u_vert.y = bound->p2.y >> 8; }
+      if ((ii/4)%2) { u_vert.z = bound->p1.z >> 8; }
+      else { u_vert.z = bound->p2.z >> 8; }
+      u_vert.x -= (cam_trans.x >> 8);
+      u_vert.y -= (cam_trans.y >> 8);
+      u_vert.z -= (cam_trans.z >> 8);
+      SwRotTransPers(&u_vert, &r_verts[ii], &zero, &ms_cam_rot, &params.screen, params.screen_proj);
+    }
+    color.r = 255;
+    color.g = 255;
+    color.b = 255;
+    for (ii=0;ii<6;ii++) {
+      prim=(poly4i*)(*prims_tail);
+      for (iii=0;iii<4;iii++) {
+        prim->verts[iii]=r_verts[rface_vert_idxes[ii][iii]];
+        prim->colors[iii]=Rgb8ToA32(color);
+      }
+      prim->texid=-1;
+      prim->flags=3;
+      next=((poly4i**)ot)[0x7FE];
+      prim->next=next;
+      prim->type=3;
+      ((poly4i**)ot)[0x7FE]=prim;
+      *prims_tail+=sizeof(poly4i);
+    }
+  }
 }
 
 #endif

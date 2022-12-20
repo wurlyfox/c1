@@ -4,13 +4,12 @@
 #include "formats/zdat.h"
 
 /* .rdata */
-#ifdef ORIG
+#ifdef CFLAGS_ORIG_IMPL
 #define NS_PATH "c:/src/willie/target/"
-#define NS_SUBPATH "streams/"
 #else
 #define NS_PATH "./"
-#define NS_SUBPATH "streams/"
 #endif
+#define NS_SUBPATH "streams/"
 
 /* .data */
 const char alpha_map[64] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
@@ -284,6 +283,9 @@ static inline int NSPageTranslateOffsets(page* page) {
   return SUCCESS;
 }
 
+#ifndef PSX
+page tpagemem[16];
+#endif
 //----- (80012F10) --------------------------------------------------------
 static void NSPageUpdateEntries(int idx) {
   page_struct *ps, *tps;
@@ -322,16 +324,19 @@ static void NSPageUpdateEntries(int idx) {
   }
   else if (type == 1) {
     idx = NSTexturePageAllocate();
-    if (idx != -12 || (idx == 21 && ps->ref_count)) {
+    if (idx != -12 || (idx = 15, ps->ref_count)) {
       tps = &texture_pages[idx];
 #ifdef PSX
       tpage_rect.x = (idx % 4) * 256;
       tpage_rect.y = (idx / 4) * 128;
       LoadImage(tpage_rect, page);
+#else
+      tpagemem[idx] = *page;
+      page = &tpagemem[idx];
 #endif
       tpg = (tpage*)page;
       pte = NSProbe(tpg->eid);
-      tps->state = ps->state;
+      tps->state = 20;
       tps->pgid = ps->pgid;
       tps->eid = tpg->eid;
       tps->pte = pte;
@@ -745,7 +750,7 @@ int NSPageAllocate(int* count, int flag) {
 int NSTexturePageAllocate() {
   int i, ii;
   page_struct *ps;
-  page_ref *ref;
+  entry_ref *ref;
   zone_header *header;
   ns_loadlist *loadlist;
 
@@ -761,19 +766,21 @@ int NSTexturePageAllocate() {
     NSTexturePageFree(15);
     return 15;
   }
+  /* steal the first slot occupied by a texture page
+     that is not in the current zone load list, if any */
   header = (zone_header*)cur_zone->items[0];
   loadlist = &header->loadlist;
   for (i=15;i>=0;i--) {
     ps = &texture_pages[i];
     if (ps->state != 20 && ps->state != 21) { continue; }
-    for (ii=0;ii<loadlist->page_count;ii++) {
-      ref = (page_ref*)&loadlist->pages[ii];
-      if (ref->is_pgid) {
-        if (ref->pgid == ps->page_count) { break; }
+    for (ii=0;ii<loadlist->entry_count;ii++) {
+      ref = (entry_ref*)&loadlist->entries[ii];
+      if (ref->is_eid) {
+        if (ref->eid == ps->eid) { break; }
       }
-      else if (ref->pg->pgid == ps->page_count) { break; }
+      else if (ref->en->eid == ps->eid) { break; }
     }
-    if (ii==loadlist->page_count) {
+    if (ii==loadlist->entry_count) {
       NSTexturePageFree(i);
       return i;
     }
@@ -788,7 +795,13 @@ int NSTexturePageFree(int idx) {
   ps = &texture_pages[idx];
   if (ps->state == 20) {
     ps->pte->pgid = ps->pgid;
+#ifdef PSX
     ns.page_map[ps->pgid >> 1] = (page_struct*)NULL_PAGE;
+#else
+    /* page contents are kept in memory on pc,
+       so keep the ps for the tpage data */
+#endif
+    ps->state = 1;
   }
   else if (ps->state == 21)
     ps->state = 1;
@@ -1273,29 +1286,32 @@ static inline void NSInitTexturePages(ns_struct *nss, uint32_t lid) {
     if (bly & 1)
       info |= 0x80;
     ps->info = info;
-    if (i<8)
-      ps->state = 18; /* upper half of vram "inaccessible" */
-    else if (ps->state != 20 && ps->state != 21) {
-      ps->state = 2; /* freshly reserved; ready for transfer */
+    if (i<8) {
+      ps->state = 30; /* upper half of vram "inaccessible" */
       continue;
     }
+    else if (ps->state != 20 && ps->state != 21) { /* this slot not used in previous level? */
+      ps->state = 1; /* freshly reserved; ready for transfer */
+      continue;
+    }
+    /* slot was used in previous level */
     hash = (ps->eid >> 15) & 0xFF;
     pte = nss->pte_buckets[hash];
     while (ps->eid != pte->eid) {
       idx = (++pte - nss->page_table);
       if (idx >= nss->nsd->page_table_size) {
-        pte = (nsd_pte*)-10;
+        pte = (nsd_pte*)-10; /* texture not in the page table for this level */
         break;
       }
     }
-    if (ISSUCCESSCODE(pte)) {
-      ps->state = 20; /* loaded; open for replacement ?? */
+    if (!ISERRORCODE(pte)) { /* loaded texture also in page table for this level? */
+      ps->state = 20; /* loaded */
       ps->pte = pte;
       ps->pgid = pte->pgid;
-      ns.page_map[pte->pgid >> 1] = ps;
+      ns.page_map[pte->pgid >> 1] = ps; /* reuse this ps */
     }
     else
-      ps->state = 21; /* loaded; open for replacement */
+      ps->state = 21; /* loaded, but should be replaced */
   }
 }
 
@@ -1396,7 +1412,10 @@ void NSInit(ns_struct *nss, uint32_t lid) {
   /* display loading screen */
   TitleLoading(lid, nss->ldat->image_data, nsd);
   nsd_size = sizeof(nsd) + sizeof(nsd_pte)*nsd->page_table_size + sizeof(nsd_ldat);
+#ifdef PSX
+  /* note: psy-q realloc always shrinks in-place */
   nss->nsd = realloc(nss->nsd, nsd_size); /* trim splash screen image */
+#endif
   /* convert pte bucket relative offsets to absolute pointers */
   buckets = nss->pte_buckets;
   offsets = nss->nsd->ptb_offsets;
@@ -1525,4 +1544,3 @@ int NSKill(ns_struct *nss) {
 void NSKillPage(ns_struct *nss, int idx) {
   nss->physical_pages[idx].state = 0;
 }
-

@@ -21,15 +21,16 @@ typedef struct {
 } wgeo_header;
 
 typedef struct {
-BITFIELDS_08(
+BITFIELDS_09(
   uint32_t a_idx:12,
   uint32_t b_idx:12,
   uint32_t anim_period:3,
-  uint32_t anim_phase:5,
+  uint32_t anim_mask:4,
+  uint32_t :1,
   uint32_t c_idx:12,
   uint32_t tinf_idx:12,
   uint32_t tpag_idx:3,
-  uint32_t anim_mask:5
+  uint32_t anim_phase:5
 )
 } wgeo_polygon;
 

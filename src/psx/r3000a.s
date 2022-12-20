@@ -2782,7 +2782,7 @@ create_poly_gt3_rgb1_1:
     mfc2    $sp, $17                         # get transformed z value for vert 1
     mtc2    $s3, $6                          # set GTE RGB to vert 1 rgb value
     slt     $fp, $a3, $sp
-    beqz    $fp, create_poly_gt3_rgb2_1      # skip rgb interp for transformed vert 1 if z >= the passed far value
+    beqz    $fp, create_poly_gt3_rgb2_1      # skip rgb interp for transformed vert 1 if z <= the passed far value
 create_poly_gt3_rgb1_2:
     subu    $fp, $sp, $a3                    # calc z dist of transformed vert 1 from passed far value
     sllv    $fp, $a0                         # shift left by z dist shamt

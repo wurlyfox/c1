@@ -1,5 +1,6 @@
 #include "tree.h"
 #include <string.h>
+//#include "mmalloc.h"
 
 tree_node_t *tree_node_next_ancestor(tree_node_t *node, tree_node_t *root) {
   while (node=node->parent) {
@@ -303,26 +304,16 @@ tree_node_t *tree_swap_nodes(tree_node_t *l, tree_node_t *r) {
   l->tail_child = rt_child;
   r->tail_child = lt_child;
   */
-#define insert_r(prev) \
-if (lparent) { tree_insert_node(lparent, prev, r); } \
-else { root = r; }
-#define insert_l(prev) \
-if (rparent) { tree_insert_node(rparent, prev, l); } \
-else { root = l; }
   tree_remove_node(l);
   tree_remove_node(r);
-  if (rprev == l) {
-    insert_r(lprev);
-    insert_l(r);
-  }
-  else if (lprev == r) {
-    insert_l(rprev);
-    insert_r(l);
-  }
-  else {
-    insert_l(rprev);
-    insert_r(lprev);
-  }
+  if (!lparent) { root = r; }
+  if (!rparent) { root = l; }
+  if (rprev == l && lparent)
+    tree_insert_node(lparent, lprev, r);
+  if (rparent)
+    tree_insert_node(rparent, (rprev==l)?r:rprev, l);
+  if (rprev != l && lparent)
+    tree_insert_node(lparent, (lprev==r)?l:lprev, r);
   return root;
 }
 
@@ -683,6 +674,7 @@ tree_node_t *tree_map_from(void *data, void **child_fn(void*), void *(*map)(void
     mc = tree_map_from(child, child_fn, map);
     tree_add_node(root, mc);
   }
+  free(children);
   return root;
 }
 
@@ -786,14 +778,14 @@ list_t *tree_changes(tree_node_t *src, tree_node_t *dst) {
     }
   }
   sc = tree_flatten(sr);
-  list_for_each(sc, val) {
+  list_for_each_reverse(sc, val) {
     sn = tree_find_node(sr, val);
     dn = tree_find_node(dst, val);
     if ((sn->parent ? sn->parent->data:0) != (dn->parent ? dn->parent->data:0)) {
+      node = tree_find_node(sr, dn->parent->data);
       delta = tree_delta_alloc();
       delta->op = 3; /* move */
       delta->parent = dn->parent->data;
-      node = tree_find_node(sr, dn->parent->data);
       tree_remove_node(sn);
       tree_add_node(node, sn);
       delta->prev = sn->prev ? sn->prev->data: 0;

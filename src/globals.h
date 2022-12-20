@@ -20,7 +20,7 @@ typedef struct {
   lid_t cur_lid_ro;
   uint32_t dword_80061890;
   int32_t screen_shake;
-  uint32_t dword_80061898;
+  int32_t fog_z;
   uint32_t next_display_flags;
   int respawn_count;
   gool_object *fruit_hud;
@@ -28,7 +28,7 @@ typedef struct {
   gool_object *ambiance_obj;
   uint32_t cur_display_flags;
   int i_death_cam;
-  uint32_t dword_800618B8;
+  int32_t dword_800618B8;
   gool_object *pause_obj;
   uint32_t dword_800618C0;
   gool_object *pickup_hud;
@@ -56,7 +56,7 @@ typedef struct {
   gool_object *cam_spin_obj;
   vec cam_trans_ro;
   ang cam_rot_ro;
-  uint32_t ticks_cur_frame; 
+  uint32_t ticks_cur_frame;
   vec2 screen_ro;
   int level_count;
   int levels_unlocked;
@@ -121,7 +121,7 @@ extern gool_globals globals;
 
 #define cur_lid_ro globals.cur_lid_ro
 #define screen_shake globals.screen_shake
-#define dword_80061898 globals.dword_80061898
+#define fog_z globals.fog_z
 #define next_display_flags globals.next_display_flags
 #define respawn_count globals.respawn_count
 #define fruit_hud globals.fruit_hud
