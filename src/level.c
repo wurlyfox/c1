@@ -347,7 +347,7 @@ void LevelUpdateMisc(zone_gfx *gfx, uint32_t flags) {
   prev_vram_fill_color = vram_fill_color;
   next_vram_fill_color = gfx->unknown_h;
   cur_zone_flags_ro = gfx->flags;
-  if (flags & 4)
+  if (!(flags & 4))
     MidiSetStateStopped();
 }
 

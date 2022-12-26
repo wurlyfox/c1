@@ -14,6 +14,8 @@
 
 extern ns_struct ns;
 extern gool_handle handles[8];
+extern gool_object *objects;
+extern gool_object *player;
 
 void GuiItemReplace(gui_item *item, gui_item *repl) {
   gui_item *parent, *prev;
@@ -74,7 +76,12 @@ static int GuiUnparseObjPtr(void *data, char *str) {
     sprintf(str, "none");
     return 1;
   }
-  if ((int)data < 0x3000) {
+  if (!(((int)data >= (int)objects &&
+         (int)data <= (int)(objects+(GOOL_OBJECT_COUNT-1))) 
+      ||((int)data == (int)player)
+      ||((int)data >= (int)&handles[0] &&
+         (int)data <= (int)&handles[7])
+      ||((int)data == (int)&handles_root))) {
     sprintf(str, "non-object pointer");
     return 1;
   }
@@ -87,7 +94,8 @@ static int GuiUnparseObjPtr(void *data, char *str) {
     return 1;
   }
   entity = obj->entity;
-  if (entity) {
+  if ((int)entity >= (int)ns.pagemem 
+   && (int)entity <= (int)(ns.pagemem+ns.physical_page_count)) {
     id = entity->id;
     type = entity->type;
     eid_str = NSEIDToString(((entry*)ns.ldat->exec_map[type])->eid);
@@ -99,7 +107,7 @@ static int GuiUnparseObjPtr(void *data, char *str) {
     sprintf(str, "%s (subtype %i)", eid_str, subtype);
   }
   else {
-    sprintf(str, "unknown @%08x", obj);
+    sprintf(str, "unknown @%08x", (uint32_t)obj);
   }
   return 1;
 }
@@ -320,7 +328,7 @@ static gui_item *GuiReflRgb(gui_item **children) {
 
 static gui_item *GuiReflMat16(gui_item **children) {
   gui_item *item, *it, *cmp, *next, *group;
-  gui_item *rows[3];
+  gui_item *rows[4];
   int i;
 
   group = children[0]->child;
@@ -334,8 +342,8 @@ static gui_item *GuiReflMat16(gui_item **children) {
     rows[i] = GuiNodeNew(0,0);
     GuiAddChild(rows[i], it);
     it->flags |= GUI_FLAGS_NODE_CONTENT;
-
   }
+  rows[i] = 0;
   item = GuiReflGroup(rows, 0);
   GuiItemFree(children[0], 1);
   GuiItemFree(children[1], 1);

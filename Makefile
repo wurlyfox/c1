@@ -41,8 +41,8 @@ OUT = c1
 INCLUDE = -I./src/
 
 # C compiler flags (-g -O3 -Wall)
-DEFS = -DCFLAGS_GFX_SW_PERSP -DCFLAGS_GUI -DCFLAGS_GOOL_DEBUG -DCFLAGS_DRAW_EXTENSIONS
-LDLIBS = -lSDL2 -lSDL2_mixer -lfluidsynth -lGL -lm -lstdc++
+DEFS = -DCFLAGS_GFX_SW_PERSP -DCFLAGS_DRAW_EXTENSIONS -DCFLAGS_GUI -DCFLAGS_GOOL_DEBUG
+LDLIBS = -lSDL2 -lGL -lfluidsynth -lm -lstdc++
 CFLAGS = -g -fplan9-extensions -m32
 CFLAGS += $(LDLIBS) $(DEFS)
 

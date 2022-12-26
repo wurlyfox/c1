@@ -626,6 +626,7 @@ static void GuiTree(gui_item *item) {
   if (tree->column_count) {
     tbl = igBeginTableEx(0, (ImGuiID)item, tree->column_count+1,
                          table_flags, def_size, 0.0);
+    if (!tbl) { return; }
   }
   GuiNode(item);
   if (tbl)

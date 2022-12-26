@@ -6,6 +6,8 @@
 
 char ostr[256];
 
+#define scatf(s,...) sprintf(s+strlen(s),__VA_ARGS__)
+
 // Type definition of functions
 typedef char* (*TdisGOOLF)(uint32_t ins, uint32_t pc);
 
@@ -17,16 +19,16 @@ typedef char* (*TdisGOOLF)(uint32_t ins, uint32_t pc);
     b; ostr[(strlen(ostr) - 1)] = 0; return ostr; \
   }
 
-#define gName(i) sprintf(ostr, "%s %5s  ", ostr, i)
+#define gName(i) scatf(ostr, " %5s  ", i)
 #define gRefI(i) GoolFormatRef(ostr,i,0)
 #define gRefO(i) GoolFormatRef(ostr,i,1)
 #define gRefX(i) GoolFormatRef(ostr,i,2)
-#define gIm(i)   sprintf(ostr, "%s 0x%x,", ostr, i)
-#define gReg(i)  sprintf(ostr, "%s self[0x%x],", ostr, 0x60+(i*4));
+#define gIm(i)   scatf(ostr, " 0x%x,", i)
+#define gReg(i)  scatf(ostr, " self[0x%x],", 0x60+(i*4));
 #define gLnk(i)  GoolFormatLnk(ostr,i)
 #define gVec(i)  GoolFormatVec(ostr,i)
 #define gCol(i)  GoolFormatCol(ostr,i)
-#define gCofs(i) sprintf(ostr, "%s code[0x%4.4X],", ostr, i)
+#define gCofs(i) scatf(ostr, " code[0x%4.4X],", i)
 
 /*********************************************************
 * add, mult, and non-commutative arithmetic              *
@@ -348,22 +350,22 @@ char *GoolFormatRef(char *str, uint32_t ref, int mode) {
 
   if ((ref & 0xFFF) == 0xE1F) {
     if (mode == 0)
-      sprintf(str, "%s pop(),", str);
+      scatf(str, " pop(),");
     else if (mode == 1)
-      sprintf(str, "%s push(),", str);
+      scatf(str, " push(),");
     else if (mode == 2)
-      sprintf(str, "%s inout(),", str);
+      scatf(str, " inout(),");
   }
   else if ((ref & 0xE00) == 0xE00) {
     reg = ref & 0x1FF;
-    sprintf(str, "%s obj[0x%x],", str, (reg*4)+0x60);
+    scatf(str, " obj[0x%x],", (reg*4)+0x60);
   }
   else if ((ref & 0x0800) == 0) {
     ireg = ref & 0x3FF;
     if ((ref & 0x400) == 0)
-      sprintf(str, "%s ireg[0x%x],", str, (ireg*4));
+      scatf(str, " ireg[0x%x],", (ireg*4));
     else
-      sprintf(str, "%s pool[0x%x],", str, (ireg*4));
+      scatf(str, " pool[0x%x],", (ireg*4));
   }
   else if ((ref & 0x400) == 0) {
     if ((ref & 0x200) == 0) {
@@ -372,13 +374,13 @@ char *GoolFormatRef(char *str, uint32_t ref, int mode) {
         sign = (ref & 0x100) >> 8;
         if (sign) {
           integer = 0x100 - integer;
-          sprintf(str, "%s -0x%x00,", str, integer);
+          scatf(str, " -0x%x00,", integer);
         }
         else
-          sprintf(str, "%s 0x%x00,", str, integer);
+          scatf(str, " 0x%x00,", integer);
       }
       else
-        sprintf(str, "%s 0,", str);
+        scatf(str, " 0,");
     }
     else if ((ref & 0x100) == 0) {
       integer = (ref & 0x70) >> 4;
@@ -388,37 +390,37 @@ char *GoolFormatRef(char *str, uint32_t ref, int mode) {
         if (sign) {
           integer = 8 - integer;
           fraction = 16 - fraction;
-          sprintf(str, "%s -%d.%-4.4d,", str, integer, fraction*625);
+          scatf(str, " -%d.%-4.4d,", integer, fraction*625);
         }
         else
-          sprintf(str, "%s %d.%-4.4d,", str, integer, fraction*625);
+          scatf(str, " %d.%-4.4d,", integer, fraction*625);
       }
       else
-        sprintf(str, "%s 0,", str);
+        scatf(str, " 0,");
     }
     else if ((ref & 0x80) == 0) {
       sign = (ref & 0x40) >> 6;
       offset = (ref & 0x3F);
       if (sign) {
         offset = 0x40 - offset;
-        sprintf(str, "%s -0x%x($fp),", str, offset*4);
+        scatf(str, " -0x%x($fp),", offset*4);
       }
       else
-        sprintf(str, "%s 0x%x($fp),", str, offset*4);
+        scatf(str, " 0x%x($fp),", offset*4);
     }
     else if (ref == 0xBE0)
-      sprintf(str, "%s 0,", str);
+      scatf(str, " 0,");
     else if (ref == 0xBF0)
-      sprintf(str, "%s pop(), pop(),", str);
+      scatf(str, " pop(), pop(),");
     else
-      sprintf(str, "%s INVALID OPERAND,", str);
+      scatf(str, " INVALID OPERAND,");
   }
   else {
     lnk = (ref & 0x1C0) >> 6;
     GoolFormatLnk(str, lnk);
     str[strlen(str)-1] = 0;
     reg = (ref & 0x3F);
-    sprintf(str, "%s[0x%x],", str, 0x60+(reg*4));
+    scatf(str, "[0x%x],", 0x60+(reg*4));
   }
   return str;
 }
@@ -428,7 +430,7 @@ char *GoolFormatLnk(char *str, uint32_t lnk) {
     "self"    , "parent"  , "sibling" , "child"   ,
     "creator" , "player"  , "collider", "sender"  };
 
-  sprintf(str, "%s %s,", str, disRNameLnk[lnk]);
+  scatf(str, " %s,", disRNameLnk[lnk]);
   return str;
 }
 
@@ -437,7 +439,7 @@ char *GoolFormatVec(char *str, uint32_t vec) {
     "trans"   , "rot"      , "scale"       ,
     "velocity", "targetrot", "rotvelocity" };
 
-  sprintf(str, "%s %s,", str, disRNameVec[vec]);
+  scatf(str, " %s,", disRNameVec[vec]);
   return str;
 }
 
@@ -451,7 +453,7 @@ char *GoolFormatCol(char *str, uint32_t col) {
     "colormatrix.v2x", "colormatrix.v2y", "colormatrix.v2z",
     "colormatrix.v3x", "colormatrix.v3y", "colormatrix.v3z",
     "intensity.r"    , "intensity.g"    , "intensity.b"    };
-
-  sprintf(str, "%s %s,", str, disRNameCol[col]);
+  
+  scatf(str, " %s,", disRNameCol[col]);
   return str;
 }

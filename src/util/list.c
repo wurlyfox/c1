@@ -333,9 +333,9 @@ char *list_str(list_t *list) {
   str[0] = 0;
   list_for_each_node(list, n) {
     if (!n->next)
-      str += sprintf(str, "%i", n->data);
+      str += sprintf(str, "%i", (int)n->data);
     else
-      str += sprintf(str, "%i, ", n->data);
+      str += sprintf(str, "%i, ", (int)n->data);
   }
   return list_str_buf;
 }

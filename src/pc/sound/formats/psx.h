@@ -8,7 +8,7 @@ typedef struct { /* sep header */
   char type[4];
   uint16_t version;
   uint8_t data[];
-} PThd;
+} __attribute__((packed)) PThd;
 
 typedef struct { /* seq header (sep internal) */
   uint16_t seq_num;
@@ -16,9 +16,10 @@ typedef struct { /* seq header (sep internal) */
   uint32_t init_tempo:24;
   uint32_t tsg_num:8;
   uint8_t tsg_denom;
-  uint32_t length;
+  uint16_t unused;
+  uint16_t length;
   uint8_t data[];
-} SThd;
+} __attribute__((packed)) SThd;
 
 /* other seq subchunk structures are identical to those of SMF... */
 typedef MEvt SEvt;
@@ -36,12 +37,12 @@ typedef struct {
     /* no length */
   };
   uint8_t data[];
-} SMev;
+} __attribute__((packed)) SMev;
 
 #define set3b(d,v) \
-d[0]=(v&0xFF); \
-d[1]=(v&0xFF00)>>8; \
-d[2]=(v&0xFF0000)>>16
+(d)[0]=((v)&0xFF); \
+(d)[1]=((v)&0xFF00)>>8; \
+(d)[2]=((v)&0xFF0000)>>16
 
 static inline void set4c(char *dst, const char *src) {
   *((uint32_t*)dst) = *((uint32_t*)src);
@@ -117,20 +118,19 @@ typedef struct {
   uint32_t reserved1;
 } VabHdr;
 
-typedef struct {
-  VabHdr hdr;
-  ProgAtr atrs[128];
-  VagAtr vagatrs[128][16];
-  uint16_t unk;
-  uint16_t wave_sizes[254]; /* multiply by 16 for actual size */
-} VabHead;
-
 typedef uint8_t VabBody;
 
 typedef struct {
-  VabHead head;
+  VabHdr hdr;
+  ProgAtr atrs[128];
+  VagAtr vagatrs[][16];  /* count is hdr.ps x 16 */
+} VabA;
+
+typedef struct {
+  uint16_t unk;
+  uint16_t wave_sizes[255]; /* multiply by 16 for actual size */
   VabBody body[];
-} Vab;
+} VabB;
 
 typedef struct {
   char form[4];

@@ -1,5 +1,26 @@
 # Changelog
 
+## 2022-12-26
+
+### Fixed
+
+- broken sfx code
+- broken music/midi player code
+- myriad of issues related to audio
+- no initialization of gool globals at game init
+
+### Added
+
+- custom audio sampler and mixer implementation
+
+### Removed
+
+- SDL mixer dependency
+
+### Other
+
+- Sound effects and music are now working. Volume levels may not be completely accurate to the original game, however. Expect a fix for this in future updates.
+
 ## 2022-12-19
 
 ### Fixed

@@ -2,6 +2,7 @@
 
 ## General
 
+- a few sfx are very loud and distorted (ex. warp sound, also when entering a bonus round)
 - objects are not bright enough
 - camera position offset oscillates at a few points in specific levels (ex. The Lost City)
 - main death sequence camera behavior is incorrect

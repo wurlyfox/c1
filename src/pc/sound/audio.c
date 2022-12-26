@@ -1,242 +1,268 @@
-/*
- * fluidsynth pc audio backend
- */
 #include "audio.h"
+#include "util.h"
 
-#ifdef CFLAGS_SFX_FLUIDSYNTH
+#include <SDL2/SDL.h>
+#include <math.h>
 
-#include <fluidsynth.h>
-
-fluid_settings_t *asettings;
-fluid_synth_t *synth;
-fluid_sfloader_t *aloader;
-fluid_audio_driver_t *adriver;
-fluid_preset_t *presets[24] = { 0 };
-fluid_sample_t *samples[24] = { 0 };
-fluid_voice_t *fluid_voices[24] = { 0 };
-uint32_t sample_lengths[24] = { 0 };
-uint32_t keys_on[24] = { 0 };
+#define SVOICE_VOL_BASE 0x3FFF
+#define SVOICE_PITCH_BASE 0x1000
 
 typedef struct {
-  int bank;
-  int num;
-  const char *name;
-} fluid_preset_info_t;
+  int len;
+  int loop_idx; /* negative index relative to sample end */
+  int16_t data[];
+} sample_t;
 
-fluid_preset_info_t preset_infos[24] ={
-  {.bank = 0, .num =  0, .name = "Preset 01" },
-  {.bank = 0, .num =  1, .name = "Preset 02" },
-  {.bank = 0, .num =  2, .name = "Preset 03" },
-  {.bank = 0, .num =  3, .name = "Preset 04" },
-  {.bank = 0, .num =  4, .name = "Preset 05" },
-  {.bank = 0, .num =  5, .name = "Preset 06" },
-  {.bank = 0, .num =  6, .name = "Preset 07" },
-  {.bank = 0, .num =  7, .name = "Preset 08" },
-  {.bank = 0, .num =  8, .name = "Preset 09" },
-  {.bank = 0, .num =  9, .name = "Preset 10" },
-  {.bank = 0, .num = 10, .name = "Preset 11" },
-  {.bank = 0, .num = 11, .name = "Preset 12" },
-  {.bank = 0, .num = 12, .name = "Preset 13" },
-  {.bank = 0, .num = 13, .name = "Preset 14" },
-  {.bank = 0, .num = 14, .name = "Preset 15" },
-  {.bank = 0, .num = 15, .name = "Preset 16" },
-  {.bank = 0, .num = 16, .name = "Preset 17" },
-  {.bank = 0, .num = 17, .name = "Preset 18" },
-  {.bank = 0, .num = 18, .name = "Preset 19" },
-  {.bank = 0, .num = 19, .name = "Preset 20" },
-  {.bank = 0, .num = 20, .name = "Preset 21" },
-  {.bank = 0, .num = 21, .name = "Preset 22" },
-  {.bank = 0, .num = 22, .name = "Preset 23" },
-  {.bank = 0, .num = 23, .name = "Preset 24" }
+typedef struct {
+  int done;
+  double t;
+  double amp[2];
+  double freq;
+  sample_t *sample;
+} sampler_t;
+
+typedef struct {
+  int on;
+  int16_t vol[2];
+  int pitch;
+  sampler_t sampler;
+  svoice_callback_t callback;
+  float gain;
+} svoice_t;
+
+const sampler_t def_sampler = { 
+  .amp = { 1.0, 1.0 } 
+};
+const svoice_t def_svoice = {  
+  .vol = { SVOICE_VOL_BASE, SVOICE_VOL_BASE },
+  .pitch = SVOICE_PITCH_BASE,
+  .sampler = def_sampler,
+  .gain = 1.0
 };
 
-static const char *preset_get_name(fluid_preset_t *preset) {
-  fluid_preset_info_t *preset_info;
+double m_amp = 1.0;
+svoice_t svoices[24];
 
-  preset_info = fluid_preset_get_data(preset);
-  return preset_info->name;
+static void SampleNext(sampler_t *sampler, int len, int16_t *data) {
+  sample_t *sample;
+  double t;
+  int16_t *p, s;
+  int loop_len;
+  int i, idx;
+  
+  sample = sampler->sample;
+  if (!sample) {
+    memset(data, 0, len*2*sizeof(int16_t));
+    return;
+  }
+  p = data;
+  for (i=0;i<len;i++) {
+    idx = (int)sampler->t;
+    t = sampler->t - (double)idx;
+    if (sample->loop_idx && idx >= sample->len) {
+      /* add negative index to go back to loop start */
+      sampler->t += (double)sample->loop_idx;
+      idx = (int)sampler->t;
+    }
+    if (idx == sample->len-1) { --idx; t+=1.0; }
+    else if (idx >= sample->len) { 
+      sampler->done=1;
+      break; 
+    }
+    s = sample->data[idx];
+    s+=t*(sample->data[idx+1]-s);
+    *(p++) = (int16_t)((double)s*sampler->amp[0]*m_amp);
+    *(p++) = (int16_t)((double)s*sampler->amp[1]*m_amp);
+    sampler->t += sampler->freq;
+  }
+  for (;i<len;i++) {
+    *(p++) = 0;
+    *(p++) = 0;
+  }
 }
 
-static int preset_get_bank(fluid_preset_t *preset) {
-  fluid_preset_info_t *preset_info;
-
-  preset_info = fluid_preset_get_data(preset);
-  return preset_info->bank;
-}
-
-static int preset_get_num(fluid_preset_t *preset) {
-  fluid_preset_info_t *preset_info;
-
-  preset_info = fluid_preset_get_data(preset);
-  return preset_info->num;
-}
-
-static int preset_noteon(fluid_preset_t *preset, fluid_synth_t *synth, int chan, int key, int vel) {
-  fluid_sample_t *sample;
-  fluid_voice_t *voice;
-
-  sample = samples[chan];
-  voice = fluid_synth_alloc_voice(synth, sample, chan, key, 127);
-  fluid_synth_start_voice(synth, voice);
-  fluid_voices[chan] = voice;
-}
-
-static const char *sfont_get_name(fluid_sfont_t *sfont) {
-  return "General MIDI";
-}
-
-static fluid_preset_t *create_preset(int prenum, fluid_sfont_t *sfont) {
-  fluid_preset_t *preset;
-
-  preset = new_fluid_preset(sfont,
-    preset_get_name,
-    preset_get_bank,
-    preset_get_num,
-    preset_noteon,
-    delete_fluid_preset);
-  fluid_preset_set_data(preset, &preset_infos[prenum]);
-  presets[prenum] = preset;
-  return preset;
-}
-
-static fluid_preset_t *sfont_get_preset(fluid_sfont_t *sfont, int bank, int prenum) {
-  fluid_preset_t *preset;
-
-  preset = presets[prenum];
-  if (!preset)
-    preset = create_preset(prenum, sfont);
-  return preset;
-}
-
-static fluid_sfont_t *sfloader_load(fluid_sfloader_t *loader, const char *filename) {
-  fluid_sfont_t *sfont;
-
-  sfont = new_fluid_sfont(sfont_get_name,
-    sfont_get_preset,
-    NULL,
-    NULL,
-    delete_fluid_sfont);
-  return sfont;
+static void AudioCallback(void *userdata, uint8_t *stream, size_t size) {
+  svoice_t *svoice;
+  sampler_t *sampler;
+  int32_t *p32, buf32[2048];
+  int16_t *p16, buf16[2048];
+  int i, j, len;
+  
+  len = size/(2*sizeof(int16_t));
+  memset(buf32, 0, len*2*sizeof(int32_t));
+  for (i=0;i<24;i++) {
+    svoice = &svoices[i];
+    if (!svoice->on) { continue; }
+    if (!svoice->callback) {
+      sampler = &svoice->sampler;
+      SampleNext(sampler, len, buf16);
+      if (sampler->done)
+        svoice->on = 0;
+    }
+    else { /* sampler override */
+      svoice_callback_t callback;
+      float amp[2], freq;
+      callback = svoice->callback;
+      amp[0] = (double)svoice->vol[0] / SVOICE_VOL_BASE;
+      amp[1] = (double)svoice->vol[1] / SVOICE_VOL_BASE; 
+      freq = (double)svoice->pitch / SVOICE_PITCH_BASE;
+      callback(i, amp, freq, len, buf16);
+    }
+    p32 = buf32;
+    p16 = buf16;
+    for (j=0;j<len;j++) {
+      *(p32++) += ((int32_t)*(p16++))*svoice->gain;
+      *(p32++) += ((int32_t)*(p16++))*svoice->gain;
+    }
+  } 
+  p32 = buf32;
+  p16 = (int16_t*)stream; 
+  for (i=0;i<len;i++) {
+    *(p16++) = *(p32++) / 24;
+    *(p16++) = *(p32++) / 24;
+  }
 }
 
 void SwAudioInit() {
-  int sfont_id, i;
+  SDL_AudioSpec spec;
+  svoice_t *voice;
+  sampler_t *sampler;
+  int i;
 
-  asettings = new_fluid_settings();
-  fluid_settings_setstr(asettings, "audio.driver", "sdl2");
-  fluid_settings_setint(asettings, "audio.periods", 4);
-  fluid_settings_setint(asettings, "audio.period-size", 2048);
-  fluid_settings_setint(asettings, "synth.midi-channels", 24);
-  synth = new_fluid_synth(asettings);
-  aloader = new_fluid_sfloader(sfloader_load, delete_fluid_sfloader);
-  fluid_synth_add_sfloader(synth, aloader);
-  sfont_id = fluid_synth_sfload(synth, "unused", 0);
-  adriver = new_fluid_audio_driver(asettings, synth);
-  for (i=0;i<24;i++) {
-    // fluid_synth_program_change(synth, i, i);
-    fluid_synth_program_select(synth, i, sfont_id, 0, i);
+  m_amp = 1.0;
+  for (i=0;i<24;i++)
+    svoices[i] = def_svoice;
+  spec.freq = 44100;
+  spec.callback = (SDL_AudioCallback)AudioCallback;
+  spec.format = AUDIO_S16;
+  spec.samples = 64;
+  spec.channels = 2;
+  if (SDL_OpenAudio(&spec, 0) < 0) {
+    printf("Error initializing audio: %s\n", SDL_GetError());
+    return;
   }
+  SDL_PauseAudio(0);  
 }
 
 void SwAudioKill() {
   int i;
 
   for (i=0;i<24;i++) {
-    if (samples[i]) {
-      delete_fluid_sample(samples[i]);
-      samples[i] = 0;
-    }
+    SwUnloadSample(i);
   }
-  delete_fluid_audio_driver(adriver);
-  delete_fluid_synth(synth);
-  delete_fluid_settings(asettings);
+  SDL_PauseAudio(1);
+  SDL_CloseAudio();
 }
 
 void SwSetMVol(uint32_t vol) {
-  /* TODO: linear or log? */
-  fluid_synth_set_gain(synth, (float)(vol/(127)));
+  m_amp = (double)vol / 0x7F;  
 }
 
-uint8_t pcm_buf[0x100000];
+uint8_t pcm_buf[0x80000];
 void SwLoadSample(int voice_idx, uint8_t *data, size_t size) {
-  fluid_sample_t *sample;
+  svoice_t *svoice;
+  sampler_t *sampler;
+  sample_t *sample;
+  int loop_offs, loop_idx;
 
-  if (samples[voice_idx])
+  size -= 32;
+  size = ADPCMToPCM16(data, size, pcm_buf, &loop_offs);
+  data = pcm_buf;
+  svoice = &svoices[voice_idx];
+  sampler = &svoice->sampler;
+  if (sampler->sample)
     SwUnloadSample(voice_idx);
-  size = ADPCMToPCM16(data, size, pcm_buf);
-  /* assuming 16 bit sample points, nbframes = size / 2 */
-  sample = new_fluid_sample();
-  fluid_sample_set_sound_data(sample, (short*)pcm_buf, NULL, size/2, 11025, 0);
-  samples[voice_idx] = sample;
-  sample_lengths[voice_idx] = (size*17)/11025;
+  sample = (sample_t*)malloc(sizeof(sample_t)+size+sizeof(int16_t));
+  sampler->sample = sample;
+  sample->len = size/sizeof(int16_t);
+  sample->loop_idx = 0;
+  if (loop_offs != -1) {
+    loop_idx = loop_offs/sizeof(int16_t);
+    sample->loop_idx = loop_idx - sample->len;
+  }
+  memcpy(sample->data, data, size);
+  /* used when interpolating looping samples */
+  sample->data[sample->len] = sample->data[0]; 
 }
 
 void SwUnloadSample(int voice_idx) {
-  delete_fluid_sample(samples[voice_idx]);
-  samples[voice_idx] = 0;
+  svoice_t *svoice;
+  sampler_t *sampler;
+
+  svoice = &svoices[voice_idx];
+  sampler = &svoice->sampler;
+  if (sampler->sample) 
+    free(sampler->sample);
 }
 
 void SwNoteOn(int voice_idx) {
-  if (keys_on[voice_idx]) { return; }
-  keys_on[voice_idx] = sample_lengths[voice_idx];
-  fluid_synth_noteon(synth, voice_idx, 2, 127);
+  svoice_t *svoice;
+  sampler_t *sampler;
+
+  svoice = &svoices[voice_idx]; 
+  if (!svoice->on) {
+    svoice->on = 1;
+    sampler = &svoice->sampler;
+    sampler->done = 0;
+    sampler->t = 0;
+    sampler->amp[0] = (double)svoice->vol[0] / SVOICE_VOL_BASE;
+    sampler->amp[1] = (double)svoice->vol[1] / SVOICE_VOL_BASE; 
+    sampler->freq = (double)svoice->pitch / SVOICE_PITCH_BASE;
+  }
 }
 
 void SwNoteOff(int voice_idx) {
-  if (!keys_on[voice_idx]) { return; }
-  keys_on[voice_idx] = 0;
-  fluid_synth_noteoff(synth, voice_idx, 1);
+  svoice_t *svoice;
+  
+  svoice = &svoices[voice_idx];
+  if (svoice->on) {
+    svoice->on = 0;
+  }
 }
 
 void SwVoiceSetVolume(int voice_idx, uint32_t voll, uint32_t volr) {
-  int32_t pan;
-  uint32_t volume, sum;
+  svoice_t *svoice;
+  sampler_t *sampler;
 
-  sum = volr+voll;
-  if (sum != 0) {
-    pan = 500*(volr-voll)/sum;
-    volume = ((1000*voll)/(500-pan)) >> 7;
-  }
-  else {
-    pan = 0;
-    volume = 0;
-  }
-  /* attenuation is mapped to cc 7 by default */
-  fluid_synth_set_gen(synth, voice_idx, GEN_PAN, (float)pan);
-  fluid_synth_cc(synth, voice_idx, 7, volume);
+  svoice = &svoices[voice_idx];
+  sampler = &svoice->sampler;
+  svoice->vol[0] = voll;
+  svoice->vol[1] = volr;
+  sampler->amp[0] = (double)svoice->vol[0] / SVOICE_VOL_BASE;
+  sampler->amp[1] = (double)svoice->vol[1] / SVOICE_VOL_BASE;
 }
 
 void SwVoiceSetPitch(int voice_idx, uint32_t pitch) {
-  fluid_synth_pitch_bend(synth, voice_idx, pitch);
+  svoice_t *svoice;
+  sampler_t *sampler;
+
+  svoice = &svoices[voice_idx];
+  sampler = &svoice->sampler;
+  svoice->pitch = pitch;
+  sampler->freq = (double)svoice->pitch / SVOICE_PITCH_BASE;
 }
 
 void SwGetAllKeysStatus(uint8_t *status) {
-  fluid_voice_t *voice;
-  int i, on;
+  svoice_t *svoice;
+  int i;
+
   for (i=0;i<24;i++) {
-    if (keys_on[i] == 1) {
-      keys_on[i] = 0;
-      status[i] = 0;
-      SwNoteOff(i);
-    }
-    else if (keys_on[i]) {
-      --keys_on[i];
-      status[i] = 1;
-    }
+    svoice = &svoices[i];
+    status[i] = svoice->on;
   }
 }
 
-#else
+void SwVoiceSetCallback(int voice_idx, svoice_callback_t callback) {
+  svoice_t *svoice;
 
-void SwAudioInit() {}
-void SwAudioKill() {}
-void SwSetMVol(uint32_t vol) {}
-void SwLoadSample(int voice_idx, uint8_t *data, size_t size) {}
-void SwUnloadSample(int voice_idx) {}
-void SwNoteOn(int voice_idx) {}
-void SwNoteOff(int voice_idx) {}
-void SwVoiceSetVolume(int voice_idx, uint32_t voll, uint32_t volr) {}
-void SwVoiceSetPitch(int voice_idx, uint32_t pitch) {}
-void SwGetAllKeysStatus(uint8_t *status) {}
+  svoice = &svoices[voice_idx];
+  svoice->on = 1;
+  svoice->callback = callback; 
+}
 
-#endif
+void SwVoiceSetGain(int voice_idx, float gain) {
+  svoice_t *svoice;
+
+  svoice = &svoices[voice_idx];
+  svoice->gain = gain; 
+}

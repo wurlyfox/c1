@@ -11,7 +11,6 @@ Texture cache, for paletted textures.
 
 ## description ##
 
-
 Texture data in the crash games is a combination of raw 15 bit direct colors and 8 or 4 bit indices. Each index indirectly references a particular one of the 15 bit colors in the non-indexed portion of the data. The raw 15 bit direct colors portions of the data can be divided into two parts:
 - raw direct colors (non-indexed pixels), used by color mode 2
 - raw 'palette' colors referenced by indexed pixels, used by color mode 0 and 1 (a row of these is called a 'clut'/'color lookup table')
@@ -30,16 +29,6 @@ The destination texture can then be uploaded to the gpu as necessary and the uvs
 Furthermore, since multiple references to any given texture region should be expected throughout the game's lifetime (as there can be many polygons amongst one or more models that use the same texture region) it is necessary to have a cache to prevent unnecessarily converting and copying the same region of pixel data into the destination texture for each reference.
 
 The `TextureLoad` function is used to create and/or lookup existing uv coordinates for a texinfo; upon creation, the region of texture page pixels described by the texinfo are converted and copied to a rectangular region of a destination texture in the cache; the uvs are simply the corresponding quad.
-
-# `/src/pc/sound/audio.c` #
-
-Fluidsynth pc audio backend.
-
-Configuration is fairly straightforward.
-- There are 24 voices. each channel is dedicated to a separate voice. This way volumes can be controlled individually
-- [2 channel] volume is controlled by calculating pan amount and base volume from the left and right values and issuing cc 7 (which is mapped to initial attenuation, by default) with the base volume and setting the pan generator with the pan value.
-- Sample pitch can only be affected via modulation. This is because the original (psx) impl does all manipulation of pitch via the 'pitch' voice attribute in the `VoiceAttrs`. Pitch control is achieved by setting the pitch wheel value.
-- There is an array of samples, one for each voice/channel. Loading data into a sample simply involves calling the corresponding fluidsynth function and storing the result loaded sample at the index for the corresponding voice; the global sfloader is configured to, upon note on events in a particular channel, allocate and start an sf voice with that channel/voice's corresponding sample.
 
 # `/src/ext/lib/refl.c` #
 

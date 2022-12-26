@@ -101,6 +101,10 @@ int AudioInit() {
   SpuSetTransferMode(0);
 #else
   SwAudioInit();
+  /* route midi audio to voice 0 */
+  SwVoiceSetCallback(0, SwMidiProcess);
+  /* set gain to that of 8 simultaneously sounded voices */
+  SwVoiceSetGain(0, 8.0f);
 #endif
   /* set inital values for master voice */
   master_voice.delay_counter = 1;
@@ -189,7 +193,8 @@ int AudioSetReverbAttr(int mode, int16_t depth_left, int16_t depth_right, int de
 static Volume AudioSpatialize(vec *v, int vol) {
   lid_t lid;
   vec va;
-  uint32_t mag, ang_xz, amp;
+  uint32_t mag, amp;
+  int32_t ang_xz;
   uint16_t left, right;
 
   va.x = v->x / 32; /* 3 or 15 bit frac fixed point */
@@ -297,7 +302,7 @@ int AudioVoiceAlloc() {
       right=abs(attr.volume.right);
 #else
       Volume volume;
-      if (voice->obj->status_b & 0x200) { /* no spatialization? */
+      if (voice->obj && (voice->obj->status_b & 0x200)) { /* no spatialization? */
         volume.left  = voice->amplitude;
         volume.right = voice->amplitude;
         voice->flags &= ~0x200;

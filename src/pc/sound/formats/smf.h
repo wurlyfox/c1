@@ -12,31 +12,30 @@ typedef struct { /* smf header chunk */
   uint16_t tracks;
   union {
     struct {
-      uint16_t :1;
-      uint16_t tpqn:15;
+      uint16_t tpqn;
     };
     struct {
-      uint16_t fmt:1;
-      uint16_t fs:7;
       uint16_t tf:8;
+      uint16_t fs:7;
+      uint16_t fmt:1;
     } division;
   };
-} MThd;
+} __attribute__((packed)) MThd;
 
 typedef struct { /* smf track chunk */
   char type[4];
   int length;
   uint8_t data[];
-} MTrk;
+} __attribute__((packed)) MTrk;
 
 typedef struct {
   uint8_t delta_time;
   union {
     uint8_t status;
     struct {
-      uint8_t has_status:1;
-      uint8_t type:3;
       uint8_t chan:4;
+      uint8_t type:3;
+      uint8_t has_status:1;
     };
   };
   uint8_t data[];
@@ -64,7 +63,7 @@ typedef struct { /* meta-event */
   };
   uint8_t length;
   uint8_t data[];
-} MMev;
+} __attribute__((packed)) MMev;
 
 typedef uint24_t MTmp;
 

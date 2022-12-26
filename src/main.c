@@ -141,11 +141,7 @@ void CoreLoop(lid_t lid) {
   int ticks_elapsed;
 #endif
 
-#if (LID_BOOTLEVEL!=LID_TITLE)
-  // life_count=3;
-  // init_life_count=3;
-  // sfx_vol=255;
-#endif
+  LevelInitGlobals();
   NSInit(&ns, lid);
   CoreObjectsCreate();
   do {

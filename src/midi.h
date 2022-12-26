@@ -6,6 +6,12 @@
 #include "formats/midi.h"
 #include "formats/inst.h"
 
+#ifdef PSX
+#include <LIBSND.H>
+#else
+#include "pc/sound/midi.h"
+#endif
+
 typedef struct {
   int16_t num;
   int16_t unk_2;

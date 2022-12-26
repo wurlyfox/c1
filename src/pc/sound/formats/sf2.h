@@ -5,9 +5,9 @@
 
 typedef struct { /* RIFF chunk */
   char ckID[4];
-  uint16_t ckSize;
+  uint32_t ckSize;
   union {
-    char fccType[4];
+    char fccType[0];
     uint8_t ckData[0];
   };
 } CK;
@@ -25,7 +25,7 @@ typedef struct {
   uint32_t dwLibrary;
   uint32_t dwGenre;
   uint32_t dwMorphology;
-} sfPresetHeader;
+} __attribute__((packed)) sfPresetHeader;
 
 typedef struct {
   uint16_t wGenNdx;
@@ -92,8 +92,9 @@ typedef enum {
   scaleTuning                 = 56,
   exclusiveClass              = 57,
   overridingRootKey           = 58,
-  initialPitch                = 59 /* not listed in sf2 spec */
-} SFGenerator;
+  initialPitch                = 59,  /* not listed in sf2 spec */
+  sfgForce16Bit               = 65535
+} __attribute__((packed)) SFGenerator;
 
 typedef enum {
   noController   = 0,
@@ -104,14 +105,14 @@ typedef enum {
   pitchWheel     = 14,
   pitchWheelSens = 18,
   link           = 127
-} SFCtrlPalette;
+} __attribute__((packed)) SFCtrlPalette;
 
 typedef enum {
-  linear  = 0,
-  concave = 1,
-  convex  = 2,
-  _switch = 3
-} SFCtrlType;
+  linear         = 0,
+  concave        = 1,
+  convex         = 2,
+  _switch        = 3
+} __attribute__((packed)) SFCtrlType;
 
 typedef struct {
   SFCtrlPalette index:7;
@@ -119,7 +120,7 @@ typedef struct {
   uint16_t direction:1;
   uint16_t polarity:1;
   SFCtrlType type:6;
-} SFModulator;
+} __attribute__((packed)) SFModulator;
 
 #define setsfm(m,i,c,d,p,t) \
 m.index = i; \
@@ -129,9 +130,10 @@ m.polarity = p; \
 m.type = t
 
 typedef enum {
-  _linear   = 0,
-  absolute = 2
-} SFTransform;
+  _linear        = 0,
+  absolute       = 2,
+  sfctForce16Bit = 65535
+} __attribute__((packed)) SFTransform;
 
 typedef struct {
   SFModulator sfModSrcOper;
@@ -139,7 +141,7 @@ typedef struct {
   uint16_t modAmount;
   SFModulator sfModAmtSrcOper;
   SFTransform sfModTransOper;
-} sfModList;
+} __attribute__((packed)) sfModList;
 
 typedef struct {
   uint8_t byLo;
@@ -160,7 +162,7 @@ typedef struct {
 typedef struct {
   char achInstName[20];
   uint16_t wInstBagNdx;
-} sfInst;
+} __attribute__((packed)) sfInst;
 
 typedef struct {
   uint16_t wInstGenNdx;
@@ -179,7 +181,7 @@ typedef enum {
   RomRightSample  = 0x8002,
   RomLeftSample   = 0x8004,
   RomLinkedSample = 0x8008
-} SFSampleLink;
+} __attribute__((packed)) SFSampleLink;
 
 typedef struct {
   char achSampleName[20];
@@ -192,7 +194,7 @@ typedef struct {
   char chCorrection;
   uint16_t wSampleLink;
   SFSampleLink sfSampleType;
-} sfSample;
+} __attribute__((packed)) sfSample; 
 
 typedef union { /* info sub-record */
   sfVersionTag *ifil;

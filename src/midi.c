@@ -3,7 +3,6 @@
 #include "level.h"
 
 #ifdef PSX
-#include <LIBSND.H>
 #define SepSetVol         SsSepSetVol
 #define SepPlay           SsSepPlay
 #define SepPause          SsSepPause
@@ -14,7 +13,6 @@
 #define SepOpen           SsSepOpen
 #define SepClose          SsSepClose
 #else
-#include "pc/sound/midi.h"
 #define SepSetVol         SwSepSetVol
 #define SepPlay           SwSepPlay
 #define SepPause          SwSepPause
@@ -127,6 +125,7 @@ int MidiInit() {
   return SpuVmSetMaxVoice(*(uint8_t*)(&max_midi_voices)); /* tentative name! */
 #else
   // TODO
+  SwMidiInit();
   return 0;
 #endif
 }
@@ -216,7 +215,9 @@ static inline int MidiGetVab(entry *midi) {
 }
 
 void VabClose(int _vab_id) {
-  free(vabs[_vab_id]);
+  if (vabs[_vab_id])
+    free(vabs[_vab_id]);
+  vabs[_vab_id] = 0;
 }
 
 #endif
@@ -232,6 +233,7 @@ int MidiOpenAndPlay(eid_t *eid) {
   int i, ii, flag;
 
   if (seq2_vol) { return -1; } /* error if playback is paused and 80061914 or 80061918 */
+  flag = (vab_id == -1);
   if (midi_state == 1) { /* currently stopped? */
     if (cur_midi_eid != EID_NONE) { /* current midi entry is still open? */
       SepClose(sep_access_num); /* close the sep */
@@ -271,7 +273,7 @@ int MidiOpenAndPlay(eid_t *eid) {
   for (ii=0;ii<seq_count;ii++) { /* init seqs */
     seq = &midi_seqs[ii];
     if (flag) { /* no other midi/vab was previously open? */
-      vol = (init_vol << 16) >> 23;
+      vol = (seq_vol << 16) >> 23;
       MidiSeqInit(seq, vol | (vol << 16), ii); /* init seq with initial vol */
     }
     else {
@@ -300,8 +302,7 @@ void MidiUpdate(void *en_ref) {
   if (midi_state == 4 && (midi_fade_counter == 0 || (--midi_fade_counter) == 0)) /* decrement fade counter! */
     midi_state = 1; /* stop playback (will hit MidiOpenAndPlay below) */
   if (midi_state == 3) { /* resumed/already playing? */
-    if (ref->is_eid && ref->eid == cur_midi_eid
-      || ref->en->eid == cur_midi_eid) /* no change in midi entry? */
+    if ((ref->is_eid?ref->eid:ref->en->eid)==cur_midi_eid) /* no change in midi entry? */ 
       return;
     /* playback not paused, vab is already open, and haven't already scheduled a fade? */
     if (!seq2_vol && vab_id != -1 && !next_midi) {

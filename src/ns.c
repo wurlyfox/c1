@@ -361,7 +361,7 @@ static void NSPageUpdateEntries(int idx) {
       while ((++pte)->eid != entry->eid);
       if (i==0) {
         eid = page->type == 4 ? pte->eid : EID_NONE;
-        insts[ps->tail->idx] = eid;
+        insts[ps->tail->idx%8] = eid;
       }
 #ifdef PSX
       pte->value = (((entry->items[0] - (uint8_t*)page) + ps->tail->addr) << 2) | 0x80000002;

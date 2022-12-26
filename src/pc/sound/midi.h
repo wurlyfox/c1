@@ -15,4 +15,6 @@ extern void SwSepReplay(int san, int seq_num);
 extern void SwSepSetCrescendo(int san, int seq_num, uint32_t vol, int ticks);
 extern void SwSepSetDecrescendo(int san, int seq_num, uint32_t vol, int ticks);
 
+extern void SwMidiProcess(int ch, float amp[2], float freq, int len, int16_t *data);
+
 #endif /* _PC_MIDI_H_ */

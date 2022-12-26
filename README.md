@@ -6,12 +6,10 @@ The code is designed to compile for both psx and pc. At the moment only pc-speci
 
 ## Status ##
 
-- Code - 100% ported; mostly untested
-- Functionality - 55%
+- Code - 100% ported
+- Functionality - 78%
 
 At the moment the game is only partially playable with a number of currently identified [issues](doc/issues.md).
-
-Sound has been disabled as it is not working correctly, however the code is present. If you want to enable it (SFX only), add the `-DCFLAGS_SFX_FLUIDSYNTH` compilation flag to the appropriate section of the Makefile.
 
 ## Compiling ##
 
@@ -28,15 +26,14 @@ To compile c1, install the dependencies listed below, `cd` into the main project
 - GNU make
 - OpenGL 2.0 or higher
 - SDL 2
-- SDL_Mixer 2.0
 - FluidSynth
 - Dear ImGui / cimgui (embedded in project)
 - g++ / libstdc++ (for ImGui compilation)
 
 Ubuntu/Debian:
 
-- 64-bit: `sudo apt install build-essential gcc-multilib g++-multilib libstdc++6:i386 libgl1-mesa-dev:i386 libsdl2-dev:i386 libsdl2-mixer-dev:i386 libfluidsynth-dev:i386`
-- 32-bit: `sudo apt install build-essential libstdc++6 libgl1-mesa-dev libsdl2-dev libsdl2-mixer-dev libfluidsynth-dev`
+- 64-bit: `sudo apt install build-essential gcc-multilib g++-multilib libstdc++6:i386 libgl1-mesa-dev:i386 libsdl2-dev:i386 libfluidsynth-dev:i386`
+- 32-bit: `sudo apt install build-essential libstdc++6 libgl1-mesa-dev libsdl2-dev libfluidsynth-dev`
 
 #### psx ####
 (note: psx build currently does not work)
