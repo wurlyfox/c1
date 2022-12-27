@@ -76,7 +76,7 @@ bound test_bound_surface = { vec_shl8(-6.25,      0, -6.25),
                              vec_shl8( 6.25,    665,  6.25) };
 bound test_bound_zone    = { vec_shl8( -300, -267.5,  -300),
                              vec_shl8(  300,  932.5,   300) };
-bound test_bound_obj     = { vec_shl8(  -75,      0,    75),
+bound test_bound_obj     = { vec_shl8(  -75,      0,   -75),
                              vec_shl8(   75,    665,    75) };
 bound test_bound_objtop  = { vec_shl8(  -75, 498.75,   -75),
                              vec_shl8(   75,    665,    75) };
@@ -413,11 +413,11 @@ static int StopAtCeil(gool_object *obj, vec *next_trans, zone_query *query) {
   zone_rect *rect;
   gool_bound *bound, *found;
   vec above_zone;
-  int32_t max_y, ceil;
+  int32_t min_y, ceil;
   uint32_t arg;
   int i;
 
-  max_y = -999999999;
+  min_y = -999999999;
   found = 0;
   GoolCalcBound(&test_bound_objtop, next_trans, &query->collider_bound);
   for (i=0;i<object_bound_count;i++) {
@@ -425,8 +425,8 @@ static int StopAtCeil(gool_object *obj, vec *next_trans, zone_query *query) {
     if (!(bound->obj->status_b & GOOL_FLAG_SOLID_BOTTOM)) { continue; } /* skip objects which are not solid at the bottom */
     if (TestBoundIntersection(&query->collider_bound, &bound->bound)) {
       found = bound;
-      if (max_y == -999999999 || bound->p1.y >= max_y)
-        max_y = bound->p1.y;
+      if (min_y == -999999999 || bound->p1.y <= min_y)
+        min_y = bound->p1.y;
     }
   }
   GoolCalcBound(&test_bound_ceil, next_trans, &query->collider_bound);
@@ -458,17 +458,17 @@ static int StopAtCeil(gool_object *obj, vec *next_trans, zone_query *query) {
     if (ISERRORCODE(neighbor)) { /* no such zone? */
       /* then it is ok to limit ceil (to the top of the obj zone)  */
       rect = (zone_rect*)obj->zone->items[1];
-      if (rect->y < above_zone.y)
-        ceil = rect->y;
+      if ((rect->y << 8) < above_zone.y)
+        ceil = rect->y << 8;
     }
   }
   /* found an object that is hit from the bottom
      and either no ceiling found or the object is lower than the ceiling? */
-  if (max_y != -999999999 && (ceil == -999999999 || max_y < ceil)) {
+  if (min_y != -999999999 && (ceil == -999999999 || min_y < ceil)) {
     found->obj->status_a |= GOOL_FLAG_HIT_AT_BOTTOM; /* set flag for 'hit from the bottom' */
     arg = 0x6400;
     GoolSendEvent(obj, found->obj, 0x1700, 1, &arg); /* ...and send the corresponding event */
-    return max_y; /* return y location of the object bottom */
+    return min_y; /* return y location of the object bottom */
   }
   else /* the ceiling is hit */
     return ceil; /* so return that value */
@@ -1279,7 +1279,7 @@ int FindCeilY(
     level = result->level;
     type = (node & 0xE) >> 1;
     subtype = (node & 0x3F0) >> 4;
-    if (type != type_a || type != type_b) { continue; }
+    if (type != (type_a-1) || type != (type_b-1)) { continue; }
     nbound.p1.x = (result->x << 4) + nodes_bound->p1.x;
     nbound.p1.y = (result->y << 4) + nodes_bound->p1.y;
     nbound.p1.z = (result->z << 4) + nodes_bound->p1.z;

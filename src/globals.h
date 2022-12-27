@@ -68,8 +68,8 @@ typedef struct {
   uint32_t dword_80061960;
   gool_object *light_src_obj;
   uint32_t dword_80061968;
-  uint32_t dcam_zoom_speed;
-  uint32_t dcam_flip_speed;
+  int32_t dcam_zoom_speed;
+  int32_t dcam_flip_speed;
   uint32_t percent_complete;
   uint32_t card_flags_ro;
   int bonus_round;

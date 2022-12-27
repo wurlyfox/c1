@@ -683,10 +683,10 @@ int CamDeath(int *count) {
   tgeo = NSLookup(&frame->tgeo);
   /* get [unrotated] vertex in the current frame referenced by the gool object */
   vert = &frame->vertices[cam_spin_obj_vert >> 8];
-  t_header = (tgeo_header*)&tgeo->items[1];
-  u_vert.x = (vert->x - 128 + frame->x) << 10; /* 10 bit frac to 20 bit frac */
-  u_vert.y = (vert->y - 128 + frame->y) << 10;
-  u_vert.z = (vert->z - 128 + frame->z) << 10;
+  t_header = (tgeo_header*)&tgeo->items[0];
+  u_vert.x = ((int8_t)(vert->x - 128) + frame->x) << 10; /* 10 bit frac to 20 bit frac */
+  u_vert.y = ((int8_t)(vert->y - 128) + frame->y) << 10;
+  u_vert.z = ((int8_t)(vert->z - 128) + frame->z) << 10;
   /* calculate scale */
   scale.x = (obj->scale.x * t_header->scale_x) >> 12;
   scale.y = (obj->scale.y * t_header->scale_y) >> 12;
@@ -733,8 +733,8 @@ int CamDeath(int *count) {
   trans.x = r_vert.x;
   trans.y = cam_trans.y;
   trans.z = r_vert.z;
-  rot.x = 0;
-  rot.y = dcam_rot_y1 + dcam_rot_y2;
+  rot.x = dcam_rot_y1 + dcam_rot_y2;
+  rot.y = 0;
   rot.z = 0;
   GoolTransform(&u_trans, &trans, &rot, 0, &cam_trans);
   return SUCCESS;

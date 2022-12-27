@@ -8,6 +8,7 @@
 - broken music/midi player code
 - myriad of issues related to audio
 - no initialization of gool globals at game init
+- transparency/blending behavior is incorrect for some objects
 
 ### Added
 

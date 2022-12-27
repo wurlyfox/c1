@@ -7,7 +7,6 @@
 - camera position offset oscillates at a few points in specific levels (ex. The Lost City)
 - main death sequence camera behavior is incorrect
 - title sequence background images become too bright in some instances
-- transparency/blending behavior is incorrect for some objects
 - aku aku sparkle fragments do not appear
 - it is sometimes (but rarely) possible to jump in mid-air when beside walls
 - various issues with invincibility

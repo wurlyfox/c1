@@ -93,7 +93,6 @@ int GLInit(gl_callbacks *_callbacks) {
 }
 
 int GLKill() {
-  glDisable(GL_SCISSOR_TEST);
   if (context.prims_head) {
     free(context.prims_head);
     context.prims_head = 0;
@@ -217,18 +216,18 @@ void GLDrawPrims(void *data, int count) {
   poly = (poly3i*)data;
   glActiveTexture(GL_TEXTURE0);
   glDisable(GL_TEXTURE_2D);
+  glEnable(GL_BLEND);
   for (i=0;i<count;i++,poly++) {
     if (poly->type == 3)
       glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     else
       glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     if (poly->flags != flags) {
-      if (poly->flags == 3) { glDisable(GL_BLEND); }
-      else if (flags == 3)  { glEnable(GL_BLEND); }
       if (poly->flags == 2) { glBlendEquation(GL_FUNC_REVERSE_SUBTRACT); }
       else if (flags == 2)  { glBlendEquation(GL_FUNC_ADD); }
       switch (poly->flags) {
       case 0:
+      case 3:
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         break;
       case 1:
