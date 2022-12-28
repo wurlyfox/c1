@@ -548,12 +548,12 @@ void TransStopAtSolid(gool_object *obj, zone_query *query, vec *trans, vec *delt
   else
     query->ceil = 0;
   /* ceiling y location above bottom of object bound box? */
-  if (ceil != -999999999 && ceil-1 < (adj_trans.y+0x29900)) {
-    if (adj_trans.y < ceil-0x29900) /* top of object above ceiling? */
-      adj_trans.y = ceil-0x29900; /* stop object */
+  if (ceil != -999999999 && ceil < (adj_trans.y+0x29901)) {
+    if (trans->y < ceil-0x29901) /* top of object above ceiling? */
+      adj_trans.y = ceil-0x29901; /* stop object */
     if (obj->velocity.y > 0) /* also clear positive y velocity */
       obj->velocity.y = 0;
-    obj->status_b |= 0x80; /* set flag for 'hit the ceiling' */
+    obj->status_a |= 0x80; /* set flag for 'hit the ceiling' */
   }
   StopAtZone(obj, &adj_trans); /* stop at solid zone floors */
   *next_trans = adj_trans;
@@ -1170,10 +1170,6 @@ void FindFloorY(
   zone_query_summary *summary,
   int32_t default_y,
   int (*func)(gool_object*, uint32_t)) {
-
-  //ZZ_FindFloorY(obj,query,nodes_bound,collider_bound,max_y,summary,default_y,func);
-  //return;
-
   int32_t sum_y2[2];
   int count[2];
   zone_query_result *result;

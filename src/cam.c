@@ -60,19 +60,16 @@ static void CamAdjustProgress(int32_t speed, cam_info *cam) {
   entry *next_zone;
   int next_progress, next_idx;
 
-#ifndef PSX
-  speed *= 2;
-#endif
   if (cam->flags & 2) { /* forward change in progress? */
     next_progress = cur_progress + speed; /* calc next progress */
     if (cam->next_path) { /* change to a new path? */
       next_idx = next_progress >> 8;
       /* since cam changes to a new path the next idx *should*
          exceed the cur path length; this check ensures it */
-      if (next_idx >= cur_path->length) {
+      if (next_idx >= (int)cur_path->length) {
         /* subtract an entire current path length's worth of progress
            this makes it relative to the start of the next path */
-        next_progress -= (cur_path->length<<8)+1;
+        next_progress -= ((int)cur_path->length<<8)+1;
         if (!(cam->relation & 2)) /* behind the preceding path? */
           next_progress = -next_progress; /* use the equivalent negative value */
         next_zone = cam->next_path->parent_zone;
@@ -88,7 +85,7 @@ static void CamAdjustProgress(int32_t speed, cam_info *cam) {
       next_idx = next_progress >> 8;
       /* since cam changes to a new path the next idx *should*
          fall below 0; this check ensures it */
-      if (next_idx < 0) {
+      if (next_progress < 0) {
         /* that negative idx plus the next path length gives the correct index
            however LevelUpdate is already written to handle negative indexes in this way */
         if (cam->relation & 2) /* in front of the preceding path? */
@@ -112,7 +109,6 @@ static int CamGetProgress(vec *trans, zone_path *path, cam_info *cam, int flags,
   int dist, progress, pt_idx, entrance, exit;
 
   zone = path->parent_zone;
-  header = (zone_header*)zone->items[0];
   rect = (zone_rect*)zone->items[1];
   cam->progress_made = 1;
   trans_path.x = rect->x + path->points[0].x;
@@ -132,6 +128,7 @@ static int CamGetProgress(vec *trans, zone_path *path, cam_info *cam, int flags,
   if (path == cur_path) /* already the current path? */
     cam->next_path = 0; /* no next path */
   else { /* new path */
+    header = (zone_header*)cur_zone->items[0];
     if (path->direction_x && rel_path.y < -12800 && (header->flags & 0x40000))
       return 0;
     cam->next_path = path; /* set the next path */
@@ -142,7 +139,7 @@ static int CamGetProgress(vec *trans, zone_path *path, cam_info *cam, int flags,
     if (flags & 2) { exit = (int)path->exit_index; }
   }
   if (pt_idx >= entrance) { /* at or past the entrance? */
-    if (pt_idx >= (path->length - exit)) { /* past or at the exit */
+    if (pt_idx >= ((int)path->length - exit)) { /* past or at the exit */
       /* exit is not at zero or path is not current? */
       if (exit || path != cur_path)
         return 0; /* abandon the camera */
@@ -165,11 +162,14 @@ static int CamGetProgress(vec *trans, zone_path *path, cam_info *cam, int flags,
   v_dist.x = adjust.x - (rect->x + path->points[pt_idx].x);
   v_dist.y = adjust.y - (rect->y + path->points[pt_idx].y);
   v_dist.z = adjust.z - (rect->z + path->points[pt_idx].z);
-  if (abs(v_dist.x) > 3200 || abs(v_dist.y) > 3200 || abs(v_dist.z) > 3200)
+  if (!cam->progress_made 
+   && (abs(v_dist.x) > 3200 
+    || abs(v_dist.y) > 3200 
+    || abs(v_dist.z) > 3200))
     return 0;
   cam->cur_path = path;
   cam->progress = progress;
-  dist = sqrt((v_dist.x*v_dist.x)+(v_dist.y*v_dist.y)+(v_dist.z+v_dist.z));
+  dist = sqrt((v_dist.x*v_dist.x)+(v_dist.y*v_dist.y)+(v_dist.z*v_dist.z));
   cam->dist = dist;
   return 1;
 }
@@ -178,7 +178,6 @@ static int CamGetProgress(vec *trans, zone_path *path, cam_info *cam, int flags,
 static int CamGetProgress2(vec *trans, zone_path *path, cam_info *cam, int flags, int flag) {
   vec trans_pt, rel_path, dot, adjust, v_dist;
   entry *zone;
-  zone_header *header;
   zone_rect *rect;
   int32_t dist, dist_nearest;
   int32_t rot_x, progress;
@@ -186,9 +185,9 @@ static int CamGetProgress2(vec *trans, zone_path *path, cam_info *cam, int flags
   int i, is_nearer;
 
   zone = path->parent_zone;
-  header = (zone_header*)zone->items[0];
   rect = (zone_rect*)zone->items[1];
   cam->progress_made = 1;
+  progress = -1;
   /* find the path point for which the near plane is nearest to the object */
   for (i=0;i<path->length;i++) {
     trans_pt.x = rect->x + path->points[i].x;
@@ -227,7 +226,7 @@ static int CamGetProgress2(vec *trans, zone_path *path, cam_info *cam, int flags
     }
     is_nearer = abs(dist) < abs(dist_nearest);
     if (i==0 || is_nearer) {
-      if (i==0 || (dist ^ dist_nearest >= 0)) /* first point or no change in sign? */
+      if (i==0 || ((dist ^ dist_nearest) >= 0)) /* first point or no change in sign? */
         progress = i << 8;
       else /* account for sign changes when paths weave through near plane */
         progress += (abs(dist_nearest)<<8)/(abs(dist_nearest)+abs(dist));
@@ -245,11 +244,10 @@ static int CamGetProgress2(vec *trans, zone_path *path, cam_info *cam, int flags
   }
   pt_idx = progress >> 8;
   if (pt_idx >= entrance) { /* at or past the entrance? */
-    if (pt_idx >= (int32_t)(path->length - exit)) { /* past or at the exit */
+    if (pt_idx >= ((int32_t)path->length - exit)) { /* past or at the exit */
       if (exit || (path != cur_path)) /* exit is not at zero or not the current? */
         return 0; /* abandon the camera */
       progress = (path->length << 8) - 1; /* force to end of path */
-      pt_idx = path->length - 1;
       cam->progress_made = 0; /* no progress made */
     }
   }
@@ -258,9 +256,9 @@ static int CamGetProgress2(vec *trans, zone_path *path, cam_info *cam, int flags
     if (entrance || (path != cur_path))
       return 0; /* abandon the camera */
     progress = 0; /* force to start of path */
-    pt_idx = 0;
     cam->progress_made = 0; /* no progress made */
   }
+  pt_idx = progress >> 8;
   adjust.x = (cam->pan_x + crash->trans.x) >> 8;
   adjust.y = (cam->pan_y + crash->trans.y) >> 8;
   adjust.z = (cam->zoom + crash->trans.z) >> 8;
@@ -269,7 +267,7 @@ static int CamGetProgress2(vec *trans, zone_path *path, cam_info *cam, int flags
   v_dist.z = adjust.z - (rect->z + path->points[pt_idx].z);
   cam->cur_path = path;
   cam->progress = progress;
-  dist = sqrt((v_dist.x*v_dist.x)+(v_dist.y*v_dist.y)+(v_dist.z+v_dist.z));
+  dist = sqrt((v_dist.x*v_dist.x)+(v_dist.y*v_dist.y)+(v_dist.z*v_dist.z));
   cam->dist = dist;
   return 1;
 }
@@ -285,16 +283,18 @@ static void CamFollow(gool_object *obj, uint32_t flag) {
   int32_t progress, new_progress, old_progress;
   int32_t seek_pan, seek_zoom, new_pan, new_zoom, total_zoom;
   int32_t delta_dist, dist_exit, dist_nearest, cam_speed;
+  int32_t length;
   int i, path_idx, icam, flags, progress_made, same_dir, n_end;
 
   flags = 0; // for shorter paths (< 50) both flags should set
   path_idx = cur_progress >> 8;
   header = (zone_header*)cur_zone->items[0];
+  length = (int32_t)cur_path->length;
   /* less than half way but max of 50 into path? */
-  if (path_idx < (cur_path->length/2) || path_idx < 50)
+  if (path_idx < (length/2) || path_idx < 50)
     flags |= 1;
   /* more than halfway but max of 50 from end of path */
-  if (path_idx >= (cur_path->length/2) || (cur_path->length-path_idx) < 50)
+  if (path_idx >= (length/2) || (length-path_idx) < 50)
     flags |= 2;
   if (!(header->flags & 0x80) && (cam_zoom > 0x31FFF)) { /* first person zone? */
     if (!(pads[0].held & 0x1000)) { /* up not pressed? */
@@ -306,7 +306,7 @@ static void CamFollow(gool_object *obj, uint32_t flag) {
       cam_offset_dir_z = 0; /* offset cam forward */
   }
   else /* cam z dir depends on zone flag */
-    cam_offset_dir_z = header->flags & 0x8000;
+    cam_offset_dir_z = !!(header->flags & 0x8000);
   if (!(pads[0].held & 0x8000)) { /* left not pressed? */
     if (pads[0].held & 0x2000)  /* right pressed? */
       cam_offset_dir_x = 1; /* offset cam right */
@@ -317,7 +317,7 @@ static void CamFollow(gool_object *obj, uint32_t flag) {
   if (cam_offset_dir_z == 0) /* cam offset is forward? */
     cam_offset_z = max(cam_offset_z - 0x3200, -0x12C00); /* seek towards -0x12C00 */
   else /* cam offset is backward; so seek towards 0x12C00, cortex power 0x4B000 */
-    cam_offset_z = min(cam_offset_z + 0x3200, ns.ldat->lid != 3 ? 0x12C00: 0x4B000);
+    cam_offset_z = min(cam_offset_z + 0x3200, (ns.ldat->lid != 3 ? 0x12C00: 0x4B000));
   if (!(header->flags & 0x4000)) /* not a left/right direction zone? */
     cam_offset_x = 0; /* no x offset */
   else if (cur_path->direction_x) { /* path runs left or right? */
@@ -341,22 +341,22 @@ static void CamFollow(gool_object *obj, uint32_t flag) {
     if (neighbor_path.relation & flags) {
       n_path = ZoneGetNeighborPath(cur_zone, cur_path, i);
       if (n_path->direction_y)
-        new_pan = n_path->cam_zoom << 8;
+        new_pan = (int32_t)n_path->cam_zoom << 8;
       if (n_path->direction_z)
-        new_zoom = n_path->cam_zoom << 8;
+        new_zoom = (int32_t)n_path->cam_zoom << 8;
     }
   }
   if (cur_path->direction_y) {
     seek_pan = 1;
-    new_pan = cur_path->cam_zoom << 8;
+    new_pan = (int32_t)cur_path->cam_zoom << 8;
   }
   if (cur_path->direction_z) {
     seek_zoom = 1;
-    new_zoom = cur_path->cam_zoom << 8;
+    new_zoom = (int32_t)cur_path->cam_zoom << 8;
   }
   /* current or at least one neighbor path is forward/backward
      and we are at least more than 10 units from either end of the path? */
-  if (new_zoom && (path_idx >= 11) && (path_idx < (cur_path->length-10))) {
+  if (new_zoom && (path_idx >= 11) && (path_idx < ((int)cur_path->length-10))) {
     if (seek_zoom)
       cam_zoom = GoolSeek(cam_zoom, new_zoom, 0x1900); /* seek to new_zoom 25.0 increments */
     else
@@ -407,7 +407,6 @@ static void CamFollow(gool_object *obj, uint32_t flag) {
     cameras[icam].pan_x = cam_offset_x;
     cameras[icam].pan_y = cam_offset_y;
     cameras[icam].zoom = total_zoom;
-    flags = neighbor_path.goal;
     if (n_path->direction_z != 0) {
       trans = obj->trans;
       progress_made = CamGetProgress2(&trans, n_path, &cameras[icam], flags, !same_dir);
@@ -425,7 +424,7 @@ static void CamFollow(gool_object *obj, uint32_t flag) {
         dist_exit = cur_progress;
       }
       else {
-        cameras[icam].exit = ((cur_path->length<<8)-1); /* exiting at the end */
+        cameras[icam].exit = (((int32_t)cur_path->length<<8)-1); /* exiting at the end */
         dist_exit = cameras[icam].exit - cur_progress;
       }
       /* calculate entry point of neighbor path and distance from it */
@@ -435,7 +434,7 @@ static void CamFollow(gool_object *obj, uint32_t flag) {
         cameras[icam].delta_progress = dist_exit + cameras[icam].progress + 0x100;
       }
       else { /* goal is behind the current path */
-        n_end = (n_path->length << 8) - 1;
+        n_end = ((int32_t)n_path->length << 8) - 1;
         cameras[icam].entrance = n_end; /* entering at end */
         cameras[icam].relation = 1; /* current path in front of neighbor path */
         cameras[icam].delta_progress = dist_exit + (n_end-(cameras[icam].progress)) + 0x100;
@@ -454,10 +453,10 @@ static void CamFollow(gool_object *obj, uint32_t flag) {
       break;
     } /* break on cams for paths w/cam mode 1 */
     if ((!cam_nearest->progress_made && cameras[i].progress_made)
-      || (cameras[i].dist < dist_nearest
+      || ((int32_t)cameras[i].dist < dist_nearest
         && cam_nearest->progress_made == cameras[i].progress_made)) {
       cam_nearest = &cameras[i];
-      dist_nearest = cam_nearest->dist;
+      dist_nearest = (int32_t)cam_nearest->dist;
     }
   }
   if (!cam_nearest->delta_progress) { return; }
@@ -471,12 +470,18 @@ static void CamFollow(gool_object *obj, uint32_t flag) {
     cam_speed = cam_nearest->delta_progress;
   }
   else {
+#ifdef PSX
     if (cam_nearest->delta_progress <= 0x200) /* change <= 2? */
-      cam_speed = cam_nearest->delta_progress / 2; /* halve progress */
+      cam_speed = cam_nearest->delta_progress/2; /* halve progress */
     else if (cam_nearest->delta_progress < 0x500) /* from 2 to 5 non-inclusive? */
       cam_speed = 0x200; /* limit to 2 */
-    else /* > 5 */
+    else /* > 5 */ 
       cam_speed = min((cam_nearest->delta_progress/2), cam_speed)+0x100;
+#else
+    /* TODO: what makes the camera too slow to keep up with the player
+             when the above limiting code is used? */
+    cam_speed = cam_nearest->delta_progress/2;
+#endif
     CamAdjustProgress(cam_speed, cam_nearest);
   }
 }
@@ -557,16 +562,17 @@ int CamUpdate() {
         angle = sign(angle);
     }
     path_s1 = cur_path;
+    n_progress = cur_progress;
     do {
       if (angle == 0) { break; }
       path = path_s1; /* s2 */
-      progress = cur_progress;
+      progress = n_progress;
       if (island_cam_state == -1) {
         pt_idx = progress >> 8;
         point = &cur_path->points[pt_idx];
         if (abs(GoolAngDiff(point->rot_y, abs(angle))) < 0x17) { break; }
       }
-      if (island_cam_state & 4)
+      if (next_island_cam_state & 4)
         n_progress = progress + 0x400;
       else
         n_progress = progress + 0x100;
@@ -583,11 +589,10 @@ int CamUpdate() {
           for (i=0;i<path_s1->neighbor_path_count;i++) {
             neighbor_path = path_s1->neighbor_paths[i];
             if (!(neighbor_path.goal & 4)) {
-              n_path_idx = i;
               break;
             }
           }
-          /* orig impl. otherwise erroneously goes to next code with n_path_idx = -1 */
+          n_path_idx = i;
         }
         zone_s1 = path_s1->parent_zone;
         path_s1 = ZoneGetNeighborPath(zone_s1, path_s1, n_path_idx);
@@ -595,13 +600,13 @@ int CamUpdate() {
           n_progress = 0;
         else
           n_progress = (path_s1->length - 1) << 8;
-        if (island_cam_state & 4 || angle > 0) {
+        if ((next_island_cam_state & 4) || angle > 0) {
           path = path_s1;
           progress = n_progress;
           break;
         }
       }
-      else if (island_cam_state & 4 || angle > 0) {
+      else if ((next_island_cam_state & 4) || angle > 0) {
         if (angle > 0)
           path = path_s1;
         progress = n_progress;
@@ -619,11 +624,11 @@ int CamUpdate() {
     n_path_idx = -1;
     for (i=0;i<cur_path->neighbor_path_count;i++) {
       neighbor_path = cur_path->neighbor_paths[i];
-      if (neighbor_path.relation & 3 == (island_cam_state & 3)^3) { /* i.e. 3 - level_count */
-        n_path_idx = i;
+      if ((neighbor_path.relation & 3) == ((island_cam_state & 3)^3)) { /* i.e. 3 - level_count */
         break;
       }
     }
+    n_path_idx = i;
     if (island_cam_state & 1) {
       pt_idx = (cur_progress >> 8) + 1;
       if (pt_idx < cur_path->length)
@@ -654,7 +659,7 @@ int CamUpdate() {
         LevelUpdate(n_zone, n_path, n_progress, 0);
       }
     }
-    if (cur_path->cam_mode == 8)
+    if (cur_path->cam_mode != 8)
       island_cam_state = 1;
     return 1;
   default:

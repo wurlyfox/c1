@@ -1321,7 +1321,7 @@ static inline void NSInitAudioPages(ns_struct *nss, uint32_t lid) {
   nsd_pte *pte;
   eid_t eid;
   uint32_t addr;
-  int i, count, type;
+  int i, j, count, type;
 
   count=0;
   for (i=0;i<nss->nsd->page_table_size;i++) {
@@ -1358,11 +1358,30 @@ static inline void NSInitAudioPages(ns_struct *nss, uint32_t lid) {
     if (eid != EID_NONE && aps->type == 4) {
       pte = NSProbeSafe(eid);
       if (!ISERRORCODE(pte)) {
+
+#ifdef PSX
         nss->page_map[pte->pgid >> 1] = aps;
+#endif
         aps->state = 20;
         aps->pgid = pte->pgid;
         aps->eid = eid;
+#ifdef PSX
         pte->value = 0x80000002;
+#endif
+
+/*#else
+        page *page;
+        entry *entry;
+        page_struct *ps;
+        ps = ns.page_map[pte->pgid>>1];
+        page = ps->page;
+        entry = 0;
+        for (j=0;j<page->entry_count;j++) {
+          entry = page->entries[i];
+          if (pte->eid == entry->eid) { break; }
+        }
+        pte->entry = entry;
+#endif*/
       }
       else
         insts[i] = EID_NONE;

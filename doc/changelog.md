@@ -1,5 +1,17 @@
 # Changelog
 
+## 2022-12-27
+
+### Fixed
+
+- aku aku sparkle fragments do not appear
+- aku aku mask does not appear/invincibility is not completely effective
+- wumpa fruit is collected in 'groups' of 3 (and then 1 for a total of 10) instead of 1 at a time when the [top of the] player hits the bottom face of a bouncy wumpa fruit box after being launched upwards from an bounceable object
+- returning from a bonus round brings you back to the map instead of a level
+- Jungle Rollers: camera is not positioned correctly at the beginning of the level
+- The Great Gate: camera does not adjust quickly enough when moving upward
+- The Great Gate: bounceable fire pit never transitions to flame state
+
 ## 2022-12-26
 
 ### Fixed

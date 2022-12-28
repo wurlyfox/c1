@@ -3091,7 +3091,7 @@ void GoolOpTransformVectors(gool_object *obj, uint32_t instruction) {
     svtx_frame *frame;
     svtx_vertex *vert;
     tgeo_header *header;
-    vec in, *out, scale, model_trans, model_scale;
+    vec in, *out, scale;
     link_idx = (instruction >> 21) & 7;
     link = obj->links[link_idx];
     anim = (gool_vertex_anim*)link->anim_seq;
@@ -3106,18 +3106,12 @@ void GoolOpTransformVectors(gool_object *obj, uint32_t instruction) {
     header = (tgeo_header*)tgeo->items[0];
     vert_idx = *(ptr) >> 8; /* index of vert to transform */
     vert = &frame->vertices[vert_idx];
-    model_trans.x = frame->bound_x1;
-    model_trans.y = frame->bound_y1;
-    model_trans.z = frame->bound_z1;
-    model_scale.x = header->scale_x;
-    model_scale.y = header->scale_y;
-    model_scale.z = header->scale_z;
-    in.x = (model_trans.x+(vert->x-0x80)) << 10;
-    in.y = (model_trans.y+(vert->y-0x80)) << 10;
-    in.z = (model_trans.z+(vert->z-0x80)) << 10;
-    scale.x = (model_scale.x * link->scale.x) >> 12;
-    scale.y = (model_scale.y * link->scale.y) >> 12;
-    scale.z = (model_scale.z * link->scale.z) >> 12;
+    in.x = (frame->x+(int8_t)(vert->x-0x80)) << 10;
+    in.y = (frame->y+(int8_t)(vert->y-0x80)) << 10;
+    in.z = (frame->z+(int8_t)(vert->z-0x80)) << 10;
+    scale.x = (header->scale_x * link->scale.x) >> 12;
+    scale.y = (header->scale_y * link->scale.y) >> 12;
+    scale.z = (header->scale_z * link->scale.z) >> 12;
     GoolTransform(&in, &link->trans, &link->rot, &scale, out);
     break;
   }
@@ -3248,9 +3242,10 @@ static inline void GoolOpSpawnChildren(gool_object *obj, uint32_t instruction, u
       child = GoolObjectCreate(obj,type,subtype,argc,args,flag);
       if (ISERRORCODE(child))
         obj->misc_child = 0;
-      else
+      else {
+        child->creator = obj;
         obj->misc_child = child;
-      child->creator = obj;
+      }
     }
   }
   obj->sp -= argc; /* pop args */
@@ -3408,7 +3403,7 @@ int GoolSendEvent(gool_object *sender, gool_object *recipient, uint32_t event, i
     if (sender)
       sender->misc_flag = transition.guard;
   }
-  if (ISERRORCODE(res)) { /* no ESR or invalid state return from ESR? */
+  if (!ISSUCCESSCODE(res)) { /* no ESR or invalid state return from ESR? */
     exec = recipient->global;
     header = (gool_header*)exec->items[0];
     subtype_map_idx = header->subtype_map_idx;

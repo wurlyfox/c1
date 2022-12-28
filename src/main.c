@@ -137,6 +137,7 @@ void CoreLoop(lid_t lid) {
   zone_header *header;
   void *ot;
   uint32_t arg;
+  int bonus_return2;
 #ifndef PSX
   int ticks_elapsed;
 #endif
@@ -201,10 +202,12 @@ void CoreLoop(lid_t lid) {
       if (next_lid == -2) {
         lid = savestate.lid;
         bonus_return = 1; /* i.e. loading nsf and there is a savestate to load */
+        bonus_return2 = 1; /* LdatInit clears bonus_return so we need a persistent variant */
       }
       else {
         lid = next_lid;
         bonus_return = 0;
+        bonus_return2 = 0;
       }
       ns.draw_skip_counter = 2;
       NSKill(&ns);
@@ -219,12 +222,13 @@ void CoreLoop(lid_t lid) {
       }
       NSInit(&ns, lid);
       CoreObjectsCreate();
-      if (bonus_return) {
+      if (bonus_return2) {
         next_lid = -2;
         LevelSpawnObjects();
         next_lid = -1;
         LevelRestart(&savestate);
       }
+      bonus_return = 0;
     }
 #ifdef PSX
     NSUpdate(-1);

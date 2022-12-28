@@ -2,18 +2,16 @@
 
 ## General
 
+- sound dies after collecting 3 aku aku and any level transitions thereafter cause the game to crash 
 - a few sfx are very loud and distorted (ex. warp sound, also when entering a bonus round)
 - objects are not bright enough
 - camera position offset oscillates at a few points in specific levels (ex. The Lost City)
 - main death sequence camera behavior is incorrect
 - title sequence background images become too bright in some instances
-- aku aku sparkle fragments do not appear
 - it is sometimes (but rarely) possible to jump in mid-air when beside walls
 - various issues with invincibility
-- wumpa fruit is collected in 'groups' of 3 (and then 1 for a total of 10) instead of 1 at a time when the [top of the] player hits the bottom face of a bouncy wumpa fruit box after being launched upwards from an bounceable object
 - press X icon at level win is scaled incorrectly
 - hot pipe shading intensity appears to be inverted
-- returning from a bonus round brings you back to the map instead of a level
 - level transitions cause the game to crash when the game is booted directly into a level (i.e. level has not been entered from the map)
 - demo mode does not function correctly
 - attempting to enter any title state other than the map from the main menu ultimately results in the game entering an infinite loop and/or crashing
@@ -32,12 +30,7 @@
 
 ### Jungle Rollers
 
-- camera is not positioned correctly at the beginning of the level
-
 ### The Great Gate
-
-- camera does not adjust quickly enough when moving upward
-- bounceable fire pit never transitions to flame state
 
 ### Boulders
 
@@ -56,8 +49,6 @@
 - works fine up until a certain point in the level where it is not possible to veer away from the camera path
 
 ### Native Fortress
-
-- camera does not adjust quickly enough when moving upward
 
 ### Up The Creek
 
