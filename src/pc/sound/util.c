@@ -90,7 +90,7 @@ size_t ADPCMToPCM16(uint8_t *adpcm, size_t size, uint8_t *pcm, int *loop) {
 #define SeqNext(s,t,d) Next(s,t,d)
 #define MidNext(m,t,d) Next(m,t,d)
 
-size_t SeqToMid(uint8_t *seq, uint8_t *mid) {
+size_t SeqToMid(uint8_t *seq, uint8_t *mid, size_t *seq_size) {
   MThd *mthd; SThd *sthd;
   MTrk *mtrk;
   MMev *mmev; SMev *smev;
@@ -127,6 +127,10 @@ size_t SeqToMid(uint8_t *seq, uint8_t *mid) {
   m.tsg->npc = 8;
   length = 0;
   while (1) { 
+    if (seq[0]==0 && seq[1]==0 && seq[2]==0xFF && seq[3]==0x2F) {
+      *(mid++) = 0;
+      seq++;
+    }
     SeqNext(seq, SEvt, sevt);
     if (!sevt->has_status && type < 7) {
       sevr = (SEvr*)sevt;
@@ -170,9 +174,12 @@ size_t SeqToMid(uint8_t *seq, uint8_t *mid) {
     for (i=0;i<length;i++)
       *(mid++) = *(seq++);
   }
+  
   length = mid - mtrk->data;
   mtrk->length = SwapEndian(length, mtrk->length);
   size = mid - (uint8_t*)mthd;
+  if (seq_size)
+    *seq_size = (size_t)(seq - (uint8_t*)sthd) + 2;
   return size;
 }
 

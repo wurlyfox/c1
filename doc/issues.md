@@ -2,17 +2,12 @@
 
 ## General
 
-- sound dies after collecting 3 aku aku and any level transitions thereafter cause the game to crash 
+- colors are slightly different from psx (map differently?)
 - a few sfx are very loud and distorted (ex. warp sound, also when entering a bonus round)
-- objects are not bright enough
-- camera position offset oscillates at a few points in specific levels (ex. The Lost City)
+- in some instances, game transitions occur too early (ex. game immediately jumps to win level screen when player lands on a warp platform, without playing either of crash's 'win level' animation sequences; some death sequences are cut short)
 - main death sequence camera behavior is incorrect
 - title sequence background images become too bright in some instances
 - it is sometimes (but rarely) possible to jump in mid-air when beside walls
-- various issues with invincibility
-- press X icon at level win is scaled incorrectly
-- hot pipe shading intensity appears to be inverted
-- level transitions cause the game to crash when the game is booted directly into a level (i.e. level has not been entered from the map)
 - demo mode does not function correctly
 - attempting to enter any title state other than the map from the main menu ultimately results in the game entering an infinite loop and/or crashing
 - compiling with optimization flags causes the game to behave differently (aside from performance improvements)
@@ -23,7 +18,6 @@
 ### Map
 
 - camera is incorrect
-- some controls do not work
 - textures fail to load in some instances
 
 ### N. Sanity Beach
@@ -42,11 +36,10 @@
 
 ### Papu Papu
 
-- Papu Papu's staff does no damage to Crash
-
 ### Hog Wild
 
-- works fine up until a certain point in the level where it is not possible to veer away from the camera path
+- player dies after respawning at a checkpoint
+- crash skips the 'look back at camera and then jump on hog' animation sequence that typically begins hog levels
 
 ### Native Fortress
 
@@ -59,7 +52,6 @@
 ### The Lost City
 
 - game crashes when attempting to kill lizards
-- oscillating camera at a few points
 
 ### Temple Ruins
 
@@ -83,8 +75,6 @@
 - boulders launched by Koala Kong do not appear or are not thrown in the destined direction
 
 ### Heavy Machinery
-
-- camera is unable to keep up with player during the falling descent at the beginning of the level, thus causing Crash to fall below bottom of the screen (which the games registers as death) and making the level unplayable
 
 ### Cortex Power
 
@@ -135,4 +125,4 @@
 
 ### Stormy Ascent
 
-- potion viles thrown by lab asses are not visible
+- potion vials thrown by lab asses are not visible

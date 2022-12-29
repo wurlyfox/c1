@@ -183,7 +183,7 @@ int TitleLoadState() {
     type = 3;
     break;
   case 6: /* options menu */
-    eid = NSStringToEID("0e_pZ");
+    eid = NSStringToEID("0f_pZ");
     type = 1;
     break;
   case 8: /* Naughty Dog */
@@ -195,15 +195,15 @@ int TitleLoadState() {
     type = 1;
     break;
   case 13: case 14: /* password/load game menu */
-    eid = NSStringToEID("0b_pZ");
+    eid = NSStringToEID("0e_pZ");
     type = 1;
     break;
   case 15: /* world map */
     if (cur_map_level == 99
       || cur_map_level < 9) {
-      eid = NSStringToEID("1e_pZ");
+      eid = NSStringToEID("1a_pZ");
     }
-    else if (cur_map_level == 9) { eid = NSStringToEID("1a_pZ"); }
+    else if (cur_map_level == 9) { eid = NSStringToEID("1e_pZ"); }
     else if (cur_map_level < 18) { eid = NSStringToEID("2b_pZ"); }
     else if (cur_map_level < 50) { eid = NSStringToEID("3a_pZ"); }
     type = 1;

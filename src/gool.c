@@ -590,6 +590,7 @@ static inline gool_object *GoolObjectAlloc(int flag) {
         target = handle->children;
       else if (GoolObjectTestStateFlags((gool_object*)handle, 0x80000))
         target = GoolObjectGetChildren(handle);
+      found = 0;
       for (cur=target;cur&&!found;cur=cur->sibling)
         found = (gool_object*)GoolObjectSearchTree(
           cur,
@@ -1394,7 +1395,7 @@ static int GoolTextStringTransform(
   vec scale;
   int32_t y_offs, max_x;
   char c, c2, buf[16];
-  int i, center, flag;
+  int i, center, count, flag;
 
   flag = 1;
   center = 0;
@@ -1422,16 +1423,15 @@ static int GoolTextStringTransform(
         break;
       case 'p':
         c = *(str++);
-        flag = obj->sp[-1-(c-'0')];
-        if (flag) { str++; }
-        c = *str;
-        if (c == 0) { break; }
-        if (c == '~') { continue; }
+        count = obj->sp[-2-(c-'0')];
+        if (count == 1) { str++; }
+        c = *(str++);
+        if ((c == '~') || (c == 0)) { str--; continue; }
         break;
       case 's':
         c = *(str++);
-        c2 = *(str);
-        for (i=0;c2!='~';i++, c2=*(str++)) {
+        c2 = *(str++);
+        for (i=0;c2!='~';i++,c2=*(str++)) {
           buf[i] = c2;
         }
         buf[i] = 0;
@@ -1439,14 +1439,14 @@ static int GoolTextStringTransform(
           scale.x = atoi(buf) << size;
         else
           scale.y = atoi(buf) << size;
-        c = *str;
-        if (c == '~') { continue; }
+        c = *(str++);
+        if (c == '~') { str--; continue; }
         break;
       case 'c':
         c = *(str++);
         flag = c == '1';
-        c = *str;
-        if (c == '~') { continue; }
+        c = *(str++);
+        if (c == '~') { str--; continue; }
         break;
       }
     }
@@ -1550,7 +1550,7 @@ void GoolTextObjectTransform(gool_object *obj, gool_text *text, int terms_skip, 
   else
     arg = 0;
   prims_tail = GpuGetPrimsTail();
-  GoolTextStringTransform(obj, str, -arg/4, font, pginfo, size, prims_tail);
+  GoolTextStringTransform(obj, str, -arg/2, font, pginfo, size, prims_tail);
 #else
   tpag = font->tpage;
   if (flag)
@@ -1558,7 +1558,7 @@ void GoolTextObjectTransform(gool_object *obj, gool_text *text, int terms_skip, 
   else
     arg = 0;
   prims_tail = GLGetPrimsTail();
-  GoolTextStringTransform(obj, buf, -arg/4, font, tpag, size, prims_tail);
+  GoolTextStringTransform(obj, buf, -arg/2, font, tpag, size, prims_tail);
 #endif
 }
 

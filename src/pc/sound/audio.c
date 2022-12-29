@@ -226,8 +226,8 @@ void SwVoiceSetVolume(int voice_idx, uint32_t voll, uint32_t volr) {
 
   svoice = &svoices[voice_idx];
   sampler = &svoice->sampler;
-  svoice->vol[0] = voll;
-  svoice->vol[1] = volr;
+  svoice->vol[0] = limit(voll,0,0x3FFF);
+  svoice->vol[1] = limit(volr,0,0x3FFF);
   sampler->amp[0] = (double)svoice->vol[0] / SVOICE_VOL_BASE;
   sampler->amp[1] = (double)svoice->vol[1] / SVOICE_VOL_BASE;
 }

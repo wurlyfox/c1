@@ -140,8 +140,11 @@ void MidiTogglePlayback(int a1) {
   if (seq_count < 2) { return; } /* return if less than 2 seqs */
   if (midi_state != 3) { return; } /* return if not resuming playback */
   if (a1 >> 8 == 3) {
-    if (mus_vol || sfx_vol)
-      seq2_vol = 0x3FFF;
+    if (mus_vol || sfx_vol) {
+      /* bug: orig impl set this to 0x3FFF (14 bit volume) 
+              but it should be 0x7F (7 bit volume) */
+      seq2_vol = 0x7F;
+    }
     else
       seq2_vol = 0;
     MidiControl(&midi_seqs[0], 2, 0); /* pause 1st seq; no arg for pause */
@@ -174,8 +177,7 @@ static inline int MidiGetVab(entry *midi) {
   return vab_id;
 }
 #else
-uint8_t *vabs[16];
-int vab_count=0;
+uint8_t *vabs[16] = { 0 };
 
 static inline int MidiGetVab(entry *midi) {
   entry *inst;
@@ -210,11 +212,16 @@ static inline int MidiGetVab(entry *midi) {
     for (ii=0;ii<i_header->len;ii++)
       *(vd++) = *(vb++);
   }
-  vabs[vab_count] = vab;
-  return vab_count++;
+  for (i=0;i<16;i++) {
+    if (vabs[i]) { continue; }
+    vabs[i] = vab;
+    return i;
+  }
+  return -1;
 }
 
 void VabClose(int _vab_id) {
+  int i;
   if (vabs[_vab_id])
     free(vabs[_vab_id]);
   vabs[_vab_id] = 0;
@@ -324,7 +331,7 @@ int MidiKill() {
   return SsEnd();
 #else
   int i;
-  for (i=0;i<vab_count;i++)
+  for (i=0;i<16;i++)
     VabClose(i);
 #endif
 }

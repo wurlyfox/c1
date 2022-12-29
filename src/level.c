@@ -1476,6 +1476,7 @@ inline zone_path *ZoneGetNeighborPath(entry *zone, zone_path *path, int idx) {
   entry *neighbor;
   int neighbor_idx, n_path_idx;
 
+  if (path->neighbor_path_count == 0) { return 0; }
   neighbor_path = path->neighbor_paths[idx];
   neighbor_idx = neighbor_path.neighbor_zone_idx;
   header = (zone_header*)zone->items[0];

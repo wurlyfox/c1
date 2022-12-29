@@ -1514,8 +1514,8 @@ void GfxLoadWorlds(zone_header *header) {
       tpag=NSLookup(&w_header->tpags[ii]);
     }
   }
-  if (ns.ldat->lid == LID_TITLE && title_state == 15) /* title screen? */
-    sub_8001A460(map_level_links, map_key_links); /* do additional stuff */
+  if (ns.ldat->lid == LID_TITLE && title_state == 15) /* map? */
+    GfxAnimMapPaths(map_level_links, map_key_links); /* animate path */
 }
 
 //----- (80019508) --------------------------------------------------------
@@ -1823,7 +1823,7 @@ void GfxTransformWorldsDark2(void *ot) {
   flags_a is a bitfield which disables texture animations (holds them at frame 16?) for group i if the i'th bit is set
   flags_b is a bitfield which disables texture animations (holds them at frame 2?) for group i-32 if the i'th bit is set
 */
-void sub_8001A460(uint32_t flags_a, uint32_t flags_b) {
+void GfxAnimMapPaths(uint32_t flags_a, uint32_t flags_b) {
   zone_header *header; // $v0
   zone_world *worlds;
   entry *wgeo;
@@ -1843,8 +1843,8 @@ void sub_8001A460(uint32_t flags_a, uint32_t flags_b) {
     w_header = (wgeo_header*)wgeo->items[0];
     id_list = (poly_id_list*)wgeo->items[3];
     len = id_list->len;
-    for (ii=1;ii<len+1;ii++) {
-      poly_id = id_list->ids[ii];
+    for (ii=0;ii<len;ii++) {
+      poly_id = id_list->ids[ii-1];
       poly_idx = poly_id.poly_idx;
       if (poly_id.flag) {
         poly_idx2 = poly_id.poly_idx;
@@ -1853,20 +1853,13 @@ void sub_8001A460(uint32_t flags_a, uint32_t flags_b) {
       if (poly_idx >= w_header->poly_count) { continue; }
       polys = (wgeo_polygon*)wgeo->items[1];
       poly = &polys[poly_idx];
-      bit_idx = poly_idx2 < 32 ? (1 << poly_idx2) : (1 << (poly_idx2-32));
+      bit_idx = poly_idx2 % 32;
       mask = (1 << bit_idx);
-      if (poly_idx2 < 32) {
-        mask = (1 << poly_idx2);
-        if (flags_a & mask) {
-          poly->anim_phase &= 1;
-          poly->anim_phase |= 0xF;
-        }
-      }
-      else {
-        mask = (1 << (poly_idx2-32));
-        if (flags_b & mask)
-          poly->anim_phase &= 1;
-      }
+      if ((poly_idx2 < 32 && (flags_a & mask)) 
+       || (poly_idx2 >= 32 && (flags_b & mask)))
+        poly->anim_mask = 7;
+      else 
+        poly->anim_mask = 0;
     }
   }
 }

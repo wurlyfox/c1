@@ -1,5 +1,19 @@
 # Changelog
 
+## 2022-12-28
+
+### Fixed
+
+- object shading inaccuracy
+- press X icon at level win is scaled incorrectly
+- hot pipe shading intensity appears to be inverted
+- sound dies after collecting 3 aku aku and any level transitions thereafter cause the game to crash 
+- map controls do not work
+- (partial) attempting to enter any title state other than the map from the main menu ultimately results in the game entering an infinite loop and/or crashing
+- issue with singular/plural text
+- Papu Papu: staff does no damage to Crash
+- Hog Wild: works fine up until a certain point in the level where it is not possible to veer away from the camera path
+
 ## 2022-12-27
 
 ### Fixed

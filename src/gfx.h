@@ -44,7 +44,7 @@ extern void GfxTransformWorldsRipple(void *ot);
 extern void GfxTransformWorldsLightning(void *ot);
 extern void GfxTransformWorldsDark(void *ot);
 extern void GfxTransformWorldsDark2(void *ot);
-extern void sub_8001A460(uint32_t flags_a, uint32_t flags_b);
+extern void GfxAnimMapPaths(uint32_t flags_a, uint32_t flags_b);
 extern int sub_8001A5F4(int type, uint8_t *icon, int idx, rect2 *rect);
 extern void sub_8001A754(char *dst, int id, char *src, int len);
 

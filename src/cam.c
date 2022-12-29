@@ -549,8 +549,8 @@ int CamUpdate() {
     next_island_cam_state = island_cam_state;
     if (island_cam_state == 0) { return 0; }
     else if (island_cam_state == -1) {
-      angle = -angle12(island_cam_rot_x);
       next_island_cam_state = 1;
+      angle = -angle12(island_cam_rot_x);
     }
     else if (island_cam_state == 5 || island_cam_state == 6)
       angle = 0x22;
@@ -569,7 +569,7 @@ int CamUpdate() {
       progress = n_progress;
       if (island_cam_state == -1) {
         pt_idx = progress >> 8;
-        point = &cur_path->points[pt_idx];
+        point = &path->points[pt_idx];
         if (abs(GoolAngDiff(point->rot_y, abs(angle))) < 0x17) { break; }
       }
       if (next_island_cam_state & 4)
@@ -612,7 +612,7 @@ int CamUpdate() {
         progress = n_progress;
         break;
       }
-    } while (path_s1 != cur_path && (n_progress >> 8) != (cur_progress >> 8));
+    } while (path_s1 != cur_path || (n_progress >> 8) != (cur_progress >> 8));
     if (island_cam_state == -1)
       island_cam_state = next_island_cam_state;
     if (path && (path != cur_path || progress != cur_progress)) {
@@ -625,10 +625,10 @@ int CamUpdate() {
     for (i=0;i<cur_path->neighbor_path_count;i++) {
       neighbor_path = cur_path->neighbor_paths[i];
       if ((neighbor_path.relation & 3) == ((island_cam_state & 3)^3)) { /* i.e. 3 - level_count */
+        n_path_idx = i;
         break;
       }
     }
-    n_path_idx = i;
     if (island_cam_state & 1) {
       pt_idx = (cur_progress >> 8) + 1;
       if (pt_idx < cur_path->length)

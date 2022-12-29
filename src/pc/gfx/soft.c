@@ -397,9 +397,9 @@ void SwTransformSvtx(
         ldir.x=(((int64_t)lm[0][0]*n.x)+((int64_t)lm[0][1]*n.y)+((int64_t)lm[0][2]*n.z))>>12;
         ldir.y=(((int64_t)lm[1][0]*n.x)+((int64_t)lm[1][1]*n.y)+((int64_t)lm[1][2]*n.z))>>12;
         ldir.z=(((int64_t)lm[2][0]*n.x)+((int64_t)lm[2][1]*n.y)+((int64_t)lm[2][2]*n.z))>>12;
-        ldir.x=limit(ldir.x,-0x8000,0x7FFF);
-        ldir.y=limit(ldir.y,-0x8000,0x7FFF);
-        ldir.z=limit(ldir.z,-0x8000,0x7FFF);
+        ldir.x=limit(ldir.x,0,0x7FFF);
+        ldir.y=limit(ldir.y,0,0x7FFF);
+        ldir.z=limit(ldir.z,0,0x7FFF);
         color16.r=((int64_t)((int64_t)(bc.r<<12))
                +(cm[0][0]*ldir.x)+(cm[0][1]*ldir.y)+(cm[0][2]*ldir.z))>>12;
         color16.g=((int64_t)((int64_t)(bc.g<<12))
@@ -829,11 +829,11 @@ static void SwLightningShader(vert_id vert_id, vec *vert, rgb8 *color, sw_transf
 
   world_vert = SwWorldVertex(vert_id);
   if (!world_vert->fx) {
-    t = params->far_t1;
+    t = params->far_t1/16;
     far_color = &params->far_color1;
   }
   else {
-    t = params->far_t2;
+    t = params->far_t2/16;
     far_color = &params->far_color2;
   }
   /* convert integer-valued color components
@@ -841,9 +841,9 @@ static void SwLightningShader(vert_id vert_id, vec *vert, rgb8 *color, sw_transf
   c1.r = ((int32_t)color->r)<<4;
   c1.g = ((int32_t)color->g)<<4;
   c1.b = ((int32_t)color->b)<<4;
-  c2.r = ((int32_t)params->far_color1.r)<<4;
-  c2.g = ((int32_t)params->far_color1.g)<<4;
-  c2.b = ((int32_t)params->far_color1.b)<<4;
+  c2.r = ((int32_t)far_color->r)<<4;
+  c2.g = ((int32_t)far_color->g)<<4;
+  c2.b = ((int32_t)far_color->b)<<4;
   cd.r = limit((c2.r-c1.r), -0x800, 0x7FF);
   cd.g = limit((c2.g-c1.g), -0x800, 0x7FF);
   cd.b = limit((c2.b-c1.b), -0x800, 0x7FF);

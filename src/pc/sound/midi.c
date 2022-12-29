@@ -181,8 +181,12 @@ void SwMidiKill() {
     synth = context->synth;
     player = context->player;
     sfid = context->sfid;
-    delete_fluid_player(player);
-    fluid_synth_sfunload(synth, sfid, 0);
+    if (player) {
+      fluid_player_stop(player);
+      delete_fluid_player(player);
+    }
+    if (sfid != -1)
+      fluid_synth_sfunload(synth, sfid, 1);
     delete_fluid_synth(synth);
   }
   delete_fluid_sfloader(loader);
@@ -196,29 +200,32 @@ int16_t SwSepOpen(uint8_t *sep, int vab_id, int count) {
   fluid_preset_t *preset;
   mbuf_t buf;
   PThd *pthd;
-  size_t size, midi_sizes[32];
+  size_t sf2_size, seq_size, mid_size;
+  size_t midi_sizes[32];
   uint8_t *vab, *sf2, *seq, *mid;
   uint8_t *midi_data;
   int i, sfid;
 
   for (i=0;i<count;i++) {
     context = &midi_contexts[i];
-    player = context->player;
-    if (!player) { continue; }
     synth = context->synth;
     sfid = context->sfid;
-    fluid_player_stop(player);
-    delete_fluid_player(player);
-    fluid_synth_sfunload(synth, sfid, 1);
+    player = context->player;
+    if (player) {
+      fluid_player_stop(player);
+      delete_fluid_player(player);
+    }
+    if (sfid != -1)
+      fluid_synth_sfunload(synth, sfid, 1);
     *context = def_context;
     context->synth = synth;
   }
   vab = vabs[vab_id];
   sf2 = (uint8_t*)malloc(0x400000);
-  size = VabToSf2(vab, sf2);
+  sf2_size = VabToSf2(vab, sf2);
   strcpy(buf.dummy, "buf");
   buf.data = sf2;
-  buf.size = size;
+  buf.size = sf2_size;
   for (i=0;i<count;i++) {
     context = &midi_contexts[i];
     synth = context->synth;
@@ -230,21 +237,22 @@ int16_t SwSepOpen(uint8_t *sep, int vab_id, int count) {
   pthd = (PThd*)sep;
   seq = pthd->data;
   for (i=0;i<count;i++) {
-    size = SeqToMid(seq, mid);
-    midi_sizes[i] = size;
-    mid += size;
-    seq += sizeof(SThd) + ((SThd*)seq)->length;
+    mid_size = SeqToMid(seq, mid, &seq_size);
+    midi_sizes[i] = mid_size;
+    mid += mid_size;
+    seq += seq_size;
   } 
   mid = midi_data;
   for (i=0;i<count;i++) {
-    size = midi_sizes[i];
+    mid_size = midi_sizes[i];
     context = &midi_contexts[i];
     synth = context->synth;
     sfid = context->sfid;
     player = new_fluid_player(synth);
-    fluid_player_add_mem(player, mid, size);
+    fluid_player_add_mem(player, mid, mid_size);
+    fluid_player_stop(player);
     context->player = player;
-    mid += size;
+    mid += mid_size;
   }
   mid = midi_data;
   free(sf2);
@@ -263,9 +271,12 @@ void SwSepClose(int san) {
     synth = context->synth;
     sfid = context->sfid;
     player = context->player;
-    //fluid_player_stop(player);
-    delete_fluid_player(player);
-    fluid_synth_sfunload(synth, sfid, 1);
+    if (player) {
+      fluid_player_stop(player);
+      delete_fluid_player(player);
+    }
+    if (sfid != -1)
+      fluid_synth_sfunload(synth, sfid, 1);
     *context = def_context;
     context->synth = synth;
   }

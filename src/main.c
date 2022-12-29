@@ -290,7 +290,6 @@ void CoreLoop(lid_t lid) {
 #else
     GLUpdate();
 #endif
-
   } while (!done);
   cur_display_flags = 0;
 #ifdef PSX
