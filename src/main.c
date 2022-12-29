@@ -81,6 +81,10 @@ int draw_wallmap = 0;
 int draw_objbounds = 0;
 #endif
 
+#ifdef CFLAGS_HIRES_TEST
+int hires = 1;
+#endif
+
 #ifdef PSX
 extern gfx_context_db context;
 extern int ticks_elapsed;
@@ -279,6 +283,10 @@ void CoreLoop(lid_t lid) {
       draw_objbounds = !draw_objbounds;
     if (draw_objbounds)
       SwTransformObjectBounds(object_bounds, object_bound_count, ot, GLGetPrimsTail());
+#endif
+#if defined(CFLAGS_HIRES_TEST)
+    if (pads[0].tapped & 2)
+      hires = !hires;
 #endif
 #ifndef PSX
     GLClear();

@@ -324,6 +324,13 @@ int SwCalcSpriteRotMatrix(
   return 1;
 }
 
+#ifdef CFLAGS_HIRES_TEST
+extern int hires;
+extern double interp_factor;
+extern svtx_frame *next_frame;
+extern int is_last_frame;
+#endif
+
 void SwTransformSvtx(
   svtx_frame *frame,
   void *ot,
@@ -348,6 +355,7 @@ void SwTransformSvtx(
   int32_t z_min, z_max, z_sum;
   int i,ii,texid,z_idx,res;
 
+
   SwCopyMat(lm, params->m_light.m);
   SwCopyMat(cm, params->m_color.m);
   bc=params->back_color;
@@ -359,11 +367,48 @@ void SwTransformSvtx(
     poly_verts[0]=(svtx_vertex*)((uint8_t*)verts+poly->a_idx);
     poly_verts[1]=(svtx_vertex*)((uint8_t*)verts+poly->b_idx);
     poly_verts[2]=(svtx_vertex*)((uint8_t*)verts+poly->c_idx);
+#ifdef CFLAGS_HIRES_TEST
+    svtx_vertex *verts2, *poly_verts2[3];
+    if (hires && next_frame) {
+      verts2 = next_frame->vertices;
+      poly_verts2[0]=(svtx_vertex*)((uint8_t*)verts2+poly->a_idx);
+      poly_verts2[1]=(svtx_vertex*)((uint8_t*)verts2+poly->b_idx);
+      poly_verts2[2]=(svtx_vertex*)((uint8_t*)verts2+poly->c_idx);
+    }
+#endif
     for (ii=0;ii<3;ii++) {
       vert=poly_verts[ii];
+#ifndef CFLAGS_HIRES_TEST
       u_vert.x=((frame->x-128)+vert->x)*4;
       u_vert.y=((frame->y-128)+vert->y)*4;
       u_vert.z=((frame->z-128)+vert->z)*4;
+#else
+      if (!hires || !next_frame) {
+        u_vert.x=((frame->x-128)+vert->x)*4;
+        u_vert.y=((frame->y-128)+vert->y)*4;
+        u_vert.z=((frame->z-128)+vert->z)*4;
+      }
+      else if (is_last_frame) {
+        svtx_vertex *vert2;
+        vert2=poly_verts2[ii];
+        u_vert.x=(((frame->x-128)+vert->x)*4)+((1+interp_factor)*
+                  ((((next_frame->x-128)+vert2->x)*4)-(((frame->x-128)+vert->x)*4)));
+        u_vert.y=(((frame->y-128)+vert->y)*4)+((1+interp_factor)*
+                  ((((next_frame->y-128)+vert2->y)*4)-(((frame->y-128)+vert->y)*4)));
+        u_vert.z=(((frame->z-128)+vert->z)*4)+((1+interp_factor)*
+                  ((((next_frame->z-128)+vert2->z)*4)-(((frame->z-128)+vert->z)*4)));
+      }
+      else {
+        svtx_vertex *vert2;
+        vert2=poly_verts2[ii];
+        u_vert.x=((1-interp_factor)*(((frame->x-128)+vert->x)*4)) +
+                 (interp_factor*(((next_frame->x-128)+vert2->x)*4));
+        u_vert.y=((1-interp_factor)*(((frame->y-128)+vert->y)*4)) +
+                 (interp_factor*(((next_frame->y-128)+vert2->y)*4));
+        u_vert.z=((1-interp_factor)*(((frame->z-128)+vert->z)*4)) +
+                 (interp_factor*(((next_frame->z-128)+vert2->z)*4));
+      }
+#endif                  
 #ifdef CFLAGS_GFX_SW_PERSP
       res = SwRotTransPers(&u_vert, &r_verts[ii], &params->trans, &params->m_rot,
         &params->screen, params->screen_proj);
@@ -391,9 +436,35 @@ void SwTransformSvtx(
     else {
       for (ii=0;ii<3;ii++) {
         vert=poly_verts[ii];
+#ifndef CFLAGS_HIRES_TEST
         n.x=(int32_t)vert->normal_x*256;
         n.y=(int32_t)vert->normal_y*256;
         n.z=(int32_t)vert->normal_z*256;
+#else
+        svtx_vertex *vert2;
+        vert2=poly_verts2[ii];
+        if (!hires || !next_frame) {
+          n.x=(int32_t)vert->normal_x*256;
+          n.y=(int32_t)vert->normal_y*256;
+          n.z=(int32_t)vert->normal_z*256;
+        }
+        else if (is_last_frame) {
+          n.x=((int32_t)vert->normal_x*256)+
+               ((interp_factor+1)*(((int32_t)vert2->normal_x*256)-((int32_t)vert->normal_x*256)));
+          n.y=((int32_t)vert->normal_y*256)+
+               ((interp_factor+1)*(((int32_t)vert2->normal_y*256)-((int32_t)vert->normal_y*256)));
+          n.z=((int32_t)vert->normal_z*256)+
+               ((interp_factor+1)*(((int32_t)vert2->normal_z*256)-((int32_t)vert->normal_z*256)));
+        }
+        else {
+          n.x=(1-interp_factor)*((int32_t)vert->normal_x*256) +
+              (interp_factor)*((int32_t)vert2->normal_x*256);
+          n.y=(1-interp_factor)*((int32_t)vert->normal_y*256) +
+              (interp_factor)*((int32_t)vert2->normal_y*256);
+          n.z=(1-interp_factor)*((int32_t)vert->normal_z*256) +
+              (interp_factor)*((int32_t)vert2->normal_z*256);
+        }
+#endif    
         ldir.x=(((int64_t)lm[0][0]*n.x)+((int64_t)lm[0][1]*n.y)+((int64_t)lm[0][2]*n.z))>>12;
         ldir.y=(((int64_t)lm[1][0]*n.x)+((int64_t)lm[1][1]*n.y)+((int64_t)lm[1][2]*n.z))>>12;
         ldir.z=(((int64_t)lm[2][0]*n.x)+((int64_t)lm[2][1]*n.y)+((int64_t)lm[2][2]*n.z))>>12;

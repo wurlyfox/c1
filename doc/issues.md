@@ -9,7 +9,7 @@
 - title sequence background images become too bright in some instances
 - it is sometimes (but rarely) possible to jump in mid-air when beside walls
 - demo mode does not function correctly
-- attempting to enter any title state other than the map from the main menu ultimately results in the game entering an infinite loop and/or crashing
+- attempting to enter the options menu causes the game to crash
 - compiling with optimization flags causes the game to behave differently (aside from performance improvements)
 - tree change tracking implementation is broken
 

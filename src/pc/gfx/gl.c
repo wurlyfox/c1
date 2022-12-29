@@ -19,6 +19,10 @@
 #include "cimgui_impl.h"
 #endif
 
+#ifdef CFLAGS_HIRES_TEST
+extern int hires;
+#endif
+
 int GLCreateTexture(dim2 dim, uint8_t *buf) {
   int texid;
 
@@ -388,6 +392,10 @@ static void GLDraw(void *ot) {
 int GLRoundTicks(int ticks) {
   if (ticks < 0)
     return 34;
+#ifdef CFLAGS_HIRES_TEST
+  if (ticks < 19/2)
+    return 17/2;
+#endif
   if (ticks < 19)
     return 17; /* 1/2 frame */
   if (ticks < 36)
@@ -427,6 +435,7 @@ void GLClear() {
   }
 }
 
+float draw_count_f=0.0;
 void GLUpdate() {
   zone_header *header;
   rgb8 fill;
@@ -444,8 +453,20 @@ void GLUpdate() {
 #endif
   cur_display_flags = next_display_flags;  /* copy display/animate flags */
   vram_fill_color = next_vram_fill_color;
-  if (!paused && (cur_display_flags & 0x1000))
+  if (!paused && (cur_display_flags & 0x1000)) {
+#ifndef CFLAGS_HIRES_TEST
     draw_count++;
+#else
+    if (!hires) {
+      draw_count++;
+      draw_count_f = draw_count;
+    }
+    else {
+      draw_count_f += 0.25f;
+      draw_count = (int)draw_count_f;
+    }
+#endif
+  }
   AudioUpdate();
   ticks_elapsed = GetTicksElapsed();
   context.sync_stamp = ticks_elapsed;
@@ -453,9 +474,16 @@ void GLUpdate() {
     ticks_cur_frame = ticks_elapsed - context.draw_stamp; /* time elapsed between current sync and previous draw  */
   else
     ticks_cur_frame = 17; /* default to 17 */
+#ifndef CFLAGS_HIRES_TEST
   while (ticks_elapsed - context.draw_stamp < 34) {
     ticks_elapsed = GetTicksElapsed();
   }
+#else
+  int frame_rate = 34 / (hires ? 4 : 1);
+  while (ticks_elapsed - context.draw_stamp < frame_rate) {
+    ticks_elapsed = GetTicksElapsed();
+  }
+#endif
   if (pbak_state == 2)
     SetTicksElapsed(cur_pbak_frame->ticks_elapsed);
   ticks_elapsed = GetTicksElapsed();
@@ -470,7 +498,11 @@ void GLUpdate() {
   GLResetPrims(&context);
   if (fade_counter != 0) { /* brightness */
     if (fade_counter < -2) {
+#ifndef CFLAGS_HIRES_TEST
       fade_counter += fade_step;
+#else
+      fade_counter += fade_step / (hires ? 4 : 1);
+#endif
       GLDrawOverlay(fade_counter + 256);
       if (fade_counter == 0 && !(cur_display_flags & 0x200000))
         fade_counter = -2;
@@ -480,7 +512,11 @@ void GLUpdate() {
       fade_counter = -1;
     }
     else {
+#ifndef CFLAGS_HIRES_TEST
       fade_counter -= fade_step;
+#else
+      fade_counter -= fade_step / (hires ? 4 : 1);
+#endif
       GLDrawOverlay(fade_counter);
     }
   }

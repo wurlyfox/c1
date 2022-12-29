@@ -1085,6 +1085,15 @@ static int GoolObjectPopFrame(gool_object *obj, uint32_t *flags) {
   return SUCCESS;
 }
 
+#ifdef CFLAGS_HIRES_TEST
+
+extern int hires;
+svtx_frame *next_frame = 0;
+double interp_factor = 0.0;
+int is_last_frame = 0;
+
+#endif
+
 //----- (8001DA0C) --------------------------------------------------------
 int GoolObjectUpdate(gool_object *obj, int flag) {
   gool_header *header;
@@ -1165,11 +1174,19 @@ int GoolObjectUpdate(gool_object *obj, int flag) {
       timestamp = top & 0x00FFFFFF;
       wait = (top & 0xFF000000) >> 24;
       elapsed_since = frames_elapsed - timestamp;
+#ifdef CFLAGS_HIRES_TEST
+      interp_factor = ((((double)context.draw_stamp/34.0f)-(double)timestamp)/((double)wait));
+      interp_factor = limit(interp_factor, 0.0, 1.0);
+      if (wait > 0x8) { interp_factor = 0.0; }
+#endif
 #ifdef CFLAGS_GOOL_DEBUG
       if (dbg->flags & GOOL_FLAG_PAUSED_CODE) {}
       else
 #endif
       if (elapsed_since >= wait) { /* if the required wait time (or more) has elapsed */
+#ifdef CFLAGS_HIRES_TEST
+        if (hires) { interp_factor = 0.0; }
+#endif
         obj->sp--;                 /* get rid of the now useless tag */
         res = GoolObjectInterpret(obj, GOOL_FLAG_SUSPEND_ON_ANIM, &response); /* ...and continue execution until another animation instruction is reached */
         if (ISERRORCODE(res)) { return res; } /* return on fail */
@@ -1243,7 +1260,27 @@ void GoolObjectTransform(gool_object *obj) {
     en = NSLookup(&anim->v.eid);
     if (en->type != 20) {
       svtx = NSLookup(&anim->v.eid);
-      GfxTransformSvtx((svtx_frame*)svtx->items[frame_idx], ot, obj);
+      svtx_frame *frame;
+      frame = (svtx_frame*)svtx->items[frame_idx];
+#ifdef CFLAGS_HIRES_TEST
+      next_frame = 0;
+      if (hires) {
+        if (svtx->item_count == 1) { 
+          next_frame = 0; 
+        }
+        else if (frame_idx == svtx->item_count-1) {
+          frame_idx--;
+          frame = svtx->items[frame_idx];
+          next_frame = svtx->items[frame_idx+1];
+          is_last_frame = 1;
+        }
+        else { 
+          is_last_frame = 0;
+          next_frame = (svtx_frame*)svtx->items[frame_idx+1];
+        }
+      }
+#endif
+      GfxTransformSvtx(frame, ot, obj);
     }
     else {
       cvtx = NSLookup(&anim->v.eid);
