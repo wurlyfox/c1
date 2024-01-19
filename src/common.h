@@ -31,8 +31,9 @@
 #define ERROR_NO_FREE_PAGES       -12
 #define ERROR_INVALID_REF         -10
 
-#define ISERRORCODE(v)   ((int)(v) < 0 && (int)(v) > -255)
-#define ISSUCCESSCODE(v) ((int)(v)==-255)
+#define ISERRORCODE(v)   ((int)(v) < 0 && (int)(v) > SUCCESS)
+/* can be used to check pointer status, which will have the most significant bit set and also be smaller than -255 */
+#define ISSUCCESSCODE(v) ((int)(v) <= SUCCESS) 
 #define ISCODE(v)        ((int)(v) < 0 && (int)(v) >= -255)
 
 /* aliases */
