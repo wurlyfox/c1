@@ -773,5 +773,5 @@ void GuiIgNavDisableKeyboard() {
 }
 
 int GuiIgKeyPressed(int key_code) {
-  return igIsKeyPressed(key_code, 0);
+  return igIsKeyPressed_Bool(key_code, 0);
 }
