@@ -1576,24 +1576,22 @@ static inline int GoolObjectColorByZone(gool_object *obj) {
 
 //----- (8001EB28) --------------------------------------------------------
 int GoolObjectColors(gool_object *obj) {
-  entry *zone;
-  zone_header *header;
   gool_header *g_header;
+  gool_object *collider;
   int invincibility_state, elapsed_since;
   int mod, val;
 
   invincibility_state = obj->invincibility_state;
   elapsed_since = frames_elapsed - obj->invincibility_stamp;
-  zone = obj->zone ? obj->zone : cur_zone;
-  header = (zone_header*)zone->items[0];
   switch (invincibility_state) { /* cases 3, 4, 5 all fall down to case 2 */
   case 4:
     if (elapsed_since > 60) /* 1s at 60fps */
       GoolObjectColorByZone(obj);
     if (obj->collider) {
-      g_header = (gool_header*)obj->global->items[0];
+      collider = obj->collider;
+      g_header = (gool_header*)collider->global->items[0];
       if (g_header->category == 0x300)
-        GoolSendEvent(obj, obj->collider, GOOL_EVENT_HIT_INVINCIBLE, 1, 0);
+        GoolSendEvent(obj, collider, GOOL_EVENT_HIT_INVINCIBLE, 1, 0);
     }
   case 3:
     if (invincibility_state == 3 && elapsed_since > 451) /* 7.5s at 60fps */
