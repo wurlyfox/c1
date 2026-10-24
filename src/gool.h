@@ -301,7 +301,12 @@ typedef struct {
 
 /* misc structure definitions */
 typedef struct {
-  bound;
+  union {
+    bound;
+#ifdef _WIN32
+    bound bound;
+#endif
+  };
   gool_object *obj;
 } gool_bound;
 
@@ -401,8 +406,8 @@ typedef struct {
   gool_debug *main_dbg;
 } gool_debug_cache;
 
-extern void GoolObjectPrint(gool_object *obj, FILE *stream);
-extern void GoolObjectPrintDebug(gool_object *obj, FILE *stream);
+extern int GoolObjectSummary(gool_object *obj, char *str);
+extern int GoolObjectSummaryDebug(gool_object *obj, char *str);
 extern gool_debug *GoolObjectDebug(gool_object *obj);
 extern void GoolObjectPause(gool_object *obj, int type, int trans);
 extern void GoolObjectResume(gool_object *obj, int type);

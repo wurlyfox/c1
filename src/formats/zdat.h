@@ -31,7 +31,7 @@
 typedef struct {
   union {
     eid_t eid;
-    entry *entry;
+    entry *en;
     uint32_t key;
     uint32_t tag;
   };

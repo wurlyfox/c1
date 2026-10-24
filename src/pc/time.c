@@ -4,7 +4,7 @@ int32_t ticks_base = 0;
 
 #ifdef _WIN32
 #include <windows.h>
-inline int32_t GetTicks() {
+static inline int32_t GetTicks() {
   LARGE_INTEGER _freq, _count;
   int64_t freq, count;
   int32_t ticks;

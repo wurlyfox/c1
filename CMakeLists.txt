@@ -21,23 +21,44 @@ add_compile_definitions(
 
 # Compiler flags
 if(MSVC)
-    add_compile_options(/W3 /utf-8)
+    add_compile_options(/W3 /utf-8 /wd4200 /Zc:zeroSizeArray-)
+    add_compile_definitions(_CRT_SECURE_NO_WARNINGS NOMINMAX WIN32_LEAN_AND_MEAN
+                            _USE_MATH_DEFINES)
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+        message(FATAL_ERROR
+            "The game code requires 32-bit pointers; target Win32 (cmake -A Win32).")
+    endif()
 else()
-    add_compile_options(-m32 -fplan9-extensions 
+    add_compile_options(-fplan9-extensions
                         -Wall -Wextra -Wno-unused-parameter -Wno-unused-function
                         -Wno-missing-braces)
-    add_link_options(-m32)
+    if(WIN32)
+        # MinGW: a 64-bit toolchain must be retargeted to 32-bit; a 32-bit
+        # (i686) toolchain needs nothing.
+        if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+            add_compile_options(-m32)
+            add_link_options(-m32)
+        endif()
+    else()
+        add_compile_options(-m32)
+        add_link_options(-m32)
 
-    # -m32 on a 64-bit Debian/Ubuntu host: resolve dependencies from the
-    # i386 multiarch directories instead of the x86_64 ones.
-    if(CMAKE_SIZEOF_VOID_P EQUAL 8 AND EXISTS "/usr/lib/i386-linux-gnu")
-        set(CMAKE_LIBRARY_ARCHITECTURE i386-linux-gnu)
-        set(ENV{PKG_CONFIG_LIBDIR}
-            "/usr/lib/i386-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig")
+        # -m32 on a 64-bit Debian/Ubuntu host: resolve dependencies from the
+        # i386 multiarch directories instead of the x86_64 ones.
+        if(CMAKE_SIZEOF_VOID_P EQUAL 8 AND EXISTS "/usr/lib/i386-linux-gnu")
+            set(CMAKE_LIBRARY_ARCHITECTURE i386-linux-gnu)
+            set(ENV{PKG_CONFIG_LIBDIR}
+                "/usr/lib/i386-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig")
+        endif()
     endif()
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(-g -O0)
     endif()
+endif()
+
+if(WIN32)
+    # main() stays a console entry point; skip SDL's main/WinMain redirection
+    add_compile_definitions(SDL_MAIN_HANDLED)
 endif()
 
 include(FetchContent)
@@ -118,6 +139,12 @@ target_link_libraries(cimgui PUBLIC ${SDL2_LIBRARIES} OpenGL::GL)
 
 # Fetch Fluidsynth and build as a static lib
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(BUILD_UNIT_TESTS  OFF CACHE BOOL "" FORCE)
+set(BUILD_DOC         OFF CACHE BOOL "" FORCE)
+set(BUILD_BY_DEFAULT  OFF CACHE BOOL "" FORCE)
+set(osal             "cpp11" CACHE STRING "" FORCE)
+set(enable-floats     ON  CACHE BOOL "" FORCE)
+
 foreach(opt alsa pulseaudio pipewire jack sndfile libsndfile dbus network readline
             openmp midishare coreaudio wasapi dsound winmidi waveout oss sdl2
             libinstpatch ladspa systemd opensles oboe portaudio)
@@ -127,8 +154,9 @@ endforeach()
 FetchContent_Declare(
     fluidsynth
     GIT_REPOSITORY https://github.com/FluidSynth/fluidsynth.git
-    GIT_TAG        v2.3.6
+    GIT_TAG        v2.5.0
     GIT_SHALLOW    TRUE
+    GIT_SUBMODULES ""
 )
 FetchContent_MakeAvailable(fluidsynth)
 

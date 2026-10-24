@@ -1,7 +1,7 @@
 #include <SDL2/SDL.h>
 #ifdef CFLAGS_GUI
 #define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
-#define CIMGUI_USE_SDL
+#define CIMGUI_USE_SDL2
 #include "cimgui.h"
 #include "cimgui_impl.h"
 #endif
@@ -27,6 +27,9 @@ extern eid_t insts[8];
 extern page_struct texture_pages[16];
 
 void SDLInit() {
+#ifdef _WIN32
+  SDL_SetMainReady();
+#endif
   SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
   window = SDL_CreateWindow("c1",
     SDL_WINDOWPOS_UNDEFINED,

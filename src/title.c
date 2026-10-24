@@ -387,7 +387,7 @@ int TitleUpdate(void *ot) {
     title->transition_state = 6; /* change transition state to 'started fading in' */
     if (next_display_flags & GOOL_FLAG_DISPLAY_IMAGES) { /* screen image in this state? */
       TitleCalcTiles(title, title->x_offs, title->y_offs); /* calculate infos for each tile, set draw modes, and get tpage ids */
-      TitleLoadImages(title, title->x_offs, title->y_offs); /* load tile textures into vram */
+      TitleLoadImages(&title->info, title->x_offs, title->y_offs); /* load tile textures into vram */
     }
     fade_counter = 288; /* reset fade counter again (in case it was changed) */
     break;
