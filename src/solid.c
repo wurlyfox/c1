@@ -820,7 +820,7 @@ static int ReplotWalls(int op, int flags, vec *next_trans, gool_object *obj) {
       node_bound.p2.y = node_bound.p1.y + (int32_t)node_rect.dim.h;
       dist.p1.y = node_bound.p1.y - next_trans->y;
       dist.p2.y = node_bound.p2.y - next_trans->y;
-      plot = ((flags == 0 && dist.p1.y<=(100<<8) && dist.p2.y>=(-400<<8)))
+      plot = ((flags == 0 && dist.p1.y<=(100<<8) && dist.p2.y>=-(400<<8)))
            || (flags == 1 && dist.p2.y>=0)
            || (flags != 0 && flags != 1);
       if (!plot) {
