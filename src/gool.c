@@ -1806,7 +1806,7 @@ int GoolObjectPhysics(gool_object *obj) {
 #else
   scale = min(context.ticks_per_frame, 0x66);
 #endif
-  if ((status_b & GOOL_FLAG_DPAD_CONTROL) && game_state == GAME_STATE_PLAYING) { /* dir controlled by joypad? */
+  if ((status_b & GOOL_FLAG_DPAD_CONTROL) && (game_state == GAME_STATE_PLAYING)) { /* dir controlled by joypad? */
     speed_scale = GoolObjectControlDir(obj, scale);
     /* calc velocity vector */
     tgt_ang_xz = obj->target_rot.x;
@@ -1856,7 +1856,7 @@ int GoolObjectPhysics(gool_object *obj) {
   }
   /* xz plane at height y=obj->process.floor_y is treated as solid ground? */
   /* beginning to touch or fall below it? */
-  if ((status_b & GOOL_FLAG_SOLID_GROUND) && obj->trans.y <= obj->floor_y) {
+  if ((status_b & GOOL_FLAG_SOLID_GROUND) && (obj->trans.y <= obj->floor_y)) {
     obj->trans.y = obj->floor_y; /* reposition */
     obj->status_a |= 1;
     obj->floor_impact_stamp = frames_elapsed; /* record timestamp */
