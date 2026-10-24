@@ -416,6 +416,7 @@ int GoolObjectSearchTree(
   }
   child = GoolObjectGetChildren(obj);
   if (!child) { return 0; }
+  res = 0;
   while (!res && child) {
     sibling = child->sibling;
     res = GoolObjectSearchTree(child, func, arg);
@@ -467,7 +468,6 @@ int GoolObjectHandleTraverseTreePostorder(
   while (child) {
     grandchild = child->children;
     sibling = child->sibling;
-    /* TODO: verify-should there be an else block somewhere here */
     while (grandchild) {
       next_grandchild = grandchild->sibling;
       res = GoolObjectTraverseTreePostorder(grandchild, func, arg);
@@ -525,16 +525,15 @@ int GoolFindNearestObject(gool_object *obj, gool_nearest_query *query) {
   maps = (gool_state_maps*)obj->global->items[3];
   state_idx = maps->event_map[query->event >> 8];
   if (state_idx == 0xFF) { /* null state index? */
-    if (query->event != GOOL_EVENT_HIT /* not a hit a event? */
-      || obj->invincibility_state == 2
-      || obj->invincibility_state == 3
-      || obj->invincibility_state == 4
-      || obj->status_c & 2) {
-      if ((query->event == GOOL_EVENT_HIT_INVINCIBLE && !(obj->state_flags & 0x800))
-        || query->event == GOOL_EVENT_WIN_BOSS) { /* hit when invincible or win boss? */
-        query->nearest_obj = obj; /* set as new nearest obj */
-        query->dist = dist; /* set as new min dist */
-      }
+    if ((query->event == GOOL_EVENT_HIT 
+      && obj->invincibility_state != 2 
+      && obj->invincibility_state != 3 
+      && obj->invincibility_state != 4
+      && !(obj->status_c & 2))
+     || (query->event == GOOL_EVENT_HIT_INVINCIBLE && !(obj->state_flags & 0x800))
+     || (query->event == GOOL_EVENT_WIN_BOSS)) { /* hit when invincible or win boss? */
+      query->nearest_obj = obj; /* set as new nearest obj */
+      query->dist = dist; /* set as new min dist */
     }
     return 0;
   }
@@ -556,7 +555,9 @@ int GoolFindNearestObject(gool_object *obj, gool_nearest_query *query) {
   }
   states = (gool_state*)obj->global->items[4];
   state = &states[state_idx];
-  if (obj->invincibility_state >= 2 && obj->invincibility_state <= 4)
+  if (obj->invincibility_state == 2 
+   || obj->invincibility_state == 3
+   || obj->invincibility_state == 4)
     flag = (obj->status_c | 0x1002) & state->flags;
   else
     flag = obj->status_c & state->flags;
