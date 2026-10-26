@@ -116,21 +116,50 @@ target_compile_definitions(cimgui PRIVATE "IMGUI_IMPL_API=extern \"C\"")
 target_compile_definitions(cimgui PUBLIC IMGUI_DISABLE_OBSOLETE_FUNCTIONS=1)
 target_link_libraries(cimgui PUBLIC ${SDL2_LIBRARIES} OpenGL::GL)
 
-# Fetch Fluidsynth and build as a static lib
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-foreach(opt alsa pulseaudio pipewire jack sndfile libsndfile dbus network readline
-            openmp midishare coreaudio wasapi dsound winmidi waveout oss sdl2
-            libinstpatch ladspa systemd opensles oboe portaudio)
-    set(enable-${opt} OFF CACHE BOOL "" FORCE)
-endforeach()
+# Locate Fluidsynth system installation
+find_package(Fluidsynth QUIET)
 
-FetchContent_Declare(
-    fluidsynth
-    GIT_REPOSITORY https://github.com/FluidSynth/fluidsynth.git
-    GIT_TAG        v2.3.6
-    GIT_SHALLOW    TRUE
-)
-FetchContent_MakeAvailable(fluidsynth)
+if(NOT FluidSynth_FOUND)
+    find_package(PkgConfig QUIET)
+    if(PKG_CONFIG_FOUND)
+        pkg_check_modules(FLUIDSYNTH QUIET fluidsynth)
+    endif()
+endif()
+
+if(TARGET FluidSynth::fluidsynth)
+    message(STATUS "Found installed FluidSynth CMake target")
+    set(FLUIDSYNTH_LIBRARIES FluidSynth::fluidsynth)
+    set(FLUIDSYNTH_INCLUDE_DIRS "")
+elseif (FLUIDSYNTH_FOUND)
+    message(STATUS "Found installed FluidSynth via pkg-config")
+    add_library(FluidSynth::fluidsynth INTERFACE IMPORTED)
+    target_include_directories(FluidSynth::fluidsynth INTERFACE ${FLUIDSYNTH_INCLUDE_DIRS})
+    target_link_libraries(FluidSynth::fluidsynth INTERFACE ${FLUIDSYNTH_LIBRARIES})
+    set(FLUIDSYNTH_LIBRARIES FluidSynth::fluidsynth)
+else()
+    message(STATUS "FluidSynth not found locally; fetching via FetchContent...")
+
+    # Fetch Fluidsynth and build as a static lib
+    foreach(opt alsa pulseaudio pipewire jack sndfile libsndfile dbus network readline
+                openmp midishare coreaudio wasapi dsound winmidi waveout oss sdl2
+                libinstpatch ladspa systemd opensles oboe portaudio)
+        set(enable-${opt} OFF CACHE BOOL "" FORCE)
+    endforeach()
+
+    FetchContent_Declare(
+        fluidsynth
+        GIT_REPOSITORY https://github.com/FluidSynth/fluidsynth.git
+        GIT_TAG        v2.3.6
+        GIT_SHALLOW    TRUE
+    )
+    FetchContent_MakeAvailable(fluidsynth)
+
+    set(FLUIDSYNTH_LIBRARIES libfluidsynth)
+    set(FLUIDSYNTH_INCLUDE_DIRS
+        ${fluidsynth_SOURCE_DIR}/include
+        ${fluidsynth_BINARY_DIR}/include
+    )
+endif()
 
 # Core source files
 file(GLOB C1_CORE_SOURCES
@@ -148,7 +177,7 @@ file(GLOB_RECURSE C1_EXT_SOURCES
     "src/util/*.c"
 )
 
-add_library(c1_core STATIC 
+add_library(c1_core 
     ${C1_CORE_SOURCES}
     ${C1_EXT_SOURCES}
 )
@@ -168,15 +197,14 @@ target_include_directories(c1 PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
     ${cimgui_SOURCE_DIR}
     ${imgui_SOURCE_DIR}
-    ${fluidsynth_SOURCE_DIR}/include
-    ${fluidsynth_BINARY_DIR}/include
+    ${FLUIDSYNTH_INCLUDE_DIRS}
 )
 
 target_link_libraries(c1 PRIVATE
     c1_core
     ${SDL2_LIBRARIES}
     OpenGL::GL
-    libfluidsynth
+    ${FLUIDSYNTH_LIBRARIES}
     cimgui
 )
 
