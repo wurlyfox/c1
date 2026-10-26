@@ -2187,8 +2187,8 @@ int GoolObjectInterpret(gool_object *obj, uint32_t flags, gool_state_ref *transi
       GoolObjectPush(obj,sl<=sr);
       break;
     case 0xD:
-      G_TRANS_GOPS(obj,instruction,r,l);
-      GoolObjectPush(obj,l%r);
+      G_TRANS_GOPS(obj,instruction,sr,sl);
+      GoolObjectPush(obj,sl%sr);
       break;
     case 0xE:
       G_TRANS_GOPS(obj,instruction,a,b);
