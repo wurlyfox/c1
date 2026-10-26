@@ -1021,6 +1021,7 @@ int GoolObjectChangeState(gool_object *obj, uint32_t state, int argc, uint32_t *
   else
     obj->tp = 0;
   header = (gool_header*)exec->items[0];
+  obj->once_p = 0; 
   obj->fp = (uint32_t*)&obj->process;
   obj->sp = (uint32_t*)&obj->process + header->init_sp;
   obj->status_a |= GOOL_FLAG_FIRST_FRAME | GOOL_FLAG_KEEP_EVENT_STACK;
