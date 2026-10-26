@@ -867,11 +867,13 @@ int GoolObjectKill(gool_object *obj, int sig) {
 
 //----- (8001D11C) --------------------------------------------------------
 int GoolZoneObjectTerminate(gool_object *obj, entry *zone) {
+  entry *old_zone;
   if (obj->handle.type == 0 || obj->zone != zone
-   || ((obj->status_b & 0x1000000) && (obj->state_flags & 0x40000)))
+   || (obj->status_b & 0x1000000) || (obj->state_flags & 0x40000))
     return SUCCESS;
+  old_zone = obj->zone;
   GoolSendEvent(0, obj, GOOL_EVENT_TERMINATE, 0, 0);
-  if (obj->zone == zone || (int)obj_zone == -1)
+  if (obj->zone == old_zone || (int)obj_zone == -1)
     return GoolObjectKill(obj, 0);
   return SUCCESS;
 }
