@@ -240,11 +240,10 @@ static Volume AudioSpatialize(vec *v, int vol) {
 void AudioVoiceFree(gool_object *obj) {
   audio_voice *voice;
   generic res;
-  int i, count;
+  int i;
 
   if (!obj) { return; }
-  count = max_midi_voices;
-  for (i=0;i<24;i++) {
+  for (i=max_midi_voices;i<24;i++) {
     voice = &voices[i];
     if ((voice->flags & 8) && voice->obj == obj) {
       ramp_rate = 9;
