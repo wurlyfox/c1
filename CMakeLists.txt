@@ -11,6 +11,9 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
 endif()
 
+# Option to toggle shared libraries
+option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
+
 # Preprocessor definitions
 add_compile_definitions(
     CFLAGS_GFX_SW_PERSP
@@ -60,18 +63,28 @@ if(NOT SDL2_FOUND)
         GIT_TAG        release-2.30.x
         GIT_SHALLOW    TRUE
     )
-    set(SDL_SHARED OFF CACHE BOOL "" FORCE)
-    set(SDL_STATIC ON CACHE BOOL "" FORCE)
+    if (BUILD_SHARED_LIBS)
+        set(SDL_SHARED ON CACHE BOOL "" FORCE)
+        set(SDL_STATIC OFF CACHE BOOL "" FORCE)
+    else()
+        set(SDL_SHARED OFF CACHE BOOL "" FORCE)
+        set(SDL_STATIC ON CACHE BOOL "" FORCE)
+    endif()
     set(SDL_TEST OFF CACHE BOOL "" FORCE)
     set(SDL2_DISABLE_UNINSTALL ON CACHE BOOL "" FORCE)
     FetchContent_MakeAvailable(SDL2)
-    set(SDL2_LIBRARIES SDL2::SDL2-static)
+    if (BUILD_SHARED_LIBS)
+        set(SDL2_LIBRARIES SDL2::SDL2)
+    else()
+        set(SDL2_LIBRARIES SDL2::SDL2-static)
+    endif()
 else()
     set(SDL2_LIBRARIES SDL2::SDL2)
 endif()
 
+# always build ImGui as a static library
 set(IMGUI_STATIC ON CACHE BOOL "" FORCE)
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+
 set(BUILD_UNIT_TESTS OFF CACHE BOOL "" FORCE)
 
 # Fetch cimgui directly
