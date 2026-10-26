@@ -158,7 +158,7 @@ int TitleLoadState() {
   eid_t eid;
   char eid_str[8], eid_char;
   uint32_t fov;
-  int i, state, type;
+  int i, type;
 
   title_pause_state = 0;
   switch (title->state) { /* get fov for this menu state */
@@ -219,7 +219,7 @@ int TitleLoadState() {
   screen_ro.y = 0;
   switch (title->state) {
   case 1: case 2: case 3: case 4:
-    dword_800618B8 = ~state;
+    dword_800618B8 = ~title->state;
     break;
   case 5: case 6: case 8: case 12: case 13: case 14: case 15:
     TitleLoadScreen(&eid, type); /* load title-specific zone */
