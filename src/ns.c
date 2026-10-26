@@ -1174,6 +1174,8 @@ int NSCountAvailablePages2(void *list, int len) {
   int cache_size;
   int i, ii, count;
 
+  count = 0;
+  cache_size = 0;
   ref = (entry_ref**)list;
   for (i=0;i<len;i++) {
     if ((*ref)->is_eid)
