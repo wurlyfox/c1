@@ -588,6 +588,8 @@ int CamUpdate() {
           }
           n_path_idx = i;
         }
+        else
+          neighbor_path = path_s1->neighbor_paths[n_path_idx];
         zone_s1 = path_s1->parent_zone;
         path_s1 = ZoneGetNeighborPath(zone_s1, path_s1, n_path_idx);
         if (neighbor_path.goal & 1)
