@@ -226,8 +226,7 @@ int GoolObjectOrientOnPath(gool_object *obj, int progress, vec *loc) {
   uint32_t status_a, status_b;
   vec *trans, *zone_loc, loc_next, dist_obj, dot, dir;
   zone_entity_path_point *path_pt, *next_pt; // $a0
-  uint32_t dist_xz;
-  int32_t x, z, proj, proj_part;
+  int32_t x, z, dist_xz, proj, proj_part;
 
   entity = obj->entity;
   if (!obj || !entity) { return ERROR; }
@@ -279,7 +278,7 @@ int GoolObjectOrientOnPath(gool_object *obj, int progress, vec *loc) {
     dot.x = (dist_obj.x>>4)*(dir.x>>4);
     dot.z = (dist_obj.z>>4)*(dir.z>>4);
     /* compute the scalar projection: (A . B) / ||B||^2 */
-    proj = (dot.x+dot.z)/((int32_t)dist_xz*(int32_t)dist_xz);
+    proj = (dot.x+dot.z)/(dist_xz*dist_xz);
     if (proj >= 0x100) { /* too far of a corresponding change in progress? */
       idx_next = idx+1;
       if (idx < path_length-1)
@@ -289,16 +288,16 @@ int GoolObjectOrientOnPath(gool_object *obj, int progress, vec *loc) {
        [compute the vector projection in the order:
        ((A . B) / ||B||) x (B / ||B||)
        to avoid precision errors] */
-    proj_part = ((dot.x + dot.z)/(int32_t)dist_xz);
-    x = abs((((proj_part>>4)*(dir.x>>4))/(int32_t)dist_xz) - dist_obj.x);
-    z = abs((((proj_part>>4)*(dir.z>>4))/(int32_t)dist_xz) - dist_obj.z);
+    proj_part = ((dot.x + dot.z)/dist_xz);
+    x = abs((((proj_part>>4)*(dir.x>>4))/dist_xz) - dist_obj.x);
+    z = abs((((proj_part>>4)*(dir.z>>4))/dist_xz) - dist_obj.z);
     /* do a sort of manhattan distance calc
        is this moment of inertia? */
     if (z<x)
       obj->misc_c.y = x + z/2;
     else
       obj->misc_c.y = z + x/2;
-    if (obj->misc_c.y > obj->_154 || proj >= 0x100 || idx == 0) {
+    if (obj->misc_c.y > obj->_154 || proj >= 0x100 || (proj < 0 && idx == 0)) {
       obj->status_a |= 0x200;
     }
     if (dir.z*(trans->x>>8)-dir.x*(trans->z>>8)
