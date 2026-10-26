@@ -3354,7 +3354,7 @@ static inline void GoolOpReactSolidSurfaces(gool_object *obj, uint32_t instructi
   case 4:
   case 5:
     flag1 = 0; flag2 = 0;
-    if (sop == 3 || sop == 4) { flag1 = 1; }
+    if (sop == 4 || sop == 5) { flag1 = 1; }
     if (sop == 3 || sop == 5) { flag2 = 1; }
     trans3 = obj->trans;
     zone = obj->zone ? obj->zone : cur_zone;

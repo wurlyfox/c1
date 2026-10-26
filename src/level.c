@@ -658,6 +658,7 @@ entry *ZoneFindNeighbor(entry *zone, vec *v) {
 uint16_t ZoneFindNode(zone_rect *zone_rect, uint16_t root, rect _rect, vec *va, vec *vb, int level) {
   zone_octree *tree;
   rect child_rect;
+  bound child_bound;
   uint16_t node, child_node;
   uint16_t *child_nodes;
   vec corner;
@@ -727,8 +728,12 @@ uint16_t ZoneFindNode(zone_rect *zone_rect, uint16_t root, rect _rect, vec *va, 
           child_rect.loc.x = _rect.loc.x + (int32_t)(i?child_rect.dim.w:0);
           child_rect.loc.y = _rect.loc.y + (int32_t)(j?child_rect.dim.h:0);
           child_rect.loc.z = _rect.loc.z + (int32_t)(k?child_rect.dim.d:0);
+          child_bound.p1 = child_rect.loc;
+          child_bound.p2.x = child_rect.loc.x + child_rect.dim.w;
+          child_bound.p2.y = child_rect.loc.y + child_rect.dim.h;
+          child_bound.p2.z = child_rect.loc.z + child_rect.dim.d;
           child_node = child_nodes[idx++];
-          if (TestPointInRect(&child_rect, va)) {
+          if (TestPointInBound(va, &child_bound)) {
             res = ZoneFindNode(zone_rect, child_node, child_rect, va, vb, level+1);
             if (res) { return res; }
           }
