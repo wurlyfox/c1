@@ -1241,15 +1241,21 @@ static inline entry *NSResolve(nsd_pte *pte) {
   return pte->entry;
 }
 
+#ifdef CFLAGS_BUGFIXES
+#define NSProbe NSProbeSafe
+#endif
+
 //----- (80015A98) --------------------------------------------------------
 entry *NSLookup(void *en_ref) {
   entry_ref *ref;
   nsd_pte *pte;
   ref = (entry_ref*)en_ref;
   if (ref->is_eid)
-    pte = ref->pte = NSProbe(ref->eid);
-  else
-    pte = ref->pte; /* ??? */
+    ref->pte = NSProbe(ref->eid);
+  pte = ref->pte; /* ??? */
+#ifdef CFLAGS_BUGFIXES
+  if (ISERRORCODE(pte)) return (entry*)pte;
+#endif
   return NSResolve(pte);
 }
 
