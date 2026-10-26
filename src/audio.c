@@ -373,6 +373,7 @@ int AudioVoiceCreate(gool_object *obj, eid_t *eid, int vol) {
   }
 #else
   adio = NSLookup(eid);
+  if (ISERRORCODE(adio)) { return -1; } /* return error on failed lookup */
   size = adio->items[1]-adio->items[0];
   SwLoadSample(idx, adio->items[0], size);
 #endif
