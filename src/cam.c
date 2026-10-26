@@ -49,7 +49,7 @@ typedef struct {
 
 extern entry *cur_zone;
 extern zone_path *cur_path;
-extern uint32_t cur_progress;
+extern int32_t cur_progress;
 
 extern pad pads[2];
 extern gool_object *crash;
@@ -707,7 +707,7 @@ int CamDeath(int *count) {
     dcam_rot_y2 = ang_xz; /* angular distance around the below circle circumference */
     dcam_accel = 22;
     cam_rot.x += dcam_angvel; /* rotate cam in xz plane towards the vertex */
-    *(count)++;
+    (*count)++;
   }
   /* calculate the angle in the yz plane */
   ang_yz = atan2(v_vert.y, dist_xz);
