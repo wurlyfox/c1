@@ -1492,6 +1492,9 @@ void GfxLoadWorlds(zone_header *header) {
   for (i=0;i<header->world_count;i++) {
     world=&header->worlds[i];
     wgeo=NSLookup(&world->eid);
+#ifdef CFLAGS_BUGFIXES
+    if (ISERRORCODE(wgeo)) { continue; } /* skip on failed lookup */
+#endif
     w_header=(wgeo_header*)wgeo->items[0];
     if (w_header->is_backdrop) {
       world->trans.x=0;
