@@ -1723,9 +1723,6 @@ void GfxTransformWorldsDark(void *ot) {
   int32_t far;
   int i,shamt;
 
-#ifdef CFLAGS_BUGFIXES
-  prims_tail = 0;
-#endif
   if (!cur_poly_ids->len) { return; }
   header=(zone_header*)cur_zone->items[0];
   worlds=header->worlds;
@@ -1763,6 +1760,7 @@ void GfxTransformWorldsDark(void *ot) {
     world=&params.worlds[i];
     world->tag=(shamt<<16)|far; /* tag is unioned with wgeo */
   }
+  prims_tail=GLGetPrimsTail();
   SwTransformWorldsDark(cur_poly_ids,ot,0x800-(screen_proj/2),draw_count,prims_tail,&params);
 #endif
 }
