@@ -1275,7 +1275,7 @@ int FindCeilY(
     node = (result->node << 1) | 1;
     level = result->level;
     type = (node & 0xE) >> 1;
-    if (type != (type_a-1) || type != (type_b-1)) { continue; }
+    if (type != (type_a-1) && type != (type_b-1)) { continue; }
     nbound.p1.x = (result->x << 4) + nodes_bound->p1.x;
     nbound.p1.y = (result->y << 4) + nodes_bound->p1.y;
     nbound.p1.z = (result->z << 4) + nodes_bound->p1.z;

@@ -67,8 +67,6 @@
 
 ### Toxic Waste
 
-- solid ceiling is not detected
-
 ### Pinstripe
 
 ### The High Road
