@@ -3,7 +3,6 @@
 ## General
 
 - colors are slightly different from psx (map differently?)
-- main death sequence camera behavior is incorrect
 - title sequence background images become too bright in some instances
 - it is sometimes (but rarely) possible to jump in mid-air when beside walls
 - demo mode does not function correctly

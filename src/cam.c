@@ -663,6 +663,7 @@ int CamUpdate() {
   }
 }
 
+
 //----- (8002BAB4) --------------------------------------------------------
 int CamDeath(int *count) {
   entry *svtx, *tgeo;
@@ -684,7 +685,7 @@ int CamDeath(int *count) {
   tgeo = NSLookup(&frame->tgeo);
   /* get [unrotated] vertex in the current frame referenced by the gool object */
   vert = &frame->vertices[cam_spin_obj_vert >> 8];
-  t_header = (tgeo_header*)&tgeo->items[0];
+  t_header = (tgeo_header*)tgeo->items[0];
   u_vert.x = ((int8_t)(vert->x - 128) + frame->x) << 10; /* 10 bit frac to 20 bit frac */
   u_vert.y = ((int8_t)(vert->y - 128) + frame->y) << 10;
   u_vert.z = ((int8_t)(vert->z - 128) + frame->z) << 10;
@@ -720,7 +721,7 @@ int CamDeath(int *count) {
   /* rotate cam in yz plane towards the vertex */
   cam_rot.y = GoolObjectRotate(cam_rot.y, -ang_yz, dcam_angvel2, 0);
   if (cur_display_flags & GOOL_FLAG_SPIN_ACCEL) {
-    dcam_angvel2 += dcam_accel; /* accelerate?? no further usage of this value... */
+    dcam_rot_y1 += dcam_accel; /* accelerate?? no further usage of this value... */
     cam_rot.x += dcam_accel; /* additional rotation??? */
   }
   /* move camera up towards the vertex */
