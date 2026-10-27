@@ -74,7 +74,7 @@
 
 ### Lights Out
 
-- shading is incorrect
+- object shading is incorrect
 
 ### Fumbling in the Dark
 
