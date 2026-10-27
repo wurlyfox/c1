@@ -3,7 +3,6 @@
 ## General
 
 - colors are slightly different from psx (map differently?)
-- a few sfx are very loud and distorted (ex. warp sound, also when entering a bonus round)
 - main death sequence camera behavior is incorrect
 - title sequence background images become too bright in some instances
 - it is sometimes (but rarely) possible to jump in mid-air when beside walls

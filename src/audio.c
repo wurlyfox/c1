@@ -650,10 +650,11 @@ void AudioUpdate() {
       fade_vol_step = 0; /* stop fading */
     }
     fade_vol += fade_vol_step; /* increase/decrease volume */
+    vol = fade_vol >> 7;
 #ifdef PSX
-    SsSetMVol(fade_vol, fade_vol); /* set master volume */
+    SsSetMVol(vol, vol); /* set master volume */
 #else
-    SwSetMVol(fade_vol);
+    SwSetMVol(vol);
 #endif
   }
 #ifdef PSX
