@@ -272,7 +272,7 @@ int TitleLoading(lid_t lid, uint8_t *image_data, nsd *nsd) {
 #else
   rect2 rect;
 #endif
-  uint16_t *palette, *src, *dst;
+  /* uint16_t *palette, *src, *dst; */
   uint32_t w, h;
   uint8_t *buf;
 
@@ -312,13 +312,15 @@ int TitleLoading(lid_t lid, uint8_t *image_data, nsd *nsd) {
     GpuSwapBuffers();
   }
 #else
+  /*
   palette = (uint16_t*)&image_data[0];
-  src = (uint16_t*)&image_data[512]; /* skip palette */
+  src = (uint16_t*)&image_data[512]; // skip palette
   dst = (uint16_t*)image_cvt;
+  */
   rect.x = context.draw_clip.x - (w/2) - 256;
   rect.y = context.draw_clip.y - (h/2) + 108;
   rect.w = w; rect.h = h;
-  TextureCopy((uint8_t*)src, (uint8_t*)dst, &rect.dim, 0, 0, 0, palette, 2, 2, 3);
+  // TextureCopy((uint8_t*)src, (uint8_t*)dst, &rect.dim, 0, 0, 0, palette, 2, 2, 3);
   GLDrawImage(&rect.dim, (uint8_t*)image_cvt, &rect.loc);
 #endif
   ns.draw_skip_counter = 2;
