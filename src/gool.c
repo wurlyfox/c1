@@ -2990,9 +2990,9 @@ int GoolOpChangeAnim(gool_object *obj, uint32_t instruction, uint32_t *flags) {
   obj->anim_seq = anim;
   GoolObjectPush(obj, (wait << 24) | frames_elapsed);
   if (flip == 0)
-    obj->scale.x = -abs(obj->scale.x);
-  else if (flip == 1)
     obj->scale.x = abs(obj->scale.x);
+  else if (flip == 1)
+    obj->scale.x = -abs(obj->scale.x);
   else if (flip == 2)
     obj->scale.x = -obj->scale.x;
   if (obj->status_b & 0x18) { /* object is solid and stopped by solid matter */
@@ -3015,9 +3015,9 @@ int GoolOpChangeAnimFrame(gool_object *obj, uint32_t instruction, uint32_t *flag
   obj->anim_frame = frame_idx;
   GoolObjectPush(obj, (wait << 24) | frames_elapsed);
   if (flip == 0)
-    obj->scale.x = -abs(obj->scale.x);
-  else if (flip == 1)
     obj->scale.x = abs(obj->scale.x);
+  else if (flip == 1)
+    obj->scale.x = -abs(obj->scale.x);
   else if (flip == 2)
     obj->scale.x = -obj->scale.x;
   GoolObjectLocalBound(obj, &obj->scale);

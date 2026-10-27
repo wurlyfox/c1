@@ -80,8 +80,6 @@
 
 ### Jaws of Darkness
 
-- spider or shadow rotation angle is incorrect
-
 ### Castle Machinery
 
 ### N. Brio
