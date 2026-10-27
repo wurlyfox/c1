@@ -176,7 +176,7 @@ static int CamGetProgress(vec *trans, zone_path *path, cam_info *cam, int flags,
 
 //----- (8002A3EC) --------------------------------------------------------
 static int CamGetProgress2(vec *trans, zone_path *path, cam_info *cam, int flags, int flag) {
-  vec trans_pt, rel_path, dot, adjust, v_dist;
+  vec trans_pt, rel_path, adjust, v_dist;
   entry *zone;
   zone_rect *rect;
   int32_t dist, dist_nearest;
@@ -279,7 +279,7 @@ static void CamFollow(gool_object *obj, uint32_t flag) {
   zone_header *header;
   zone_path *path, *n_path;
   zone_neighbor_path neighbor_path;
-  vec trans, cam_offset_new;
+  vec trans;
   int32_t progress, new_progress, old_progress;
   int32_t seek_pan, seek_zoom, new_pan, new_zoom, total_zoom;
   int32_t delta_dist, dist_exit, dist_nearest;
@@ -336,7 +336,7 @@ static void CamFollow(gool_object *obj, uint32_t flag) {
   }
   seek_pan = 0; new_pan = 0; /* seek_pan/seek_zoom boolean vals are inverted in orig impl */
   seek_zoom = 0; new_zoom = 0;
-  for (i=0;i<cur_path->neighbor_path_count;i++) { /* get nearest neighbor paths */
+  for (i=0;i<(int)cur_path->neighbor_path_count;i++) { /* get nearest neighbor paths */
     neighbor_path = cur_path->neighbor_paths[i];
     if (neighbor_path.relation & flags) {
       n_path = ZoneGetNeighborPath(cur_zone, cur_path, i);
@@ -393,7 +393,7 @@ static void CamFollow(gool_object *obj, uint32_t flag) {
       cameras[icam].flags = 2;
     icam++;
   }
-  for (i=0;i<cur_path->neighbor_path_count;i++) {
+  for (i=0;i<(int)cur_path->neighbor_path_count;i++) {
     neighbor_path = cur_path->neighbor_paths[i];
     if ((neighbor_path.goal & 4) /* timed override of neighbor cam? */
       && frames_elapsed - gem_stamp > 15) {
@@ -572,7 +572,7 @@ int CamUpdate() {
         n_progress = progress + 0x100;
       n_path_idx = -1;
       if (n_progress >= (path_s1->length << 8)) {
-        for (i=0;i<path_s1->neighbor_path_count;i++) {
+        for (i=0;i<(int)path_s1->neighbor_path_count;i++) {
           neighbor_path = path_s1->neighbor_paths[i];
           if (neighbor_path.goal == next_island_cam_state
            || (n_path_idx == -1 && (path_s1->neighbor_path_count == 1
@@ -580,7 +580,7 @@ int CamUpdate() {
             n_path_idx = i;
         }
         if (n_path_idx == -1) {
-          for (i=0;i<path_s1->neighbor_path_count;i++) {
+          for (i=0;i<(int)path_s1->neighbor_path_count;i++) {
             neighbor_path = path_s1->neighbor_paths[i];
             if (!(neighbor_path.goal & 4)) {
               break;
@@ -618,7 +618,7 @@ int CamUpdate() {
     return 1;
   case 8:
     n_path_idx = -1;
-    for (i=0;i<cur_path->neighbor_path_count;i++) {
+    for (i=0;i<(int)cur_path->neighbor_path_count;i++) {
       neighbor_path = cur_path->neighbor_paths[i];
       if ((neighbor_path.relation & 3) == ((island_cam_state & 3)^3)) { /* i.e. 3 - level_count */
         n_path_idx = i;

@@ -122,7 +122,7 @@ static void TitleLoadScreen(eid_t *eid, int type) {
   paused = 0;
   pause_status = -1;
   GoolForEachObjectHandle(
-    (gool_ifnptr2_t)GoolObjectHandleTraverseTreePostorder,
+    (gool_ifnptr2_t)(void*)GoolObjectHandleTraverseTreePostorder,
     (int)GoolObjectTerminate,
     0);
   if (type == 0) {
@@ -267,15 +267,14 @@ int TitleKill() {
 int TitleLoading(lid_t lid, uint8_t *image_data, nsd *nsd) {
 #ifdef PSX
   rect216 rect;
+  int32_t x, y;
+  int i,j,k,l;
 #else
-  dim2 dim;
   rect2 rect;
 #endif
-  int32_t x, y;
+  uint16_t *palette, *src, *dst;
   uint32_t w, h;
   uint8_t *buf;
-  uint16_t *palette, *src, *dst;
-  int i,j,k,l;
 
   if (!nsd->has_loading_image || !nsd->loading_image_width || !nsd->loading_image_height)
     return SUCCESS;
@@ -319,7 +318,7 @@ int TitleLoading(lid_t lid, uint8_t *image_data, nsd *nsd) {
   rect.x = context.draw_clip.x - (w/2) - 256;
   rect.y = context.draw_clip.y - (h/2) + 108;
   rect.w = w; rect.h = h;
-  //TextureCopy((uint8_t*)src, (uint8_t*)dst, &rect.dim, 0, 0, 0, palette, 2, 2, 3);
+  TextureCopy((uint8_t*)src, (uint8_t*)dst, &rect.dim, 0, 0, 0, palette, 2, 2, 3);
   GLDrawImage(&rect.dim, (uint8_t*)image_cvt, &rect.loc);
 #endif
   ns.draw_skip_counter = 2;
@@ -361,12 +360,14 @@ int TitleUpdate(void *ot) {
   SPRT_16 *sprite;
   DR_MODE *dr_mode;
 #else
-  uint32_t tile_cvt[16*16];
-  uint32_t *subimage;
+#ifdef PSX
+   uint32_t tile_cvt[16*16];
+   uint32_t *subimage;
+   int x, y;
+#endif
   rect2 rect;
   dim2 sdim, ddim;
   pnt2 dloc;
-  int x, y;
 #endif
   tileinfo *cur;
   int transition_state;
@@ -381,7 +382,7 @@ int TitleUpdate(void *ot) {
   case 0: /* start of game? */
     title->unk7 = 0;
     title->unk8 = 0;
-  case 1: /* blank screen? */
+   case 1: /* blank screen? */
     next_display_flags |= GOOL_FLAG_DISPLAY | GOOL_FLAG_ANIMATE; /* set display flags */
     fade_counter = 288; /* reset fade counter */
     title->transition_state = 6; /* change transition state to 'started fading in' */
@@ -448,7 +449,7 @@ int TitleUpdate(void *ot) {
   }
   else if (title->transition_state == 7) { /* finished fading out? */
     GoolForEachObjectHandle( /* kill all objects spawned in this title state */
-      (gool_ifnptr2_t)GoolObjectHandleTraverseTreePostorder,
+      (gool_ifnptr2_t)(void*)GoolObjectHandleTraverseTreePostorder,
       (int)GoolObjectTerminate,
       0);
     if (title->at_title) /* at a title card/splash? */
@@ -561,8 +562,10 @@ void TitleLoadImages(timginfo *info, int x_offs, int y_offs) {
   mdat_header *header;
   imag_tile *tile;
   tileinfo *tileinfo;
+#ifdef PSX
   uvinfo *uvinfo;
   rect216 rect;
+#endif
   int x_idx, y_idx, w_idx, h_idx;
   int i, ii, idx;
 #ifdef PSX
@@ -578,7 +581,6 @@ void TitleLoadImages(timginfo *info, int x_offs, int y_offs) {
       y_idx = i+(y_offs>>4);
       if (x_idx >= w_idx || y_idx >= h_idx) { continue; }
       tileinfo = &info->tileinfos[i+(ii*16)];
-      uvinfo = &info->uvinfos[i+(ii*16)];
       tileinfo->x = x_offs+(ii*16);
       tileinfo->y = y_offs+(i*16);
       mdat = NSLookup(&title->mdat);
@@ -587,6 +589,7 @@ void TitleLoadImages(timginfo *info, int x_offs, int y_offs) {
       tile = (imag_tile*)imag->items[y_idx];
       tileinfo->clut_idx = tile->clut_id;
 #ifdef PSX
+      uvinfo = &info->uvinfos[i+(ii*16)];
       rect.x = (uvinfo->u_idx*8)+256; /* color mode 1; actual memory size of pixel region is half that of 16 bit pixel region */
       rect.y = (uvinfo->v_idx*16)+256;
       rect.w = 8; /* color mode 1 */
@@ -668,7 +671,7 @@ void TitleLoadEntries(int state, int flag, int count) {
         ipal = NSLookup(&header->ipals[ipal_idx]);
         clut = ipal->items[i % 120];
         line = &header->clut_lines[line_idx];
-        if (clut_idx >= line->clut_count) {
+        if (clut_idx >= (int)line->clut_count) {
           clut_idx = 0;
           line_idx++;
         }

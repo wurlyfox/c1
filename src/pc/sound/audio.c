@@ -47,7 +47,6 @@ static void SampleNext(sampler_t *sampler, int len, int16_t *data) {
   sample_t *sample;
   double t;
   int16_t *p, s;
-  int loop_len;
   int i, idx;
   
   sample = sampler->sample;
@@ -125,8 +124,6 @@ static void AudioCallback(void *userdata, uint8_t *stream, size_t size) {
 
 void SwAudioInit() {
   SDL_AudioSpec spec;
-  svoice_t *voice;
-  sampler_t *sampler;
   int i;
 
   m_amp = 1.0;

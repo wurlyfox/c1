@@ -541,7 +541,7 @@ int ReflGetOffsetA(void *data, refl_field *field, int idx) {
   refl_field *f;
   uint8_t *data_base;
   size_t size;
-  int count, offset, offs_base, offs_max;
+  int offset, offs_base, offs_max;
   int i;
 
   offset = ReflGetOffset(data, field);
@@ -565,7 +565,7 @@ int ReflGetOffsetA(void *data, refl_field *field, int idx) {
         data_base = (uint8_t*)data + offset;
         offs_base = offset + ReflGetOffset(data_base, f);
         size = ReflGetSize(data_base, f);
-        offs_max = max(offs_base + size, offs_max);
+        offs_max = max(offs_base + size, (size_t)offs_max);
       }
       offset = offs_max;
     }
@@ -588,7 +588,6 @@ int ReflGetOffsetA(void *data, refl_field *field, int idx) {
  * \returns size_t - size
  */
 size_t ReflGetSize(void *data, refl_field *field) {
-  refl_field *f;
   size_t size;
   int count, offset;
 
@@ -642,7 +641,7 @@ size_t ReflGetSizeA(void *data, refl_field *field, int idx) {
       data_base = (uint8_t*)data + offset;
       offs_base = offset + ReflGetOffset(data_base, f);
       size = ReflGetSize(data_base, f);
-      offs_max = max(offs_base + size, offs_max);
+      offs_max = max(offs_base + size, (size_t)offs_max);
     }
     size = offs_max - offset;
   }
@@ -936,10 +935,9 @@ refl_value ReflGetParent(void *data, refl_field *field, refl_type *ptype, char *
  * \return int - string length
  */
 int ReflStrlen(void* data, refl_field *field, int idx) {
-  char *str;
-  int i, offset, len;
+  int i, len;
 
-  offset=ReflGetOffset(data, field);
+  ReflGetOffset(data, field);
   for (i=0;i<idx;i++)
     data = (uint8_t*)data + strlen(data) + 1;
   len = strlen(data);
@@ -1099,8 +1097,8 @@ static void *ReflTraverseC(refl_context *context) {
 static void **ReflTraverseR(refl_context *context) {
   refl_type *type, *subtype;
   refl_field *f;
-  void *data, **mapped, **a_mapped, **children;
-  int i, ii, fcount, count;
+  void *data, **mapped, **a_mapped;
+  int i, ii, count;
 
   data = context->data;
   type = context->type;

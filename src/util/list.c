@@ -107,7 +107,6 @@ int list_contains_node(list_t *list, list_node_t *node) {
 
 list_node_t *list_pop_node(list_t *list, int idx) {
   list_node_t *n;
-  void *d;
   int i;
 
   if (idx == -1) { n = list->tail; }
@@ -269,7 +268,6 @@ list_t *list_distinct(list_t *list) {
 
 int list_swap(list_t *list, void *ldata, void *rdata) {
   list_node_t *l, *r;
-  void *tmp;
 
   list_first_node(list, l, l->data == ldata);
   if (l==0) { return 0; }
@@ -305,7 +303,7 @@ list_t *list_intersection(list_t *src, list_t *dst, void *(*map_eq)(void*,void*)
 
 list_t *list_difference(list_t *src, list_t *dst, int (*eq)(void*,void*)) {
   list_t *list;
-  void *s, *d, *v;
+  void *s, *d;
 
   list = list_new();
   if (!eq) {

@@ -3,7 +3,7 @@
 //#include "mmalloc.h"
 
 tree_node_t *tree_node_next_ancestor(tree_node_t *node, tree_node_t *root) {
-  while (node=node->parent) {
+  while ((node=node->parent)) {
     if (node == root) { return 0; }
     if (node->next) { return node->next; }
   }
@@ -32,7 +32,7 @@ tree_node_t *tree_node_next_cousin(tree_node_t *node, tree_node_t *root) {
 }
 
 tree_node_t *tree_node_prev_ancestor(tree_node_t *node, tree_node_t *root) {
-  while (node=node->parent) {
+  while ((node=node->parent)) {
     if (node == root) { return 0; }
     if (node->prev) { return node->prev; }
   }
@@ -272,10 +272,13 @@ int tree_node_level(tree_node_t *node) {
  * \returns tree_node_t* - [possibly new] root of the tree
  */
 tree_node_t *tree_swap_nodes(tree_node_t *l, tree_node_t *r) {
+  /*/
   tree_node_t *lparent, *lprev, *lchild, *rparent, *rprev, *rchild;
   tree_node_t *lh_child, *lt_child, *rh_child, *rt_child;
-  tree_node_t *it, *root;
-  void *data;
+  tree_node_t *it;
+  */
+  tree_node_t *lparent, *lprev, *rparent, *rprev;
+  tree_node_t *root;
 
   /* this variant is not intended for swapping nodes in separate trees
      as such, if l and r are the respective roots of 2 separate trees
@@ -383,7 +386,7 @@ int tree_remove(tree_node_t *root, void *data) {
  * \returns tree_node_t* - [possibly new] root of the tree, or 0 if value cannot be found
  */
 tree_node_t *tree_remove_inherit(tree_node_t *root, void *data) {
-  tree_node_t *n, *p, *it, *next;
+  tree_node_t *n;
 
   tree_first_node(root, n, n->data == data);
   if (n == 0) { return 0; }
@@ -600,7 +603,7 @@ tree_node_t *tree_map(tree_node_t *root, void *(*map)(void*)) {
  */
 tree_node_t *tree_map_postorder(tree_node_t *root, void *(*map)(void*, void**)) {
   tree_node_t *mapped, **c_mapped, *it, *mc;
-  void *data, **cd_mapped, *md;
+  void **cd_mapped, *md;
   int count, i;
 
   count=tree_child_count(root);
@@ -634,7 +637,7 @@ tree_node_t *tree_map_postorder(tree_node_t *root, void *(*map)(void*, void**)) 
  * \returns - new object
  */
 void *tree_map_to(tree_node_t *root, void *(*map)(void*, void**)) {
-  void *mapped, **c_mapped, *data;
+  void *mapped, **c_mapped;
   tree_node_t *it;
   int i, count;
 
@@ -662,9 +665,9 @@ void *tree_map_to(tree_node_t *root, void *(*map)(void*, void**)) {
  * \returns - new tree root node
  */
 tree_node_t *tree_map_from(void *data, void **child_fn(void*), void *(*map)(void*)) {
-  void *mapped, **children, *child;
-  tree_node_t *root, *parent, *mc;
-  int i, count;
+  void **children, *child;
+  tree_node_t *root, *mc;
+  int i;
 
   root=tree_node_new();
   root->data=map?map(data):data;
@@ -706,7 +709,7 @@ void tree_delta_free(tree_delta_t *delta) {
  */
 list_t *tree_changes(tree_node_t *src, tree_node_t *dst) {
   /* flatten src and dst; then get src - dst, dst - src */
-  tree_node_t *sr, *node, *sn, *dn, *nl, *nr, *it;
+  tree_node_t *sr, *node, *sn, *dn, *nl, *nr;
   tree_delta_t *delta;
   list_t *sf, *df, *sd, *dd, *sc, *dl;
   int si, di;
@@ -921,7 +924,7 @@ int tree_strs_len = 0;
 #define max(a,b) ((a)>(b)?(a):(b))
 void *tree_node_str(void *data) {
   char buf[32];
-  int i, len, plen;
+  int len;
 
   sprintf(buf, "%i", *(int*)data);
   len = strlen(buf);
@@ -944,7 +947,7 @@ void tree_str_r(tree_node_t *root, list_t *columns, text_column *pcol, int level
     /* odd number of children and middle child? */
     if ((count % 2) && (i == (count/2))) {
       column = pcol; /* reuse the parent node's column */
-      column->w = max(column->w, strlen(it->data));
+      column->w = max((size_t)column->w, strlen(it->data));
     }
     else {
       len = strlen(it->data);
@@ -982,11 +985,11 @@ static void tree_str_c(tree_node_t *strs, list_t *columns) {
 
 char *tree_str(tree_node_t *root) {
   list_t columns;
-  tree_node_t *strs, *n;
+  tree_node_t *strs;
   text_column *column;
   text_cell *cell;
   int i, level, found;
-  int tree_str_len, cpad;
+  int cpad;
   char *str;
 
   /* map the tree to a tree of strings */

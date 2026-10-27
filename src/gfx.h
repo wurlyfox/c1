@@ -16,9 +16,9 @@
 
 extern int TgeoOnLoad(entry *tgeo);
 
-extern int GfxInitMatrices();
+extern void GfxInitMatrices();
 extern void GfxUpdateMatrices();
-extern int GfxResetCam(vec *trans);
+extern void GfxResetCam(vec *trans);
 extern int GfxCalcObjectMatrices(svtx_frame *frame, tgeo_header *t_header,
   gool_object *obj, int flag, int32_t *zdist);
 extern void GfxTransformSvtx(svtx_frame *frame, void *ot, gool_object *obj);

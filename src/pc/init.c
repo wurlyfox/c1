@@ -1,7 +1,7 @@
 #include <SDL2/SDL.h>
 #ifdef CFLAGS_GUI
 #define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
-#define CIMGUI_USE_SDL
+#define CIMGUI_USE_SDL2
 #include "cimgui.h"
 #include "cimgui_impl.h"
 #endif
@@ -74,6 +74,7 @@ void SDLUpdate() {
     case SDL_MOUSEBUTTONUP:
     case SDL_MOUSEBUTTONDOWN:
       mousel = e.type == SDL_MOUSEBUTTONDOWN;
+      break;
     case SDL_MOUSEMOTION:
       mousex = e.motion.x;
       mousey = e.motion.y;
@@ -129,4 +130,5 @@ int init() {
 int _kill() {
   GLKill();
   SDLKill();
+  return 0;
 }

@@ -20,7 +20,7 @@
 #endif
 
 int GLCreateTexture(dim2 dim, uint8_t *buf) {
-  int texid;
+  GLuint texid;
 
   glGenTextures(1, &texid);
   glActiveTexture(GL_TEXTURE0);
@@ -32,11 +32,12 @@ int GLCreateTexture(dim2 dim, uint8_t *buf) {
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, dim.w, dim.h, 0,
     GL_RGBA, GL_UNSIGNED_BYTE, buf);
   glBindTexture(GL_TEXTURE_2D, 0);
-  return texid;
+  return (int)texid;
 }
 
 void GLDeleteTexture(int texid) {
-  glDeleteTextures(1, &texid);
+  GLuint gl_texid = (GLuint)texid;
+  glDeleteTextures(1, &gl_texid);
 }
 
 void GLUpdateTexture(int texid, rect2 rect, uint8_t *buf) {
@@ -75,8 +76,7 @@ void GLKillGui() {
 int textures_inited=0;
 /* gl */
 int GLInit(gl_callbacks *_callbacks) {
-  rect2 window;
-  int i;
+  
 
   callbacks = *_callbacks;
 #ifdef CFLAGS_GUI
@@ -287,7 +287,7 @@ void GLAddPrim(void *prim, int idx) {
 
   ps = (prim_struct*)prim;
   if (!context.ot[idx]) { return; }
-  for (it=context.ot[idx];(next=PRIM_NEXT(it))&&next->type;it=next);
+  for (it=context.ot[idx];(next=PRIM_NEXT(it))&&next->type;it=next) { /* empty */ }
   PRIM_SETNEXT(it,ps);
   PRIM_SETNEXT(ps,next);
 }
@@ -329,7 +329,7 @@ static void GLConvertToTris(void *ot, poly3i **tris, int *count) {
   src = (uint8_t*)prim;
   dst = (uint8_t*)*tris;
   ot_idx = 0;
-  while (src = (uint8_t*)prim) {
+  while ((src = (uint8_t*)prim)) {
     if (prim->type == 1) {
       *(poly3i*)dst = *(poly3i*)src;
 #ifdef CFLAGS_GFX_SW_PERSP
@@ -428,9 +428,6 @@ void GLClear() {
 }
 
 void GLUpdate() {
-  zone_header *header;
-  rgb8 fill;
-  int fh;
   int ticks_elapsed, elapsed_since;
   gl_input gl_input;
 

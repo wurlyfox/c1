@@ -26,9 +26,9 @@ add_compile_definitions(
 if(MSVC)
     add_compile_options(/W3 /utf-8)
 else()
-    add_compile_options(-m32 -fplan9-extensions 
+    add_compile_options(-m32 $<$<COMPILE_LANGUAGE:C>:-fplan9-extensions> 
                         -Wall -Wextra -Wno-unused-parameter -Wno-unused-function
-                        -Wno-missing-braces)
+                        -Wno-missing-braces -Wno-implicit-fallthrough)
     add_link_options(-m32)
 
     # -m32 on a 64-bit Debian/Ubuntu host: resolve dependencies from the

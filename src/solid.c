@@ -884,7 +884,7 @@ int StopAtWalls(vec *trans, int x, int z, int *adj_x, int *adj_z, gool_object *o
       *adj_z = z;
       return ret+2;
     }
-    for (i=0;i<sizeof(sorted_points)/sizeof(vec28);i++) {
+    for (i=0;i<(int)(sizeof(sorted_points)/sizeof(vec28));i++) {
       offs = sorted_points[i];
       ox = offs.x; oz = offs.y;
       if  (TestWall(tx=x+ox,tz=z+oz)
@@ -965,7 +965,7 @@ static void ZoneQueryOctreeR(
   zone_query_result *results,
   int *result_count,
   int level) {
-  int16_t *children;
+  uint16_t *children;
   zone_query_result *result;
   rect subrect;
   int i, j, k, idx, flags, mask;
@@ -1255,7 +1255,8 @@ int FindCeilY(
   dim zone_dim;
   vec max_depth;
   int16_t node;
-  int i, level, type, subtype;
+  int i, level, type;
+
   sum_y1 = 0; count = 0;
   result = &query->results[0];
   for (i=0;i<query->result_count;i++) {
@@ -1274,7 +1275,6 @@ int FindCeilY(
     node = (result->node << 1) | 1;
     level = result->level;
     type = (node & 0xE) >> 1;
-    subtype = (node & 0x3F0) >> 4;
     if (type != (type_a-1) || type != (type_b-1)) { continue; }
     nbound.p1.x = (result->x << 4) + nodes_bound->p1.x;
     nbound.p1.y = (result->y << 4) + nodes_bound->p1.y;

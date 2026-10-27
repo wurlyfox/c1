@@ -186,7 +186,6 @@ gui_item *GuiGroupNew() {
 
 gui_item *GuiTextNew(char *str, char *label) {
   gui_item *item;
-  int len;
 
   item = GuiItemNew();
   item->type = text;
@@ -331,14 +330,13 @@ gui_item *GuiNodeMap(void *data, void **c_mapped) {
 
   item = GuiNodeNew(data, _node_unparse);
   if (!c_mapped) { return item; }
-  for (i=0;it=c_mapped[i];i++) {
+  for (i=0;(it=c_mapped[i]);i++) {
     GuiAddChild(item, it);
   }
   return item;
 }
 
 gui_item *GuiTreeNode(gui_item *tree, void *data) {
-  gui_item *item;
   gui_tree *tr;
   gui_tree_sync *sync;
   tree_node_t *n;

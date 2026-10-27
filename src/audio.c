@@ -483,7 +483,9 @@ void AudioControl(int id, int op, generic *arg, gool_object *obj) {
 #endif
   Volume volume;
   audio_voice *voice; // $s3
-  audio_voice_params *params; // $s0
+#ifdef PSX
+   audio_voice_params *params;
+#endif
   vec v; // [sp+90h] [-28h] BYREF
   int i;
 
@@ -643,7 +645,7 @@ void AudioUpdate() {
       fade_vol = 0; /* lower limit at 0 */
       fade_vol_step = 0; /* stop fading */
     }
-    if (fade_vol_step > 0 && 0x3FFF - fade_vol < fade_vol_step) { /* fading in and fade_vol > fade_vol - fade_vol_step ? */
+    if (fade_vol_step > 0 && 0x3FFF - fade_vol < (uint32_t)fade_vol_step) { /* fading in and fade_vol > fade_vol - fade_vol_step ? */
       fade_vol = 0x3FFF; /* upper limit fade_vol at 0x3FFF */
       fade_vol_step = 0; /* stop fading */
     }
@@ -659,7 +661,7 @@ void AudioUpdate() {
   SpuGetAllKeysStatus(keys_status);
 #else
 #define KEYS_STATUS_ON 1
-  SwGetAllKeysStatus(keys_status);
+  SwGetAllKeysStatus((uint8_t*)keys_status);
 #endif
   flag=0;
   for (i=max_midi_voices;i<24;i++) {
