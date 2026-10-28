@@ -36,7 +36,10 @@ SRC =	src/ns.c \
 
 # test sources (run with utest.h), plus the game sources they test
 TEST_SRC = $(wildcard tests/*.c) \
-	src/pc/pad.c
+	src/pc/pad.c \
+	src/ext/lib/gui.c \
+	src/util/tree.c \
+	src/util/list.c
 
 OBJ = $(SRC:.c=.o)
 OUT = c1
@@ -48,8 +51,8 @@ INCLUDE = -I./src/
 # C compiler flags (-g -O3 -Wall)
 DEFS = -DCFLAGS_GFX_SW_PERSP -DCFLAGS_DRAW_EXTENSIONS -DCFLAGS_GUI -DCFLAGS_GOOL_DEBUG
 CFLAGS = -g -fplan9-extensions -m32 -std=gnu17 -Wno-error=incompatible-pointer-types
-TEST_CFLAGS = -g -m32 -std=gnu17
-TEST_LDLIBS = -lSDL2
+TEST_CFLAGS = -g -fplan9-extensions -m32 -std=gnu17
+TEST_LDLIBS = -lSDL2 -lstdc++
 ifeq ($(OS),Windows_NT)
 LDLIBS = -lmingw32 -lSDL2main -lSDL2 -lopengl32 -lfluidsynth-3 -lm -lstdc++
 OUT = build/c1.exe
@@ -74,6 +77,8 @@ CIMGUI_OBJ = $(CIMGUI_PATH)/imgui/backends/imgui_impl_opengl2.o \
 	$(CIMGUI_PATH)/cimgui.o
 INCLUDE += -I$(CIMGUI_PATH) -I$(CIMGUI_PATH)/imgui
 OBJ = $(CIMGUI_OBJ)
+# the tests use the in-game gui library but not the sdl/opengl backends
+TEST_CIMGUI_OBJ = $(filter-out $(CIMGUI_PATH)/imgui/backends/%,$(CIMGUI_OBJ))
 OBJ += $(SRC:.c=.o)
 
 all: $(SRC) $(OUT)
@@ -118,6 +123,6 @@ endif
 test: $(TEST_OUT)
 	./$(TEST_OUT)
 
-$(TEST_OUT): $(TEST_SRC) tests/utest.h
+$(TEST_OUT): $(TEST_SRC) tests/utest.h $(TEST_CIMGUI_OBJ)
 	@mkdir -p $(dir $(TEST_OUT))
-	$(CC) $(INCLUDE) $(TEST_SRC) -o $(TEST_OUT) $(TEST_CFLAGS) $(TEST_LDLIBS)
+	$(CC) $(INCLUDE) $(TEST_SRC) $(TEST_CIMGUI_OBJ) -o $(TEST_OUT) $(TEST_CFLAGS) $(TEST_LDLIBS)
