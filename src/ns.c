@@ -220,15 +220,25 @@ static uint8_t *NSTransferFile(ns_filedesc *fd, uint8_t *buf, int flag) {
   return realloc(buf, fd->size); /* realloc to non sector size multiple */
 }
 #else
+#include <SDL2/SDL_messagebox.h>
 
 uint8_t *NSFileReadRange(char *filename, int start, int end, size_t *size) {
   FILE *file;
   size_t tmp;
   uint8_t *data;
+  char msg[256];
 
   if (end == 0 || (end != -1 && start >= end)) { return 0; }
   if (size == 0) { size = &tmp; }
-  file = fopen(filename, "r");
+  file = fopen(filename, "rb");
+  if (!file) {
+    snprintf(msg, sizeof(msg), "Could not open %s\n\n"
+      "Copy the game's .NSD/.NSF files into the streams directory "
+      "(see streams/README.md).", filename);
+    fprintf(stderr, "%s\n", msg);
+    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "c1", msg, 0);
+    exit(1);
+  }
   fseek(file, 0, SEEK_END);
   end = end == -1 ? ftell(file) : end;
   *size = end - start;

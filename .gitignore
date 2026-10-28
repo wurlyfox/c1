@@ -1,6 +1,7 @@
 # compile output
 *.o
 c1
+build/
 
 # user files
 streams/*

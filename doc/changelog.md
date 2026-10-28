@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-10-28
+
+### Added
+
+- Windows build support via MSYS2 MinGW32; `c1.exe` and the DLLs it needs are output to `build/`
+- `streams/` is also found next to or one directory above the executable, so it no longer has to be run from the project directory
+- `tools/extract_streams.py` for extracting asset files from a `.bin`/`.iso` disc image
+- error message naming the missing file when an asset file cannot be opened
+
+### Fixed
+
+- build fails with GCC 15+ (C23 default); now builds as gnu17
+- crash while loading the soundfont in 32-bit builds with FluidSynth 2.2+ (loader callback signatures did not match)
+- asset files were opened in text mode, which corrupts them on Windows
+- README controls list did not match the actual key bindings
+
 ## 2022-12-28
 
 ### Fixed

@@ -57,7 +57,7 @@ static void *mem_open(const char *filename) {
   stream->p = buf->data;
   return (void*)stream;
 }
-static int mem_read(void *buf, int count, void *handle) {
+static int mem_read(void *buf, fluid_long_long_t count, void *handle) {
   mstream_t *stream;
 
   stream = (mstream_t*)handle;
@@ -65,7 +65,7 @@ static int mem_read(void *buf, int count, void *handle) {
   stream->p += count;
   return FLUID_OK;
 }
-static int mem_seek(void *handle, long offset, int origin) {
+static int mem_seek(void *handle, fluid_long_long_t offset, int origin) {
   mstream_t *stream;
 
   stream = (mstream_t*)handle;
@@ -84,9 +84,9 @@ static int mem_close(void *handle) {
   free(stream);
   return FLUID_OK;
 }
-static long mem_tell(void *handle) {
+static fluid_long_long_t mem_tell(void *handle) {
   mstream_t *stream;
-  long offset;
+  fluid_long_long_t offset;
 
   stream = (mstream_t*)handle;
   offset = stream->p - stream->start;

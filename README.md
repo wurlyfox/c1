@@ -13,7 +13,7 @@ At the moment the game is only partially playable with a number of currently ide
 
 ## Compiling ##
 
-As of currently, compilation has only been tested on Ubuntu/Debian. However, the game should build on any system with a working 32-bit GNU toolchain and other dependencies listed below.
+As of currently, compilation has only been tested on Ubuntu/Debian and on Windows (MSYS2 MinGW32). However, the game should build on any system with a working 32-bit GNU toolchain and other dependencies listed below.
 
 Note that only 32-bit target executables are currently supported. If you are not already running a 32-bit OS, you will need multilib versions of gcc and g++ and 32-bit versions of the dependencies.
 
@@ -35,6 +35,15 @@ Ubuntu/Debian:
 - 64-bit: `sudo apt install build-essential gcc-multilib g++-multilib libstdc++6:i386 libgl1-mesa-dev:i386 libsdl2-dev:i386 libfluidsynth-dev:i386`
 - 32-bit: `sudo apt install build-essential libstdc++6 libgl1-mesa-dev libsdl2-dev libfluidsynth-dev`
 
+Windows (MSYS2):
+
+1. Install [MSYS2](https://www.msys2.org/) (e.g. `winget install MSYS2.MSYS2`).
+2. From an MSYS2 shell: `pacman -S --needed make mingw-w64-i686-gcc mingw-w64-i686-SDL2 mingw-w64-i686-fluidsynth`
+3. Open the **MSYS2 MINGW32** shell, `cd` into the project directory and run `make`. This produces `build/c1.exe` and copies the DLLs it needs next to it (see below).
+4. Run `build/c1.exe`, either from the project directory or by double-clicking it. The game looks for `streams/` in the working directory, then next to the executable, then in the directory above it.
+
+`c1.exe` links dynamically against SDL2, FluidSynth (and its audio codec dependencies) and the GCC runtime. Windows only looks for DLLs next to the executable or on `PATH`, so outside the MINGW32 shell the game fails to start with an error such as *"libfluidsynth-3.dll was not found"*. To avoid this, the Windows build has an extra `dlls` step that runs after linking. It recursively follows `c1.exe`'s imports and copies each one found in the MinGW32 `bin` directory (currently 17 DLLs) into `build/`. To re-copy them on their own, run `make dlls`. The `build` directory is ignored by git, and `make clean` removes it. To run the game on another machine, copy the `build` directory with the `streams` directory beside it (or inside it).
+
 #### psx ####
 (note: psx build currently does not work)
 
@@ -42,9 +51,17 @@ Ubuntu/Debian:
 
 ## Running ##
 
-To run c1, `cd` into the main project directory and run `./c1`.
+To run c1, `cd` into the main project directory and run `./c1` (`build/c1.exe` on Windows).
 
 Copies of the asset files from the Crash Bandicoot game disc are needed for the game to function. Asset files are the (.NSD/.NSF) files located in the `/S0`, `/S1`, `/S2`, and `/S3` directories, respectively. Each of these files must be copied from its respective `/S*` directory into the `/streams` directory. Additionally, after copying files to the `/streams` directory, they must renamed from the uppercase format `S00000%%.NS[F,D]` to the lowercase format `s00000%%.ns[f,d]`.
+
+If you have a disc image (`.bin` or `.iso`) made from a copy of the game you own, rather than the disc itself, `tools/extract_streams.py` does all of the above in one step. It reads the image directly, including raw 2352-byte-sector `.bin` dumps that many tools cannot open:
+
+```
+python tools/extract_streams.py crash.bin
+```
+
+If an asset file is missing, the game shows a *"Could not open ./streams/…"* error naming the file and exits.
 
 The game is hardcoded to boot into level `25` (aka. title sequence/main menu screen(s)). To choose a different boot level, redefine the `LID_BOOTLEVEL` constant in `common.h` and recompile.
 
@@ -53,11 +70,13 @@ The game is hardcoded to boot into level `25` (aka. title sequence/main menu scr
 - X - <kbd>Z</kbd>
 - square - <kbd>X</kbd>
 - circle - <kbd>C</kbd>
-- triangle - <kbd>V</kbd>
+- triangle - <kbd>S</kbd>
 - L1 - <kbd>A</kbd>
-- R1 - <kbd>S</kbd>
+- R1 - <kbd>D</kbd>
 - L2 - <kbd>Q</kbd>
-- R2 - <kbd>W</kbd>
+- R2 - <kbd>E</kbd>
+- L3 - <kbd>1</kbd>
+- R3 - <kbd>3</kbd>
 - d-pad up - <kbd>&#8593;</kbd>
 - d-pad down - <kbd>&#8595;</kbd>
 - d-pad left - <kbd>&#8592;</kbd>
@@ -66,6 +85,8 @@ The game is hardcoded to boot into level `25` (aka. title sequence/main menu scr
 - select - <kbd>Space</kbd>
 - toggle in-game GUI - <kbd>Esc</kbd>
 - toggle in-game GUI keyboard focus - <kbd>Tab</kbd>
+
+Key bindings are defined in the `pad_mappings` table in `src/pc/pad.c`; edit it and recompile to change them.
 
 ## Structure ##
 Project structure is listed below, including descriptions for each file.
@@ -150,6 +171,8 @@ Note that further documentation can be found in the `doc` directory.
 │       ├── refl.c,h         # game-specific type metadata
 │       └── disgool.c,h      # GOOL disassembler
 ├── streams                  # game assets (.NSD/.NSF files)
+├── tools                    # helper scripts
+│   └── extract_streams.py   # extracts game assets from a disc image
 ├── Makefile                 # project makefile
 └── README.md                # project overview; this file
 ```

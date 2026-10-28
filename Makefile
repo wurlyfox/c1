@@ -42,8 +42,13 @@ INCLUDE = -I./src/
 
 # C compiler flags (-g -O3 -Wall)
 DEFS = -DCFLAGS_GFX_SW_PERSP -DCFLAGS_DRAW_EXTENSIONS -DCFLAGS_GUI -DCFLAGS_GOOL_DEBUG
+CFLAGS = -g -fplan9-extensions -m32 -std=gnu17 -Wno-error=incompatible-pointer-types
+ifeq ($(OS),Windows_NT)
+LDLIBS = -lmingw32 -lSDL2main -lSDL2 -lopengl32 -lfluidsynth-3 -lm -lstdc++
+OUT = build/c1.exe
+else
 LDLIBS = -lSDL2 -lGL -lfluidsynth -lm -lstdc++
-CFLAGS = -g -fplan9-extensions -m32
+endif
 CFLAGS += $(LDLIBS) $(DEFS)
 
 # compiler/make
@@ -67,6 +72,9 @@ all: $(SRC) $(OUT)
 
 clean:
 	rm -r $(OBJ) $(OUT)
+ifeq ($(OS),Windows_NT)
+	rm -rf $(dir $(OUT))
+endif
 
 #install:
 #	...
@@ -78,4 +86,21 @@ $(CIMGUI_OBJ):
 	$(CC) $(INCLUDE) -c $< -o $@ $(CFLAGS)
 
 $(OUT): $(OBJ)
+	@mkdir -p $(dir $(OUT))
 	$(CC) $(OBJ) -o $(OUT) $(CFLAGS)
+ifeq ($(OS),Windows_NT)
+	$(MAKE) dlls
+
+# copy the toolchain dlls c1.exe depends on into build/, so it runs outside msys2
+DLLDIR = $(dir $(shell which gcc))
+dlls: $(OUT)
+	@todo="$(OUT)"; seen=""; \
+	while [ -n "$$todo" ]; do set -- $$todo; f=$$1; shift; todo="$$*"; \
+	  for d in $$(objdump -p "$$f" | sed -n 's/.*DLL Name: //p' | tr -d '\r'); do \
+	    [ -f "$(DLLDIR)$$d" ] || continue; \
+	    case " $$seen " in *" $$d "*) ;; *) seen="$$seen $$d"; todo="$$todo $(DLLDIR)$$d";; esac; \
+	  done; \
+	done; \
+	for d in $$seen; do cp -u "$(DLLDIR)$$d" $(dir $(OUT)); done; \
+	echo "copied dlls:$$seen"
+endif

@@ -132,11 +132,23 @@ static int GuiObjCodeUnparse(void *data, char *str) {
     sprintf(str, "non-handle object selected");
     return 1;
   }
+#ifdef _WIN32
+  /* no open_memstream on windows; go through a temp file */
+  stream = tmpfile();
+  if (!stream) { return 0; }
+  GoolObjectPrintDebug(obj, stream);
+  size = ftell(stream);
+  rewind(stream);
+  size = fread(str, 1, size, stream);
+  fclose(stream);
+  str[size] = 0;
+#else
   stream = open_memstream(&code, &size);
   GoolObjectPrintDebug(obj, stream);
   fclose(stream);
   memcpy(str, code, size);
   str[size] = 0;
+#endif
   return 1;
 }
 #endif

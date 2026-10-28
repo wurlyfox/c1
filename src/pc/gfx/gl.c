@@ -2,6 +2,14 @@
  * opengl pc gfx backend
  */
 #include <GL/gl.h>
+#ifdef _WIN32
+/* opengl32.dll only exports gl 1.1; load newer functions at runtime */
+#include <GL/glext.h>
+static PFNGLACTIVETEXTUREPROC pglActiveTexture;
+static PFNGLBLENDEQUATIONPROC pglBlendEquation;
+#define glActiveTexture pglActiveTexture
+#define glBlendEquation pglBlendEquation
+#endif
 #include "gl.h"
 #include "pcgfx.h"
 #include "globals.h"
@@ -79,6 +87,10 @@ int GLInit(gl_callbacks *_callbacks) {
   int i;
 
   callbacks = *_callbacks;
+#ifdef _WIN32
+  pglActiveTexture = (PFNGLACTIVETEXTUREPROC)callbacks.proc_addr("glActiveTexture");
+  pglBlendEquation = (PFNGLBLENDEQUATIONPROC)callbacks.proc_addr("glBlendEquation");
+#endif
 #ifdef CFLAGS_GUI
   GLInitGui();
 #endif
