@@ -9,7 +9,7 @@ typedef struct {
   uint32_t bits;
 } sw_pad_mapping;
 
-const sw_pad_mapping pad_mappings[16] = {
+const sw_pad_mapping pad_default_mappings[16] = {
   { .code = SDL_SCANCODE_SPACE,  .bits = PAD_SELECT   },
   { .code = SDL_SCANCODE_1,      .bits = PAD_L3       },
   { .code = SDL_SCANCODE_3,      .bits = PAD_R3       },
@@ -27,6 +27,10 @@ const sw_pad_mapping pad_mappings[16] = {
   { .code = SDL_SCANCODE_Z,      .bits = PAD_CROSS    },
   { .code = SDL_SCANCODE_X,      .bits = PAD_SQUARE   },
 };
+
+/* current bindings; set to the defaults on first use */
+sw_pad_mapping pad_mappings[16];
+static int pad_mappings_set = 0;
 
 /* button names used in controls files */
 const struct {
@@ -57,6 +61,7 @@ uint32_t SwPadRead(int idx) {
 
   held = 0;
   if (idx != 0) { return held; } /* pad 1 only for now */
+  if (!pad_mappings_set) { PadResetBindings(); }
   count = sizeof(pad_mappings)/sizeof(sw_pad_mapping);
   for (i=0;i<count;i++) {
     code = pad_mappings[i].code;
@@ -114,7 +119,8 @@ int PadParseBinding(const char *line, uint32_t *bits, SDL_Scancode *code) {
 
 /* restore the built-in default bindings */
 void PadResetBindings() {
-  /* not implemented yet */
+  memcpy(pad_mappings, pad_default_mappings, sizeof(pad_mappings));
+  pad_mappings_set = 1;
 }
 
 /*
@@ -123,5 +129,31 @@ void PadResetBindings() {
  * returns the number of bindings applied, or -1 if the file can't be opened.
  */
 int PadLoadConfig(const char *path) {
-  return 0; /* not implemented yet */
+  FILE *file;
+  char line[128];
+  uint32_t bits;
+  SDL_Scancode code;
+  int i, count, res, line_num, applied;
+
+  file = fopen(path, "rb");
+  if (!file) { return -1; }
+  if (!pad_mappings_set) { PadResetBindings(); }
+  count = sizeof(pad_mappings)/sizeof(sw_pad_mapping);
+  applied = 0;
+  for (line_num=1;fgets(line, sizeof(line), file);line_num++) {
+    res = PadParseBinding(line, &bits, &code);
+    if (res == -1) {
+      fprintf(stderr, "%s:%d: invalid binding, expected \"button = key name\"\n",
+        path, line_num);
+      continue;
+    }
+    if (res == 0) { continue; }
+    for (i=0;i<count;i++) {
+      if (pad_mappings[i].bits == bits)
+        pad_mappings[i].code = code;
+    }
+    applied++;
+  }
+  fclose(file);
+  return applied;
 }
