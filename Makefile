@@ -34,8 +34,9 @@ SRC =	src/ns.c \
 	src/ext/refl.c \
 	src/ext/disgool.c
 
-# test sources (run with utest.h)
-TEST_SRC = $(wildcard tests/*.c)
+# test sources (run with utest.h), plus the game sources they test
+TEST_SRC = $(wildcard tests/*.c) \
+	src/pc/pad.c
 
 OBJ = $(SRC:.c=.o)
 OUT = c1
