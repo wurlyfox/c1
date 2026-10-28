@@ -29,7 +29,8 @@ const sw_pad_mapping pad_default_mappings[16] = {
 };
 
 /* current bindings; set to the defaults on first use */
-sw_pad_mapping pad_mappings[16];
+sw_pad_mapping pad_mappings[64];
+int pad_mapping_count;
 static int pad_mappings_set = 0;
 
 /* button names used in controls files */
@@ -62,7 +63,7 @@ uint32_t SwPadRead(int idx) {
   held = 0;
   if (idx != 0) { return held; } /* pad 1 only for now */
   if (!pad_mappings_set) { PadResetBindings(); }
-  count = sizeof(pad_mappings)/sizeof(sw_pad_mapping);
+  count = pad_mapping_count;
   for (i=0;i<count;i++) {
     code = pad_mappings[i].code;
     if (keys[code]) {
@@ -119,26 +120,41 @@ int PadParseBinding(const char *line, uint32_t *bits, SDL_Scancode *code) {
 
 /* restore the built-in default bindings */
 void PadResetBindings() {
-  memcpy(pad_mappings, pad_default_mappings, sizeof(pad_mappings));
+  memcpy(pad_mappings, pad_default_mappings, sizeof(pad_default_mappings));
+  pad_mapping_count = sizeof(pad_default_mappings)/sizeof(sw_pad_mapping);
   pad_mappings_set = 1;
 }
 
+/* remove every key bound to the given button */
+static void PadUnbind(uint32_t bits) {
+  int i, count;
+
+  count = 0;
+  for (i=0;i<pad_mapping_count;i++) {
+    if (pad_mappings[i].bits != bits)
+      pad_mappings[count++] = pad_mappings[i];
+  }
+  pad_mapping_count = count;
+}
+
 /*
- * load key bindings from a controls file, replacing the default key for
- * each button it lists. invalid lines are reported and skipped.
+ * load key bindings from a controls file. the first line for a button
+ * replaces its current keys, and further lines for it add more keys.
+ * invalid lines are reported and skipped.
  * returns the number of bindings applied, or -1 if the file can't be opened.
  */
 int PadLoadConfig(const char *path) {
   FILE *file;
   char line[128];
-  uint32_t bits;
+  uint32_t bits, rebound;
   SDL_Scancode code;
-  int i, count, res, line_num, applied;
+  int res, line_num, applied, max;
 
   file = fopen(path, "rb");
   if (!file) { return -1; }
   if (!pad_mappings_set) { PadResetBindings(); }
-  count = sizeof(pad_mappings)/sizeof(sw_pad_mapping);
+  max = sizeof(pad_mappings)/sizeof(sw_pad_mapping);
+  rebound = 0;
   applied = 0;
   for (line_num=1;fgets(line, sizeof(line), file);line_num++) {
     res = PadParseBinding(line, &bits, &code);
@@ -148,10 +164,17 @@ int PadLoadConfig(const char *path) {
       continue;
     }
     if (res == 0) { continue; }
-    for (i=0;i<count;i++) {
-      if (pad_mappings[i].bits == bits)
-        pad_mappings[i].code = code;
+    if (!(rebound & bits)) {
+      PadUnbind(bits);
+      rebound |= bits;
     }
+    if (pad_mapping_count == max) {
+      fprintf(stderr, "%s:%d: too many bindings, skipping\n", path, line_num);
+      continue;
+    }
+    pad_mappings[pad_mapping_count].code = code;
+    pad_mappings[pad_mapping_count].bits = bits;
+    pad_mapping_count++;
     applied++;
   }
   fclose(file);
