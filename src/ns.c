@@ -1222,10 +1222,8 @@ static inline nsd_pte *NSProbeSafe(eid_t eid) {
   pte = ns.pte_buckets[hash];
   do {
     if (pte - ns.page_table >= (int)ns.nsd->page_table_size)
-      break;
-  } while ((pte++)->eid != eid);
-  if (pte - ns.page_table >= (int)ns.nsd->page_table_size)
-    return (nsd_pte*)ERROR_INVALID_REF;
+      return (nsd_pte*)ERROR_INVALID_REF;
+  } while ((pte++)->eid != eid); 
   return --pte;
 }
 
