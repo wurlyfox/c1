@@ -35,8 +35,6 @@
 
 ### Hog Wild
 
-- player dies after respawning at a checkpoint
-
 ### Native Fortress
 
 ### Up The Creek

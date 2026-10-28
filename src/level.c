@@ -532,7 +532,9 @@ void LevelRestart(level_state *state) {
   path = (zone_path*)zone->items[idx];
   LevelUpdate(zone, path, state->progress, first_spawn==0);
   NSClose(&zone_eid, 1);
-  GoolObjectCreate(&handles[6], 0, 0, 0, 0, 1);
+  if (!crash) {
+    GoolObjectCreate(&handles[6], 0, 0, 0, 0, 1);
+  }
   crash->trans = state->player_trans;
   crash->rot = state->player_rot;
   crash->scale = state->player_scale;
