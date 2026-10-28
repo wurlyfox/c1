@@ -1,4 +1,4 @@
-# Outline #
+# Outline
 
 Following is a general outline of the game, starting at the entry point.
 

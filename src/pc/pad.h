@@ -1,6 +1,7 @@
 #ifndef _PC_PAD_H_
 #define _PC_PAD_H_
 
+#include <SDL2/SDL_scancode.h>
 #include "common.h"
 #include "../pad.h"
 
@@ -22,6 +23,9 @@
 #define PAD_SQUARE      0x80
 
 uint32_t SwPadRead(int idx);
+int PadParseBindingLine(const char *line, uint32_t *bits, SDL_Scancode *code);
+int PadLoadBindings(const char *path);
+void PadResetBindings();
 
 #endif /* _PC_PAD_H_ */
 

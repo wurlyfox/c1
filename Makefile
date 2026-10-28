@@ -34,8 +34,13 @@ SRC =	src/ns.c \
 	src/ext/refl.c \
 	src/ext/disgool.c
 
+# test sources (run with utest.h), plus the game sources they test
+TEST_SRC = $(wildcard tests/*.c) \
+	src/pc/pad.c
+
 OBJ = $(SRC:.c=.o)
 OUT = c1
+TEST_OUT = build/tests
 
 # include dirs.
 INCLUDE = -I./src/
@@ -43,9 +48,12 @@ INCLUDE = -I./src/
 # C compiler flags (-g -O3 -Wall)
 DEFS = -DCFLAGS_GFX_SW_PERSP -DCFLAGS_DRAW_EXTENSIONS -DCFLAGS_GUI -DCFLAGS_GOOL_DEBUG
 CFLAGS = -g -fplan9-extensions -m32 -std=gnu17 -Wno-error=incompatible-pointer-types
+TEST_CFLAGS = -g -m32 -std=gnu17
+TEST_LDLIBS = -lSDL2
 ifeq ($(OS),Windows_NT)
 LDLIBS = -lmingw32 -lSDL2main -lSDL2 -lopengl32 -lfluidsynth-3 -lm -lstdc++
 OUT = build/c1.exe
+TEST_OUT = build/tests.exe
 else
 LDLIBS = -lSDL2 -lGL -lfluidsynth -lm -lstdc++
 endif
@@ -72,6 +80,7 @@ all: $(SRC) $(OUT)
 
 clean:
 	rm -r $(OBJ) $(OUT)
+	rm -f $(TEST_OUT)
 ifeq ($(OS),Windows_NT)
 	rm -rf $(dir $(OUT))
 endif
@@ -104,3 +113,11 @@ dlls: $(OUT)
 	for d in $$seen; do cp -u "$(DLLDIR)$$d" $(dir $(OUT)); done; \
 	echo "copied dlls:$$seen"
 endif
+
+.PHONY: test
+test: $(TEST_OUT)
+	./$(TEST_OUT)
+
+$(TEST_OUT): $(TEST_SRC) tests/utest.h
+	@mkdir -p $(dir $(TEST_OUT))
+	$(CC) $(INCLUDE) $(TEST_SRC) -o $(TEST_OUT) $(TEST_CFLAGS) $(TEST_LDLIBS)

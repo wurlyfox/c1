@@ -8,6 +8,9 @@
 - `streams/` is also found next to or one directory above the executable, so it no longer has to be run from the project directory
 - `tools/extract_streams.py` for extracting asset files from a `.bin`/`.iso` disc image
 - error message naming the missing file when an asset file cannot be opened
+- key bindings are loaded from `controls.cfg` at startup, so they can be changed without recompiling; a button can have several keys. `controls.cfg` is ignored by git; `controls.example.cfg` lists the defaults to copy from
+- Shift, Ctrl, Alt and other keys that could not be bound before can now be used (keys are tracked by SDL scancode)
+- unit tests (`make test`) using utest.h
 
 ### Fixed
 

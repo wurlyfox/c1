@@ -6,4 +6,8 @@ build/
 # user files
 streams/*
 imgui.ini
+controls.cfg
 !README.MD
+
+# claude code plans
+.claude/plans/

@@ -1,17 +1,17 @@
-# C1 #
+# C1
 
 This is a port of the game *Crash Bandicoot* to C.
 
 The code is designed to compile for both psx and pc. At the moment only pc-specific code is working.
 
-## Status ##
+## Status
 
 - Code - 100% ported
 - Functionality - 78%
 
 At the moment the game is only partially playable with a number of currently identified [issues](doc/issues.md).
 
-## Compiling ##
+## Compiling
 
 As of currently, compilation has only been tested on Ubuntu/Debian and on Windows (MSYS2 MinGW32). However, the game should build on any system with a working 32-bit GNU toolchain and other dependencies listed below.
 
@@ -19,9 +19,9 @@ Note that only 32-bit target executables are currently supported. If you are not
 
 To compile c1, install the dependencies listed below, `cd` into the main project directory, and run `make`.
 
-### Dependencies ###
+### Dependencies
 
-#### pc ####
+#### pc
 - gcc / binutils / glibc
 - GNU make
 - OpenGL 2.0 or higher
@@ -42,14 +42,18 @@ Windows (MSYS2):
 3. Open the **MSYS2 MINGW32** shell, `cd` into the project directory and run `make`. This produces `build/c1.exe` and copies the DLLs it needs next to it (see below).
 4. Run `build/c1.exe`, either from the project directory or by double-clicking it. The game looks for `streams/` in the working directory, then next to the executable, then in the directory above it.
 
-`c1.exe` links dynamically against SDL2, FluidSynth (and its audio codec dependencies) and the GCC runtime. Windows only looks for DLLs next to the executable or on `PATH`, so outside the MINGW32 shell the game fails to start with an error such as *"libfluidsynth-3.dll was not found"*. To avoid this, the Windows build has an extra `dlls` step that runs after linking. It recursively follows `c1.exe`'s imports and copies each one found in the MinGW32 `bin` directory (currently 17 DLLs) into `build/`. To re-copy them on their own, run `make dlls`. The `build` directory is ignored by git, and `make clean` removes it. To run the game on another machine, copy the `build` directory with the `streams` directory beside it (or inside it).
+`c1.exe` links dynamically against SDL2, FluidSynth (and its audio codec dependencies) and the GCC runtime. Windows only looks for DLLs next to the executable or on `PATH`, so outside the MINGW32 shell the game fails to start with an error such as *"libfluidsynth-3.dll was not found"*. To avoid this, the Windows build has an extra `dlls` step that runs after linking. It recursively follows `c1.exe`'s imports and copies each one found in the MinGW32 `bin` directory (currently 17 DLLs) into `build/`. To re-copy them on their own, run `make dlls`. The `build` directory is ignored by git, and `make clean` removes it. To run the game on another machine, copy the `build` directory with the `streams` directory beside it (or inside it), and your `controls.cfg` (if you have one) next to `streams`.
 
-#### psx ####
+#### psx
 (note: psx build currently does not work)
 
 - Psy-Q
 
-## Running ##
+### Tests
+
+Run `make test` to build and run the unit tests in `tests/`. They use the [utest.h](https://github.com/sheredom/utest.h) single-header framework (vendored in `tests/`), build to `build/tests` (`build/tests.exe` on Windows) and only need SDL 2. Tests are plain C files in `tests/`; each `UTEST(group, name)` registers itself, so adding a file there is enough for `make test` to pick it up.
+
+## Running
 
 To run c1, `cd` into the main project directory and run `./c1` (`build/c1.exe` on Windows).
 
@@ -65,7 +69,9 @@ If an asset file is missing, the game shows a *"Could not open ./streams/…"* e
 
 The game is hardcoded to boot into level `25` (aka. title sequence/main menu screen(s)). To choose a different boot level, redefine the `LID_BOOTLEVEL` constant in `common.h` and recompile.
 
-## Controls ##
+## Controls
+
+The default key bindings are below. To change them, create a `controls.cfg` (see [Changing the controls](#changing-the-controls)).
 
 - X - <kbd>Z</kbd>
 - square - <kbd>X</kbd>
@@ -86,9 +92,26 @@ The game is hardcoded to boot into level `25` (aka. title sequence/main menu scr
 - toggle in-game GUI - <kbd>Esc</kbd>
 - toggle in-game GUI keyboard focus - <kbd>Tab</kbd>
 
-Key bindings are defined in the `pad_mappings` table in `src/pc/pad.c`; edit it and recompile to change them.
+Only keyboard input is supported, and only for player 1.
 
-## Structure ##
+### Changing the controls
+
+Key bindings are read from `controls.cfg` when the game starts, so they can be changed without recompiling; just restart the game. To make one, copy [`controls.example.cfg`](controls.example.cfg) (which lists the defaults) to `controls.cfg` in the same directory and edit the copy. The game looks for `controls.cfg` in the same directory as `streams/`. It is ignored by git, so your layout stays local. Each line binds a PlayStation button to a key:
+
+```
+cross    = Z
+triangle = Left Shift
+up       = Keypad 8
+```
+
+- **Buttons:** `cross`, `square`, `circle`, `triangle`, `l1`, `r1`, `l2`, `r2`, `l3`, `r3`, `up`, `down`, `left`, `right`, `start`, `select`.
+- **Keys** use [SDL scancode names](https://wiki.libsdl.org/SDL2/SDL_Scancode) (the names, not the `SDL_SCANCODE_` constants), e.g. `Z`, `Space`, `Return`, `Left Shift`, `Left Ctrl`, `Keypad 8`, `F1`. Names are not case-sensitive. Keys are matched by their position on the keyboard, so on a non-QWERTY layout `Z` means the key where Z is on a US keyboard.
+- **Several keys for one button:** repeat the button's line. The first line for a button replaces its default key; later lines add more.
+- **Defaults:** a button that isn't listed keeps its default key, and if `controls.cfg` is missing all buttons use the defaults above (built into `src/pc/pad.c`).
+- **Mistakes:** an invalid line (an unknown button or key name, or a line without `=`) is skipped with a warning naming the line, e.g. `controls.cfg:12: invalid binding, expected "button = key name"`. Lines starting with `#` are comments. `make test` also checks your `controls.cfg` for invalid lines.
+- Avoid <kbd>Esc</kbd> and <kbd>Tab</kbd>, which the in-game GUI uses.
+
+## Structure
 Project structure is listed below, including descriptions for each file.
 
 Note that further documentation can be found in the `doc` directory.
@@ -131,7 +154,7 @@ Note that further documentation can be found in the `doc` directory.
 │   │   │       └── smf.h    # standard midi format
 │   │   │── init.c,h         # pc-specific initialization (incl. SDL)
 │   │   │── math.c,h         # fixed point implementations of math functions
-│   │   │── pad.c,h          # joypad emulation
+│   │   │── pad.c,h          # joypad emulation (keyboard bindings, controls.cfg loading)
 │   │   └── time.c,h         # tick counter
 │   ├── psx                  # psx-specific code (non-inline)
 │   │   ├── card.c,h         # memory card
@@ -171,8 +194,15 @@ Note that further documentation can be found in the `doc` directory.
 │       ├── refl.c,h         # game-specific type metadata
 │       └── disgool.c,h      # GOOL disassembler
 ├── streams                  # game assets (.NSD/.NSF files)
+├── tests                    # unit tests (make test)
+│   ├── main.c               # test runner
+│   ├── utest.h              # utest.h test framework (vendored)
+│   ├── test_pad.c           # key state to joypad buttons
+│   ├── test_pad_parse.c     # controls.cfg line parsing
+│   └── test_pad_config.c    # controls.cfg loading
 ├── tools                    # helper scripts
 │   └── extract_streams.py   # extracts game assets from a disc image
+├── controls.example.cfg     # example key bindings (copy to controls.cfg to change the controls)
 ├── Makefile                 # project makefile
 └── README.md                # project overview; this file
 ```

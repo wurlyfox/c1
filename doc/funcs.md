@@ -1,9 +1,9 @@
-# Function descriptions #
+# Function descriptions
 
 These are here for now but will likely moved into code as function comments in the future.
 
 
-## cam.c ##
+## cam.c
 - `CamAdjustProgress` - update current progress according to the given progress speed and camera struct and update the level
 - `CamGetProgress` - approximate the projected progress of the player (or a point positioned behind the player) along a particular camera path (incl possible new path, distance error of player to nearest path point, etc.), given player trans and camera path
 - `CamGetProgress2` - alternate version of `CamGetProgress`
@@ -11,7 +11,7 @@ These are here for now but will likely moved into code as function comments in t
 - `CamUpdate` - update progress and level according to current path's camera mode (where mode 5 and 6 use `CamFollow`)
 - `CamDeath` - update camera during the spinning death sequence
 
-## gfx.c ##
+## gfx.c
 - `TgeoOnLoad` - probe for tpages referenced by texinfos in a tgeo entry upon load
 - `GfxScreenProj` - return the corresponding H value for a given fov (field of view)
 - `GfxInitMatrices` - initialize all global matrices used for transformations
@@ -34,7 +34,7 @@ These are here for now but will likely moved into code as function comments in t
 - `GfxTransformWorldsDark2` - `GfxTransformWorlds` variant with alternate darkness shader
 - `sub_8001A460` - used at world map: freezes animated textures (patching over wgeo polygon texture animation info) based on bitfields
 
-## gool.c ##
+## gool.c
 - `GoolInitAllocTable` - allocate memory for player object and all other objects, establish linked list of free objects, and initialize object handles
 - `GoolKillAllocTable` - free memory for player object and all other objects
 - `GoolInitLid` - copy current lid from nsd into the read-only current lid gool global
@@ -91,7 +91,7 @@ These are here for now but will likely moved into code as function comments in t
 - `GoolObjectInterrupt` - interrupt an object
 
 
-## level.c ##
+## level.c
 - `LdatInit` - initialize the level; set current zone and path to initial zone and path as specified in the current nsd
 - `ZdatOnLoad` - onload callback for zdat entries
 - `MdatOnLoad` - onload callback for mdat entries
@@ -125,12 +125,12 @@ These are here for now but will likely moved into code as function comments in t
 - `ZonePathProgressToLoc` - converts a progress to a path point location given a zone path
 - `ZoneGetNeighborPath` - get the neighbor path at the given index in the given zone path
 
-## main.c ##
+## main.c
 - `main` - main function
 - `CoreObjectsCreate` - create main game objects (HUDs) and preload common code entries (box code, crash code, etc.)
 - `CoreLoop` - main game loop
 
-## math.c ##
+## math.c
 - `ApxDist` - compute the approximate (manhattan distance) between 2 3d points
 - `OutOfRange` - test if 2 points are out of range of each other
 - `EucDist` - compute the (euclidean) distance between two [3d] points
@@ -148,7 +148,7 @@ These are here for now but will likely moved into code as function comments in t
 - `randb` - get pseudo-random number from generator b
 - `absdiff` - get the absolute difference of 2 values
 
-## midi.c ##
+## midi.c
 - `MidiResetSeqVol` - reset volume of the playback sequence
 - `MidiInit` - initialize the midi playback engine
 - `MidiResetFadeStep` - reset step value for volume fade counters
@@ -162,12 +162,12 @@ These are here for now but will likely moved into code as function comments in t
 - `MidiClose` - close SEP and VAB
 - `MidiControl` - control midi playback (play, stop, pause, resume, or fade)
 
-## misc.c ##
+## misc.c
 - `ShaderParamsUpdate` - update level-specific world shader parameters
 - `ShaderParamsUpdateRipple` - update level-specific world shader parameters; for ripple shader only
 
 
-## ns.c ##
+## ns.c
 - `NSEIDToString` - convert an eid to a name/string
 - `NSEIDValToString` - convert an eid or entry pointer to a name/string
 - `NSStringToEID` - convert a name/string to an eid
@@ -200,25 +200,31 @@ These are here for now but will likely moved into code as function comments in t
 - `NSInit` - initialize paging subsystem for paging in pages/entries from the corresponding NSF file for the given level id
 - `NSPagePhysical` - create anew or get the existing physical page struct for a given page id (and eid), and page in the page with that id
 
-## pad.c ##
+## pad.c
 - `PadInit` - initialize structures for holding current joypad state and detecting changes in joypad state
 - `PadUpdate` - update joypad state and detect changes in joypad state
 
-## pbak.c ##
+### pc
+- `SwPadRead` - get the buttons held on a joypad, from the keys currently pressed and the current key bindings
+- `PadParseBindingLine` - parse one `button = key name` line of a controls file into a button and an SDL scancode
+- `PadResetBindings` - restore the built-in default key bindings
+- `PadLoadBindings` - load key bindings from a controls file (`controls.cfg`), skipping and reporting invalid lines
+
+## pbak.c
 - `PbakInit` - initialize demo playback
 - `PbakStart` - begin demo playback
 - `PbakPlay` - load playback entry and begin demo playback
 - `PbakChoose` - choose a random demo playback entry
 
-## slst.c ##
+## slst.c
 - `SlstInit` - allocate double poly id buffers
 - `SlstFree` - free poly id buffers allocated by `SlstInit`
 
-### pc ###
+### pc
 - `SlstDecodeForward` - delta decode a poly id list using slst delta item, for a forward change in progress
 - `SlstDecodeBackward` - delta decode a poly id list using slst delta item, for a backward change in progress
 
-## solid.c ##
+## solid.c
 - `TransSmoothStopAtSolid` - wrapper for `TransPullStopAtSolid`
 - `TransPullStopAtSolid` - calculate the limited next trans for a given object, zone query, and current trans, by iteratively taking away from velocity, adding to trans, and limiting with `TransStopAtSolid`
 - `TransStopAtSolid` - calculate the actual [limited] next trans for a given object, current trans, and projected change in trans [velocity]; add velocity to current trans and limit the result at the faces/edges of solid floors, ceilings, walls, and zone boundaries
@@ -237,7 +243,7 @@ These are here for now but will likely moved into code as function comments in t
 - `PlotWalls` - plot walls in the wall bitmap at the scaled relative locations [in the xz plane] of the nearest solid wall(s) [node bounds] and object(s) [bound boxes]
 - `StopAtWalls` - adjust input bit index (x, z) to the index of the nearest non-solid bit in the wall bitmap
 
-## title.c ##
+## title.c
 - `TitleInit` - allocate title screen struct
 - `TitleLoadNextState` - load the next title screen state
 - `TitleLoadScreen`- load a title screen
