@@ -130,6 +130,7 @@ int init() {
 
   FindDataDir();
   PadInit(2); /* initialize 2 joypad structs */
+  PadLoadConfig("controls.cfg"); /* keeps the default bindings if missing */
   SetTicksElapsed(0);
   SDLInit();
   callbacks.pre_update = SDLUpdate;
