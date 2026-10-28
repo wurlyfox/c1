@@ -96,3 +96,15 @@ UTEST(pad_config, reloading_replaces_previous_file) {
   ASSERT_EQ(0u, held_for(SDL_SCANCODE_V));
   ASSERT_EQ(0u, held_for(SDL_SCANCODE_B));
 }
+
+UTEST(pad_config, shipped_controls_file_matches_defaults) {
+  uint32_t defaults[512];
+  int i;
+
+  PadResetBindings();
+  for (i=0;i<512;i++)
+    defaults[i] = held_for((SDL_Scancode)i);
+  ASSERT_EQ(16, PadLoadConfig("controls.cfg")); /* run from the project root */
+  for (i=0;i<512;i++)
+    EXPECT_EQ(defaults[i], held_for((SDL_Scancode)i));
+}
