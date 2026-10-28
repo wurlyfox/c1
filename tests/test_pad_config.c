@@ -97,14 +97,37 @@ UTEST(pad_config, reloading_replaces_previous_file) {
   ASSERT_EQ(0u, held_for(SDL_SCANCODE_B));
 }
 
-UTEST(pad_config, shipped_controls_file_matches_defaults) {
+/* the example file documents the built-in defaults, so it must match them */
+UTEST(pad_config, example_controls_file_matches_defaults) {
   uint32_t defaults[512];
   int i;
 
   PadResetBindings();
   for (i=0;i<512;i++)
     defaults[i] = held_for((SDL_Scancode)i);
-  ASSERT_EQ(16, PadLoadConfig("controls.cfg")); /* run from the project root */
+  /* run from the project root */
+  ASSERT_EQ(16, PadLoadConfig("controls.example.cfg"));
   for (i=0;i<512;i++)
     EXPECT_EQ(defaults[i], held_for((SDL_Scancode)i));
+}
+
+/*
+ * controls.cfg is the player's own (untracked) layout. any layout is fine,
+ * so this only checks for typos, and passes if there is no controls.cfg.
+ */
+UTEST(pad_config, local_controls_file_is_valid) {
+  FILE *file;
+  char line[128];
+  uint32_t bits;
+  SDL_Scancode code;
+  int line_num;
+
+  file = fopen("controls.cfg", "rb");
+  if (!file) { return; }
+  for (line_num=1;fgets(line, sizeof(line), file);line_num++) {
+    if (PadParseBinding(line, &bits, &code) == -1)
+      fprintf(stderr, "controls.cfg:%d: invalid binding: %s", line_num, line);
+    EXPECT_NE(-1, PadParseBinding(line, &bits, &code));
+  }
+  fclose(file);
 }

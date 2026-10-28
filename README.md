@@ -42,7 +42,7 @@ Windows (MSYS2):
 3. Open the **MSYS2 MINGW32** shell, `cd` into the project directory and run `make`. This produces `build/c1.exe` and copies the DLLs it needs next to it (see below).
 4. Run `build/c1.exe`, either from the project directory or by double-clicking it. The game looks for `streams/` in the working directory, then next to the executable, then in the directory above it.
 
-`c1.exe` links dynamically against SDL2, FluidSynth (and its audio codec dependencies) and the GCC runtime. Windows only looks for DLLs next to the executable or on `PATH`, so outside the MINGW32 shell the game fails to start with an error such as *"libfluidsynth-3.dll was not found"*. To avoid this, the Windows build has an extra `dlls` step that runs after linking. It recursively follows `c1.exe`'s imports and copies each one found in the MinGW32 `bin` directory (currently 17 DLLs) into `build/`. To re-copy them on their own, run `make dlls`. The `build` directory is ignored by git, and `make clean` removes it. To run the game on another machine, copy the `build` directory with the `streams` directory beside it (or inside it), and `controls.cfg` next to `streams`.
+`c1.exe` links dynamically against SDL2, FluidSynth (and its audio codec dependencies) and the GCC runtime. Windows only looks for DLLs next to the executable or on `PATH`, so outside the MINGW32 shell the game fails to start with an error such as *"libfluidsynth-3.dll was not found"*. To avoid this, the Windows build has an extra `dlls` step that runs after linking. It recursively follows `c1.exe`'s imports and copies each one found in the MinGW32 `bin` directory (currently 17 DLLs) into `build/`. To re-copy them on their own, run `make dlls`. The `build` directory is ignored by git, and `make clean` removes it. To run the game on another machine, copy the `build` directory with the `streams` directory beside it (or inside it), and your `controls.cfg` (if you have one) next to `streams`.
 
 #### psx
 (note: psx build currently does not work)
@@ -71,7 +71,7 @@ The game is hardcoded to boot into level `25` (aka. title sequence/main menu scr
 
 ## Controls
 
-Default key bindings:
+The default key bindings are below. To change them, create a `controls.cfg` (see [Changing the controls](#changing-the-controls)).
 
 - X - <kbd>Z</kbd>
 - square - <kbd>X</kbd>
@@ -96,7 +96,7 @@ Only keyboard input is supported, and only for player 1.
 
 ### Changing the controls
 
-Key bindings are read from [`controls.cfg`](controls.cfg) when the game starts, so they can be changed without recompiling. The game looks for it in the same directory as `streams/`. Each line binds a PlayStation button to a key:
+Key bindings are read from `controls.cfg` when the game starts, so they can be changed without recompiling; just restart the game. To make one, copy [`controls.example.cfg`](controls.example.cfg) (which lists the defaults) to `controls.cfg` in the same directory and edit the copy. The game looks for `controls.cfg` in the same directory as `streams/`. It is ignored by git, so your layout stays local. Each line binds a PlayStation button to a key:
 
 ```
 cross    = Z
@@ -108,7 +108,7 @@ up       = Keypad 8
 - **Keys** use [SDL scancode names](https://wiki.libsdl.org/SDL2/SDL_Scancode) (the names, not the `SDL_SCANCODE_` constants), e.g. `Z`, `Space`, `Return`, `Left Shift`, `Left Ctrl`, `Keypad 8`, `F1`. Names are not case-sensitive. Keys are matched by their position on the keyboard, so on a non-QWERTY layout `Z` means the key where Z is on a US keyboard.
 - **Several keys for one button:** repeat the button's line. The first line for a button replaces its default key; later lines add more.
 - **Defaults:** a button that isn't listed keeps its default key, and if `controls.cfg` is missing all buttons use the defaults above (built into `src/pc/pad.c`).
-- **Mistakes:** an invalid line (an unknown button or key name, or a line without `=`) is skipped with a warning naming the line, e.g. `controls.cfg:12: invalid binding, expected "button = key name"`. Lines starting with `#` are comments.
+- **Mistakes:** an invalid line (an unknown button or key name, or a line without `=`) is skipped with a warning naming the line, e.g. `controls.cfg:12: invalid binding, expected "button = key name"`. Lines starting with `#` are comments. `make test` also checks your `controls.cfg` for invalid lines.
 - Avoid <kbd>Esc</kbd> and <kbd>Tab</kbd>, which the in-game GUI uses.
 
 ## Structure
@@ -202,7 +202,7 @@ Note that further documentation can be found in the `doc` directory.
 │   └── test_pad_config.c    # controls.cfg loading
 ├── tools                    # helper scripts
 │   └── extract_streams.py   # extracts game assets from a disc image
-├── controls.cfg             # key bindings
+├── controls.example.cfg     # example key bindings (copy to controls.cfg to change the controls)
 ├── Makefile                 # project makefile
 └── README.md                # project overview; this file
 ```
