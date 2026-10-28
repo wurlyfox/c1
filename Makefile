@@ -43,7 +43,7 @@ INCLUDE = -I./src/
 # C compiler flags (-g -O3 -Wall)
 DEFS = -DCFLAGS_GFX_SW_PERSP -DCFLAGS_DRAW_EXTENSIONS -DCFLAGS_GUI -DCFLAGS_GOOL_DEBUG
 LDLIBS = -lSDL2 -lGL -lfluidsynth -lm -lstdc++
-CFLAGS = -g -fplan9-extensions -m32
+CFLAGS = -g -fplan9-extensions -m32 -std=gnu17 -Wno-error=incompatible-pointer-types
 CFLAGS += $(LDLIBS) $(DEFS)
 
 # compiler/make
