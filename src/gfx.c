@@ -661,12 +661,8 @@ mat16 ms_cam_rot;      /* 800577E4 */
 mat16 ms_cam_rot2;     /* 80057804 */
 mat16 mn_rot;          /* 80057824 */
 mat16 ms_rot;          /* 80057844 */
-vec cam_trans;         /* 80057864 */
-ang cam_rot;           /* 80057870 */
-vec cam_scale;         /* 8005787C */
-vec cam_trans_prev;    /* 80057888 */
-ang cam_rot_prev;      /* 80057894 */
-vec cam_scale_prev;    /* 800578A0 */
+cam_state cam;         /* 80057864 */
+cam_state cam_prev;    /* 80057888 */
 uint32_t unk_800578AC; /* 800578AC */
 vec16 unk_800578B0;    /* 800578B0 */
 vec unk_800578B8;      /* 800578B8 */

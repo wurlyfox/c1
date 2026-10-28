@@ -44,8 +44,6 @@ extern uint16_t level_spawns[GOOL_LEVEL_SPAWN_COUNT];
 extern gool_handle handles[8];
 extern gool_bound object_bounds[28];
 extern int object_bound_count;
-extern vec cam_trans;
-extern ang cam_rot;
 extern uint32_t screen_proj;
 
 #ifdef PSX

@@ -160,7 +160,6 @@ extern vec v_zero;
 extern vec2 screen;
 extern uint32_t screen_proj;
 extern mat16 mn_trans;
-extern vec cam_trans, cam_trans_prev;
 extern mat16 ms_rot, ms_cam_rot;
 extern int32_t cam_rot_xz;
 extern quad28_t uv_map[600];
