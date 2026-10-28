@@ -165,8 +165,9 @@ void GuiRemoveNode(gui_item *item) {
   gui_item *parent, *child;
 
   parent = item->parent;
-  for_each_child(item, child) {
-    GuiRemoveChild(child->parent, child);
+  /* GuiRemoveChild clears child->next, so take the first child each time */
+  while ((child = item->child)) {
+    GuiRemoveChild(item, child);
     GuiAddChild(parent, child);
   }
   GuiRemoveChild(item->parent, item);
