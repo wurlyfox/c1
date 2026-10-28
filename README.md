@@ -35,6 +35,13 @@ Ubuntu/Debian:
 - 64-bit: `sudo apt install build-essential gcc-multilib g++-multilib libstdc++6:i386 libgl1-mesa-dev:i386 libsdl2-dev:i386 libfluidsynth-dev:i386`
 - 32-bit: `sudo apt install build-essential libstdc++6 libgl1-mesa-dev libsdl2-dev libfluidsynth-dev`
 
+Windows (MSYS2):
+
+1. Install [MSYS2](https://www.msys2.org/) (e.g. `winget install MSYS2.MSYS2`).
+2. From an MSYS2 shell: `pacman -S --needed make mingw-w64-i686-gcc mingw-w64-i686-SDL2 mingw-w64-i686-fluidsynth`
+3. Open the **MSYS2 MINGW32** shell, `cd` into the project directory and run `make`. This produces `c1.exe` and copies the DLLs it needs next to it.
+4. Run `c1.exe` from the project directory (it loads assets from `streams/` relative to the working directory).
+
 #### psx ####
 (note: psx build currently does not work)
 

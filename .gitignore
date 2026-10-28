@@ -1,6 +1,8 @@
 # compile output
 *.o
 c1
+c1.exe
+*.dll
 
 # user files
 streams/*
