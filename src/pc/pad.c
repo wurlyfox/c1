@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <SDL2/SDL.h>
 #include "pc/pad.h"
 
@@ -27,6 +28,29 @@ const sw_pad_mapping pad_mappings[16] = {
   { .code = SDL_SCANCODE_X,      .bits = PAD_SQUARE   },
 };
 
+/* button names used in controls files */
+const struct {
+  const char *name;
+  uint32_t bits;
+} pad_button_names[16] = {
+  { "select",   PAD_SELECT   },
+  { "l3",       PAD_L3       },
+  { "r3",       PAD_R3       },
+  { "start",    PAD_START    },
+  { "up",       PAD_UP       },
+  { "right",    PAD_RIGHT    },
+  { "down",     PAD_DOWN     },
+  { "left",     PAD_LEFT     },
+  { "l2",       PAD_L2       },
+  { "r2",       PAD_R2       },
+  { "l1",       PAD_L1       },
+  { "r1",       PAD_R1       },
+  { "triangle", PAD_TRIANGLE },
+  { "circle",   PAD_CIRCLE   },
+  { "cross",    PAD_CROSS    },
+  { "square",   PAD_SQUARE   },
+};
+
 uint32_t SwPadRead(int idx) {
   uint32_t held, bits;
   int i, count, code;
@@ -44,11 +68,46 @@ uint32_t SwPadRead(int idx) {
   return (held << 16);
 }
 
+/* strip leading and trailing whitespace from str in place */
+static char *PadTrim(char *str) {
+  char *end;
+
+  while (isspace((unsigned char)*str)) { str++; }
+  end = str + strlen(str);
+  while (end > str && isspace((unsigned char)end[-1])) { end--; }
+  *end = 0;
+  return str;
+}
+
 /*
  * parse one line of a controls file, in the form "button = key name".
+ * key names are SDL scancode names (e.g. "Z", "Left Shift", "Keypad 4").
  * returns 1 and sets bits/code for a binding, 0 for a blank or
  * comment line, and -1 for an invalid line.
  */
 int PadParseBinding(const char *line, uint32_t *bits, SDL_Scancode *code) {
-  return -1; /* not implemented yet */
+  char buf[128], *name, *key, *sep;
+  SDL_Scancode scancode;
+  int i, count;
+
+  snprintf(buf, sizeof(buf), "%s", line);
+  name = PadTrim(buf);
+  if (*name == 0 || *name == '#') { return 0; }
+  sep = strchr(name, '=');
+  if (!sep) { return -1; }
+  *sep = 0;
+  name = PadTrim(name);
+  key = PadTrim(sep+1);
+  if (*name == 0 || *key == 0) { return -1; }
+  scancode = SDL_GetScancodeFromName(key);
+  if (scancode == SDL_SCANCODE_UNKNOWN) { return -1; }
+  count = sizeof(pad_button_names)/sizeof(pad_button_names[0]);
+  for (i=0;i<count;i++) {
+    if (SDL_strcasecmp(name, pad_button_names[i].name) == 0) {
+      *bits = pad_button_names[i].bits;
+      *code = scancode;
+      return 1;
+    }
+  }
+  return -1;
 }
