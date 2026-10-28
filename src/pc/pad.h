@@ -24,6 +24,8 @@
 
 uint32_t SwPadRead(int idx);
 int PadParseBinding(const char *line, uint32_t *bits, SDL_Scancode *code);
+int PadLoadConfig(const char *path);
+void PadResetBindings();
 
 #endif /* _PC_PAD_H_ */
 

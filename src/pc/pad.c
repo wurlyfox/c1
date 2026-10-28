@@ -111,3 +111,17 @@ int PadParseBinding(const char *line, uint32_t *bits, SDL_Scancode *code) {
   }
   return -1;
 }
+
+/* restore the built-in default bindings */
+void PadResetBindings() {
+  /* not implemented yet */
+}
+
+/*
+ * load key bindings from a controls file, replacing the default key for
+ * each button it lists. invalid lines are reported and skipped.
+ * returns the number of bindings applied, or -1 if the file can't be opened.
+ */
+int PadLoadConfig(const char *path) {
+  return 0; /* not implemented yet */
+}
