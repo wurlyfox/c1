@@ -7,3 +7,6 @@ build/
 streams/*
 imgui.ini
 !README.MD
+
+# claude code plans
+.claude/plans/
