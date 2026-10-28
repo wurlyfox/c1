@@ -43,3 +43,12 @@ uint32_t SwPadRead(int idx) {
   }
   return (held << 16);
 }
+
+/*
+ * parse one line of a controls file, in the form "button = key name".
+ * returns 1 and sets bits/code for a binding, 0 for a blank or
+ * comment line, and -1 for an invalid line.
+ */
+int PadParseBinding(const char *line, uint32_t *bits, SDL_Scancode *code) {
+  return -1; /* not implemented yet */
+}
