@@ -56,7 +56,7 @@ static inline void PbakStart() {
 //----- (8002E98C) --------------------------------------------------------
 void PbakPlay(eid_t *eid) {
   entry *pbak;
-  int argv[2];
+  uint32_t argv[2];
 
   ns.draw_skip_counter = 0;
   pbak = NSOpen(eid, 1, 1);

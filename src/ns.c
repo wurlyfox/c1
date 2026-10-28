@@ -258,7 +258,7 @@ int NSCountEntries(ns_struct *nss, int type) {
 
   nsd = nss->nsd;
   count = 0;
-  for (i=0;i<nsd->page_table_size;i++) {
+  for (i=0;i<(int)nsd->page_table_size;i++) {
     pte = &nsd->page_table[i];
     if (NSEIDType(pte) == type)
       count++;
@@ -292,7 +292,7 @@ static void NSPageUpdateEntries(int idx) {
   page *page;
   entry *entry;
   eid_t eid;
-  nsd_pte *pte, *bucket;
+  nsd_pte *pte;
   int i, type, hash;
   tpage *tpg;
 
@@ -310,7 +310,7 @@ static void NSPageUpdateEntries(int idx) {
       ps->state = 20;
       return/* page*/;
     }
-    for (i=0;i<page->entry_count;i++) {
+    for (i=0;i<(int)page->entry_count;i++) {
       entry = page->entries[i];
       while ((pte++)->eid != entry->eid);
       --pte;
@@ -356,7 +356,7 @@ static void NSPageUpdateEntries(int idx) {
     entry = page->entries[0];
     hash = (entry->eid >> 15) & 0xFF;
     pte = ns.pte_buckets[hash]-1;
-    for (i=0;i<page->entry_count;i++) {
+    for (i=0;i<(int)page->entry_count;i++) {
       entry = page->entries[i];
       while ((++pte)->eid != entry->eid);
       if (i==0) {
@@ -960,10 +960,9 @@ static page_struct* NSPagePhysical(int pgid, eid_t eid) {
 #else
 
 static page_struct* NSPageTranslate(page_struct *ps) {
-  int state, type;
+  int state;
 
   state = ps->state;
-  type = ps->page->type;
   if (state == 3) {
     ps->state = 4;
     NSPageTranslateOffsets(ps->page);
@@ -1123,8 +1122,6 @@ int NSClose(void *en_ref, int count) {
   page_struct* ps;
   nsd_pte* pte;
   int pgid;
-  eid_t eid;
-
   ref = (entry_ref*)en_ref;
   if (ref->is_eid)
     pte = ref->pte = NSProbe(ref->eid);
@@ -1170,10 +1167,11 @@ int NSCountAvailablePages2(void *list, int len) {
   page_struct *ps;
   nsd_pte *pte;
   pgid_t pgid, cache[44];
-  eid_t eid;
   int cache_size;
   int i, ii, count;
 
+  count = 0;
+  cache_size = 0;
   ref = (entry_ref**)list;
   for (i=0;i<len;i++) {
     if ((*ref)->is_eid)
@@ -1223,11 +1221,9 @@ static inline nsd_pte *NSProbeSafe(eid_t eid) {
   hash = (eid >> 15) & 0xFF;
   pte = ns.pte_buckets[hash];
   do {
-    if (pte - ns.page_table >= ns.nsd->page_table_size)
-      break;
-  } while ((pte++)->eid != eid);
-  if (pte - ns.page_table >= ns.nsd->page_table_size)
-    return (nsd_pte*)ERROR_INVALID_REF;
+    if (pte - ns.page_table >= (int)ns.nsd->page_table_size)
+      return (nsd_pte*)ERROR_INVALID_REF;
+  } while ((pte++)->eid != eid); 
   return --pte;
 }
 
@@ -1239,15 +1235,21 @@ static inline entry *NSResolve(nsd_pte *pte) {
   return pte->entry;
 }
 
+#ifdef CFLAGS_BUGFIXES
+#define NSProbe NSProbeSafe
+#endif
+
 //----- (80015A98) --------------------------------------------------------
 entry *NSLookup(void *en_ref) {
   entry_ref *ref;
   nsd_pte *pte;
   ref = (entry_ref*)en_ref;
   if (ref->is_eid)
-    pte = ref->pte = NSProbe(ref->eid);
-  else
-    pte = ref->pte; /* ??? */
+    ref->pte = NSProbe(ref->eid);
+  pte = ref->pte; /* ??? */
+#ifdef CFLAGS_BUGFIXES
+  if (ISERRORCODE(pte)) return (entry*)pte;
+#endif
   return NSResolve(pte);
 }
 
@@ -1299,7 +1301,7 @@ static inline void NSInitTexturePages(ns_struct *nss, uint32_t lid) {
     pte = nss->pte_buckets[hash];
     while (ps->eid != pte->eid) {
       idx = (++pte - nss->page_table);
-      if (idx >= nss->nsd->page_table_size) {
+      if (idx >= (int)nss->nsd->page_table_size) {
         pte = (nsd_pte*)-10; /* texture not in the page table for this level */
         break;
       }
@@ -1321,10 +1323,10 @@ static inline void NSInitAudioPages(ns_struct *nss, uint32_t lid) {
   nsd_pte *pte;
   eid_t eid;
   uint32_t addr;
-  int i, j, count, type;
+  int i, count, type;
 
   count=0;
-  for (i=0;i<nss->nsd->page_table_size;i++) {
+  for (i=0;i<(int)nss->nsd->page_table_size;i++) {
     pte = &nss->nsd->page_table[i];
     type = NSEIDType(pte);
     if (type == 14) { count++; }
@@ -1370,6 +1372,7 @@ static inline void NSInitAudioPages(ns_struct *nss, uint32_t lid) {
 #endif
 
 /*#else
+        int j;
         page *page;
         entry *entry;
         page_struct *ps;
@@ -1393,14 +1396,18 @@ static inline void NSInitAudioPages(ns_struct *nss, uint32_t lid) {
 void NSInit(ns_struct *nss, uint32_t lid) {
   nsd *nsd;
   page *pagemem;
-  nsd_pte *pte, **buckets;
+  nsd_pte **buckets;
   page_struct *ps;
-  size_t nsd_size, pagemem_size;
+  size_t pagemem_size;
   char *nsf_filename, *nsd_filename;
   char filename[0x100];
-  int i, idx, page_count, hash;
-  int physical_page_count, virtual_page_count;
-  int pgid, *offsets;
+  int i, page_count;
+  int physical_page_count;
+  int *offsets;
+#ifdef PSX
+  size_t nsd_size;
+  int virtual_page_count;
+#endif
 
   cur_lid = lid;
   next_lid = -1;
@@ -1430,14 +1437,14 @@ void NSInit(ns_struct *nss, uint32_t lid) {
   nss->ldat = (nsd_ldat*)&nsd->page_table[nsd->page_table_size];
   /* display loading screen */
   TitleLoading(lid, nss->ldat->image_data, nsd);
-  nsd_size = sizeof(nsd) + sizeof(nsd_pte)*nsd->page_table_size + sizeof(nsd_ldat);
 #ifdef PSX
   /* note: psy-q realloc always shrinks in-place */
+  nsd_size = sizeof(nsd) + sizeof(nsd_pte)*nsd->page_table_size + sizeof(nsd_ldat);
   nss->nsd = realloc(nss->nsd, nsd_size); /* trim splash screen image */
 #endif
   /* convert pte bucket relative offsets to absolute pointers */
   buckets = nss->pte_buckets;
-  offsets = nss->nsd->ptb_offsets;
+  offsets = (int*)nss->nsd->ptb_offsets;
   for (i=0;i<256;i++)
     buckets[i] = &nss->page_table[offsets[i]];
   nsf_filename = NSGetFilename(1, lid);

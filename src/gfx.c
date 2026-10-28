@@ -661,12 +661,8 @@ mat16 ms_cam_rot;      /* 800577E4 */
 mat16 ms_cam_rot2;     /* 80057804 */
 mat16 mn_rot;          /* 80057824 */
 mat16 ms_rot;          /* 80057844 */
-vec cam_trans;         /* 80057864 */
-ang cam_rot;           /* 80057870 */
-vec cam_scale;         /* 8005787C */
-vec cam_trans_prev;    /* 80057888 */
-ang cam_rot_prev;      /* 80057894 */
-vec cam_scale_prev;    /* 800578A0 */
+cam_state cam;         /* 80057864 */
+cam_state cam_prev;    /* 80057888 */
 uint32_t unk_800578AC; /* 800578AC */
 vec16 unk_800578B0;    /* 800578B0 */
 vec unk_800578B8;      /* 800578B8 */
@@ -713,7 +709,7 @@ int TgeoOnLoad(entry *tgeo) {
   header = (tgeo_header*)tgeo->items[0];
   info_p = (uint8_t*)header->texinfos;
   if (cur_lid != LID_TITLE && cur_lid != LID_INTRO) {
-    for (i=0;i<header->texinfo_count;i++) {
+    for (i=0;i<(int)header->texinfo_count;i++) {
       info = (tgeo_texinfo*)info_p;
       if (info->type == 1 && (info->tpage & 1))
         info->tpage = (uint32_t)NSProbe(info->tpage); /* TODO: union? */
@@ -721,7 +717,7 @@ int TgeoOnLoad(entry *tgeo) {
     }
   }
   else {
-    for (i=0;i<header->texinfo_count;i++) {
+    for (i=0;i<(int)header->texinfo_count;i++) {
       info = (tgeo_texinfo*)info_p;
       if (info->type == 1 && (info->tpage & 1))
         NSOpen(&info->tpage, 0, 1); /* TODO: union? */
@@ -739,10 +735,11 @@ inline static int GfxScreenProj(int fov) {
   case 60: return 460;
   case 90: return 288;
   }
+  return 0;
 }
 
 //----- (80017790) --------------------------------------------------------
-int GfxInitMatrices() {
+void GfxInitMatrices() {
   GfxResetCam(&cam_trans);
   GfxFillMatrix(&mn_color, 512);
   screen_proj = GfxScreenProj(ns.ldat->fov);
@@ -892,7 +889,7 @@ void GfxUpdateMatrices() {
 }
 
 //----- (800180A0) --------------------------------------------------------
-int GfxResetCam(vec *trans) {
+void GfxResetCam(vec *trans) {
   ang *rot;
   vec *scale;
 
@@ -911,12 +908,11 @@ static inline int GfxCalcObjectZoneMatrices(
   vec *r_trans) {
   zone_header *header;
   gool_colors *colors;
-  int i,z,val,far;
+  int i,z,val;
   int dist,cdist;
   vec trans,*obj_trans,dir,cdir;
 
   header=(zone_header*)cur_zone->items[0];
-  far=header->visibility_depth>>8;
   colors=&obj->colors;
   switch (header->unknown_a) { /* TODO: rename 'unknown_a' to 'shader'? */
   case 2:
@@ -1005,11 +1001,15 @@ int GfxCalcObjectMatrices(svtx_frame *frame, tgeo_header *t_header,
   gool_object *obj, int flag, int32_t *zdist) {
   gool_vectors *vectors;
   gool_colors *colors;
-  zone_header *header;
+  /* zone_header *header; */
   mat16 m_trans;
   bound2 extents;
-  vec u_trans, *r_trans, s_trans, *col;
-  int far, code;
+  vec u_trans, *r_trans, *col;
+  /* vec s_trans; */
+#ifdef PSX
+  int code;
+#endif
+  /* int far; */
   uint32_t status_b;
 
   r_trans=&m_trans.t;
@@ -1028,17 +1028,17 @@ int GfxCalcObjectMatrices(svtx_frame *frame, tgeo_header *t_header,
   SwRotTrans(&u_trans, r_trans, &mn_trans.t, &ms_rot);
 #endif
   if (!(cur_display_flags & 0x10000)) {
-    header=(zone_header*)cur_zone->items[0];
-    far=header->visibility_depth>>8;
-    //if (r_trans->z > (far?far:12000)) { return 0; }
+    // header=(zone_header*)cur_zone->items[0];
+    // far=header->visibility_depth>>8;
+    // if (r_trans->z > (far?far:12000)) { return 0; }
     status_b = obj->process.status_b;
     colors = &obj->colors;
     if ((status_b & 0x40000) == 0) {
       if ((int32_t)screen_proj >= r_trans->z) { return 0; }
       if ((status_b & 0x80000000) == 0) {
         if (r_trans->z == 0) { return 0; }
-        s_trans.x=((int32_t)screen_proj*r_trans->x)/r_trans->z;
-        s_trans.y=((int32_t)screen_proj*r_trans->y)/r_trans->z;
+        //s_trans.x=((int32_t)screen_proj*r_trans->x)/r_trans->z;
+        //s_trans.y=((int32_t)screen_proj*r_trans->y)/r_trans->z;
         //if (abs(s_trans.x)  > 316) { return 0; }
         //if ((s_trans.y+138) > 326) { return 0; }
       }
@@ -1370,7 +1370,7 @@ void GfxTransformFragment(gool_frag *frag, int32_t z, eid_t tpag,
   texinfo info;
   uint32_t z_sum, z_dist;
   void **prims_tail;
-  int i, tinf_idx, z_idx, texid;
+  int i, z_idx, texid;
 
   verts[2].x=bound->p1.x;verts[2].y=bound->p1.y;
   verts[3].x=bound->p2.x;verts[3].y=bound->p1.y;
@@ -1421,7 +1421,7 @@ void GfxTransformFontChar(gool_object *obj, gool_glyph *glyph, int32_t z,
   rgb8 rgb;
   int32_t z_sum, z_dist;
   void **prims_tail;
-  int i, idx, z_idx, texid;
+  int i, z_idx, texid;
 
   verts[2].x=bound->p1.x;verts[2].y=bound->p1.y;
   verts[3].x=bound->p2.x;verts[3].y=bound->p1.y;
@@ -1485,13 +1485,16 @@ void GfxTransform(vec *in, mat16 *mat, vec *out) {
 void GfxLoadWorlds(zone_header *header) {
   zone_world *world;
   wgeo_header *w_header;
-  entry *wgeo,*tpag;
+  entry *wgeo;
   vec trans;
   int i, ii;
 
-  for (i=0;i<header->world_count;i++) {
+  for (i=0;i<(int)header->world_count;i++) {
     world=&header->worlds[i];
     wgeo=NSLookup(&world->eid);
+#ifdef CFLAGS_BUGFIXES
+    if (ISERRORCODE(wgeo)) { continue; } /* skip on failed lookup */
+#endif
     w_header=(wgeo_header*)wgeo->items[0];
     if (w_header->is_backdrop) {
       world->trans.x=0;
@@ -1510,8 +1513,8 @@ void GfxLoadWorlds(zone_header *header) {
     world->polygons=(wgeo_polygon*)wgeo->items[1];
     world->vertices=(wgeo_vertex*)wgeo->items[2];
     world->texinfos=w_header->texinfos;
-    for (ii=0;ii<w_header->tpag_count;ii++) {
-      tpag=NSLookup(&w_header->tpags[ii]);
+    for (ii=0;ii<(int)w_header->tpag_count;ii++) {
+      NSLookup(&w_header->tpags[ii]);
     }
   }
   if (ns.ldat->lid == LID_TITLE && title_state == 15) /* map? */
@@ -1597,7 +1600,7 @@ void GfxTransformWorldsFog(void *ot) {
   params.far_color1=params.far_color;
 #endif
   GfxGetFar(&far, &shamt);
-  for (i=0;i<header->world_count;i++) {
+  for (i=0;i<(int)header->world_count;i++) {
     world=&params.worlds[i];
     w_header=world->header;
     is_backdrop=w_header->is_backdrop;
@@ -1749,7 +1752,7 @@ void GfxTransformWorldsDark(void *ot) {
   params.far_color2.b = far_color2.b*16;
   params.far_t2 = far_t2*16;
   /* note: psx impl passes these as arguments instead of putting them in the tag */
-  for (i=0;i<header->world_count;i++) {
+  for (i=0;i<(int)header->world_count;i++) {
     world=&params.worlds[i];
     world->tag=(shamt<<16)|far; /* tag is unioned with wgeo */
   }
@@ -1761,10 +1764,14 @@ void GfxTransformWorldsDark(void *ot) {
 //----- (8001A2E0) --------------------------------------------------------
 void GfxTransformWorldsDark2(void *ot) {
   zone_header *header;
-  zone_world *worlds,*world;
+  zone_world *worlds;
   size_t size;
-  void **prims_tail,*dst;
+  void **prims_tail;
+#ifdef PSX
+  zone_world *world;
+  void *dst;
   int i;
+#endif
 
   if (!cur_poly_ids->len) { return; }
   header=(zone_header*)cur_zone->items[0];
@@ -1775,7 +1782,7 @@ void GfxTransformWorldsDark2(void *ot) {
   SetLightMatrix(&mn_light);
   RMemcpy((void*)worlds,(void*)scratch.worlds,256);
   dst=&scratch.polymem;
-  for (i=0;i<header->world_count;i++) {
+  for (i=0;i<(int)header->world_count;i++) {
     world=&worlds[i];
     RMemcpy((void*)&world->header->trans_x,(void*)dst,6);
     dst+=16; /* align each dst trans vec to 16 bytes */
@@ -1837,12 +1844,12 @@ void GfxAnimMapPaths(uint32_t flags_a, uint32_t flags_b) {
 
   header = (zone_header *)cur_zone->items[0];
   worlds = header->worlds;
-  for (i=0;i<header->world_count;i++) {
+  for (i=0;i<(int)header->world_count;i++) {
     wgeo = NSLookup(&worlds[i].eid);
     if (wgeo->item_count < 4) { continue; }
     w_header = (wgeo_header*)wgeo->items[0];
     id_list = (poly_id_list*)wgeo->items[3];
-    len = id_list->len;
+    len = (int)id_list->len;
     for (ii=0;ii<len;ii++) {
       poly_id = id_list->ids[ii-1];
       poly_idx = poly_id.poly_idx;
@@ -1850,7 +1857,7 @@ void GfxAnimMapPaths(uint32_t flags_a, uint32_t flags_b) {
         poly_idx2 = poly_id.poly_idx;
         continue;
       }
-      if (poly_idx >= w_header->poly_count) { continue; }
+      if (poly_idx >= (int)w_header->poly_count) { continue; }
       polys = (wgeo_polygon*)wgeo->items[1];
       poly = &polys[poly_idx];
       bit_idx = poly_idx2 % 32;

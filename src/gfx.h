@@ -14,11 +14,27 @@
 #include "formats/tgeo.h"
 #include "formats/zdat.h"
 
+typedef struct {
+  vec trans;
+  ang rot;
+  vec scale;
+} cam_state;
+
+extern cam_state cam;
+extern cam_state cam_prev;
+
+#define cam_trans cam.trans
+#define cam_rot cam.rot
+#define cam_scale cam.scale
+#define cam_trans_prev cam_prev.trans
+#define cam_rot_prev cam_prev.rot
+#define cam_scale_prev cam_prev.scale
+
 extern int TgeoOnLoad(entry *tgeo);
 
-extern int GfxInitMatrices();
+extern void GfxInitMatrices();
 extern void GfxUpdateMatrices();
-extern int GfxResetCam(vec *trans);
+extern void GfxResetCam(vec *trans);
 extern int GfxCalcObjectMatrices(svtx_frame *frame, tgeo_header *t_header,
   gool_object *obj, int flag, int32_t *zdist);
 extern void GfxTransformSvtx(svtx_frame *frame, void *ot, gool_object *obj);

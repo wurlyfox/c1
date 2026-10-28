@@ -77,6 +77,7 @@ void SDLUpdate() {
     case SDL_MOUSEBUTTONUP:
     case SDL_MOUSEBUTTONDOWN:
       mousel = e.type == SDL_MOUSEBUTTONDOWN;
+      break;
     case SDL_MOUSEMOTION:
       mousex = e.motion.x;
       mousey = e.motion.y;
@@ -132,4 +133,5 @@ int init() {
 int _kill() {
   GLKill();
   SDLKill();
+  return 0;
 }

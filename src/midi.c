@@ -48,7 +48,7 @@ eid_t insts[8];            /* 8005728C */
 extern lid_t cur_lid;
 
 //----- (800311B0) --------------------------------------------------------
-int MidiResetSeqVol(int16_t val) {
+void MidiResetSeqVol(int16_t val) {
   int32_t vol;
   int i;
 
@@ -201,7 +201,7 @@ static inline int MidiGetVab(entry *midi) {
   vab = (uint8_t*)malloc(size);
   vd = vab;
   vh = (uint8_t*)midi->items[1];
-  for (i=0;i<vh_size;i++)
+  for (i=0;i<(int)vh_size;i++)
     *(vd++) = *(vh++);
   for (i=0;i<7;i++) {
     inst_eid = header->insts[i];
@@ -221,7 +221,6 @@ static inline int MidiGetVab(entry *midi) {
 }
 
 void VabClose(int _vab_id) {
-  int i;
   if (vabs[_vab_id])
     free(vabs[_vab_id]);
   vabs[_vab_id] = 0;
@@ -333,6 +332,9 @@ int MidiKill() {
   int i;
   for (i=0;i<16;i++)
     VabClose(i);
+#endif
+#ifdef CFLAGS_BUGFIXES
+  return 0;
 #endif
 }
 

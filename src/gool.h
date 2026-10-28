@@ -229,7 +229,7 @@ typedef struct {
   zone_entity *entity;
   int32_t path_progress;
   uint32_t path_length;
-  uint32_t floor_y;
+  int32_t floor_y;
   uint32_t state_flags;
   int32_t speed;
   uint32_t invincibility_state;

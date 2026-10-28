@@ -157,12 +157,13 @@ void TexturesUpdate() {
 void TextureCopy(uint8_t *src, uint8_t *dst, dim2 *sdim, dim2 *ddim,
   rect2 *srect, pnt2 *dloc,
   void *clut, int clut_type, int color_mode, int semi_trans) {
-  uint32_t *data, palette[256], *dst32;
+  uint32_t palette[256], *dst32;
   uint16_t *clut_data, *src16;
   pnt2 pnt, *clut_loc;
   dim2 dim;
   rect2 rect;
-  int i, idx, si, di, x, y;
+  int i, idx, si, di;
+  uint32_t x, y;
 
   src16 = (uint16_t*)src;
   dst32 = (uint32_t*)dst;
@@ -250,7 +251,7 @@ static int TexturePageIdx(entry_ref *tpag) {
  */
 static tpage *TexturePage(entry_ref *tpag) {
   eid_t eid;
-  int i, idx;
+  int idx;
 
   eid = tpag->is_eid ? tpag->eid : tpag->en->eid;
   idx = TexturePageIdx((entry_ref*)&eid);
@@ -308,12 +309,13 @@ static int TextureNew(texinfo *texinfo, fvec (*uvs)[4]) {
   rect2 rect;
   pnt2 clut;
   uint32_t hash;
-  float page_width;
-  int i, idx, ppi, fw, texid;
+  int i, ppi, texid;
 
   ppi = (2 << (2 - texinfo->color_mode));
-  page_width = (float)(ppi << 7);
   /* // alternative variant; avoids the large blob of precomputed uvs, but slower
+  int fw;
+  float page_width;
+  page_width = (float)(ppi << 7);
   fw = rgninfo.uv_idx / 25;
   rect.x = ((rgninfo.segment * 32) + rgninfo.xoffs) * ppi;
   rect.y = rgninfo.offs * 4;
@@ -349,11 +351,11 @@ static int TextureNew(texinfo *texinfo, fvec (*uvs)[4]) {
   hash = texinfo->color_mode<<12|texinfo->segment<<10
         |texinfo->offs_x<<5|texinfo->offs_y;
   table = cache.table[atlas->tpage_id];
-  for (i=hash;i<hash+TEX_CACHE_BUCKETSIZE;i++) {
+  for (i=hash;i<(int)(hash+TEX_CACHE_BUCKETSIZE);i++) {
     entry = &table[i%0x8000];
     if (!entry->valid) { break; }
   }
-  if (i==hash+TEX_CACHE_BUCKETSIZE) { return -1; }
+  if (i==(int)(hash+TEX_CACHE_BUCKETSIZE)) { return -1; }
   entry->valid = 1;
   entry->hash = hash;
   entry->texinfo = *texinfo;
@@ -378,12 +380,12 @@ static int TextureLookup(texinfo *texinfo, fvec(*uvs)[4]) {
   hash = texinfo->color_mode<<12|texinfo->segment<<10
         |texinfo->offs_x<<5|texinfo->offs_y;
   table = cache.table[idx];
-  for (i=hash;i<hash+TEX_CACHE_BUCKETSIZE;i++) {
+  for (i=hash;i<(int)(hash+TEX_CACHE_BUCKETSIZE);i++) {
     entry = &table[i%0x8000];
     if (!entry->valid) { return -1; }
     if (hash==entry->hash && texinfo->uv_idx==entry->texinfo.uv_idx) { break; }
   }
-  if (i==hash+TEX_CACHE_BUCKETSIZE) { return -1; }
+  if (i==(int)(hash+TEX_CACHE_BUCKETSIZE)) { return -1; }
   for (i=0;i<4;i++)
     (*uvs)[i] = entry->uvs[i];
   return entry->texid;

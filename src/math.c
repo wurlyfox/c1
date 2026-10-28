@@ -115,7 +115,7 @@ int sub_80029E80(int32_t a1, int32_t a2, uint32_t aa_max) {
   }
   aa = abs(a);
   if (aa > aa_max) {
-    aa = abs(aa_max);
+    aa = abs((int32_t)aa_max);
     return a > 0 ? aa: -aa;
   }
   return a;
@@ -132,7 +132,7 @@ static inline uint32_t _rand(uint32_t max, uint32_t *seed) {
   *seed = res;
   res /= 15;
   resb = (res + (((uint64_t)res*33) >> 32)) >> 1;
-  resc = abs(res - ((int32_t)((resb & 0x7C000000) << 1) - (resb >> 26))) % max;
+  resc = abs((int32_t)(res - ((int32_t)((resb & 0x7C000000) << 1) - (resb >> 26)))) % max;
   return resc;
 }
 

@@ -150,7 +150,7 @@ void CoreLoop(lid_t lid) {
     is_pause_lid = lid != LID_TITLE && lid != LID_LEVELEND && lid != LID_INTRO;
     can_pause = (pbak_state == 0) && ((is_pause_lid && title_pause_state != -1) || title_pause_state > 0);
     if ((pads[0].tapped & 0x800) && can_pause) {
-      if (paused = 1 - paused) {
+      if ((paused = 1 - paused)) {
         if (!pause_obj) {
           pause_obj = GoolObjectCreate(&handles[7], 4, 4, 0, 0, 0);
           if (!ISERRORCODE(pause_obj)) {
@@ -192,14 +192,14 @@ void CoreLoop(lid_t lid) {
       pause_status = 0;
     if (crash && crash_eid != EID_NONE) /* crash exists and there is a pbak entry to play? */
       PbakPlay(&crash_eid);
-    if (next_lid == -1 && lid != LID_TITLE
+    if (next_lid == (lid_t)-1 && lid != LID_TITLE
       && (game_state == GAME_STATE_GAMEOVER
        || game_state == GAME_STATE_CONTINUE
        || game_state == 0x400))
       next_lid = LID_TITLE;
-    if (next_lid != -1) {
+    if (next_lid != (lid_t)-1) {
       GoolSendToColliders(0, GOOL_EVENT_LEVEL_END, 0, 0, 0);
-      if (next_lid == -2) {
+      if (next_lid == (lid_t)-2) {
         lid = savestate.lid;
         bonus_return = 1; /* i.e. loading nsf and there is a savestate to load */
         bonus_return2 = 1; /* LdatInit clears bonus_return so we need a persistent variant */

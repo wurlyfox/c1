@@ -143,7 +143,7 @@ void SwMulMatrix(mat16 *m_l, mat16 *m_r) {
 
 void SwRotMatrixYXY(mat16 *m_rot, ang *rot) {
   int16_t sx, sy, sz, cx, cy, cz;
-  int16_t sxsy, sxsz, sysz, cxsy, cxsz, sxcy, sxcz, sycz, cxcz, cycz;
+  int16_t sxsy, sxsz, sysz, cxsy, cxsz, sxcy, sxcz, sycz, cxcz;
   int16_t sxcysz, cxcysz, sxcycz, cxcycz;
 
   sx=sin(rot->x);sy=sin(rot->y);sz=sin(rot->z);
@@ -157,7 +157,6 @@ void SwRotMatrixYXY(mat16 *m_rot, ang *rot) {
   sxcz=(sx*cz)>>12;
   sycz=(sy*cz)>>12;
   cxcz=(cx*cz)>>12;
-  cycz=(cy*cz)>>12;
   sxcysz=(sxcy*sz)>>12;
   sxcycz=(sxcy*cz)>>12;
   cxcysz=(cxsz*cy)>>12;
@@ -283,7 +282,7 @@ int SwCalcSpriteRotMatrix(
   int32_t depth,
   int32_t max_depth,
   sw_transform_struct *params) {
-  mat16 m_rot2, m_scale;
+  mat16 m_scale;
   vec trans, scale;
   ang rot;
 
@@ -353,7 +352,7 @@ void SwTransformSvtx(
   bc=params->back_color;
   verts = frame->vertices;
   texinfos = header->texinfos;
-  for (i=0;i<header->poly_count;i++) {
+  for (i=0;i<(int)header->poly_count;i++) {
     poly=&polys[i];
     info=*(tgeo_texinfo*)&((uint32_t*)texinfos)[poly->texinfo_idx];
     poly_verts[0]=(svtx_vertex*)((uint8_t*)verts+poly->a_idx);
@@ -463,24 +462,19 @@ void SwTransformCvtx(
   cvtx_vertex *verts, *vert, *poly_verts[3];
   tgeo_polygon *poly;
   tgeo_texinfo *texinfos, info;
-  vec u_vert, r_verts[3], n, ldir;
+  vec u_vert, r_verts[3];
   fvec uvs[4]; /* only first 3 are used */
-  mat16_t lm, cm;
-  rgb8 color, bc;
-  rgb16 color16;
+  rgb8 color;
   poly3i *prim, *next;
   int32_t ndot;
-  int32_t z_min, z_max, z_sum;
+  int32_t z_sum;
   int32_t t1, t2, t3;
   int i, ii, texid, z_idx, res;
   int idx_adj;
 
-  SwCopyMat(lm, params->m_light.m);
-  SwCopyMat(cm, params->m_color.m);
-  bc=params->back_color;
   verts = frame->vertices;
   texinfos = header->texinfos;
-  for (i=0;i<header->poly_count;i++) {
+  for (i=0;i<(int)header->poly_count;i++) {
     poly=&polys[i];
     info=*(tgeo_texinfo*)&((uint32_t*)texinfos)[poly->texinfo_idx];
     poly_verts[0]=(cvtx_vertex*)((uint8_t*)verts+poly->a_idx);
@@ -601,21 +595,19 @@ void SwProjectBound(bound *lbound, vec *col, vec *trans, vec *_cam_trans, bound2
   vec vert;
   vec2 *screen;
   vec s_vert;
-  mat16 *m_rot;
   bound bound;
   int i, j, k;
   extents->p1.x = 0x7FFFFFFF; /* INT_MAX */
   extents->p1.y = 0x7FFFFFFF; /* INT_MAX */
   extents->p2.x = -0x80000000; /* INT_MIN */
   extents->p2.y = -0x80000000; /* INT_MIN */
-  bound.p1.x=lbound->p1.x+trans->x+(col->x-_cam_trans->x)>>8;
-  bound.p1.y=lbound->p1.y+trans->y+(col->y-_cam_trans->y)>>8;
-  bound.p1.z=lbound->p1.z+trans->z+(col->z-_cam_trans->z)>>8;
-  bound.p2.x=lbound->p2.x+trans->x+(col->x-_cam_trans->x)>>8;
-  bound.p2.y=lbound->p2.y+trans->y+(col->y-_cam_trans->y)>>8;
-  bound.p2.z=lbound->p2.z+trans->z+(col->z-_cam_trans->z)>>8;
+  bound.p1.x=lbound->p1.x+trans->x+((col->x-_cam_trans->x)>>8);
+  bound.p1.y=lbound->p1.y+trans->y+((col->y-_cam_trans->y)>>8);
+  bound.p1.z=lbound->p1.z+trans->z+((col->z-_cam_trans->z)>>8);
+  bound.p2.x=lbound->p2.x+trans->x+((col->x-_cam_trans->x)>>8);
+  bound.p2.y=lbound->p2.y+trans->y+((col->y-_cam_trans->y)>>8);
+  bound.p2.z=lbound->p2.z+trans->z+((col->z-_cam_trans->z)>>8);
   trans=&params.trans;
-  //m_rot=&params.m_rot;
   screen=&params.screen;
   for (i=0;i<2;i++) {
     for (j=0;j<2;j++) {
@@ -674,22 +666,21 @@ static void SwTransformAndShadeWorlds(
   sw_transform_struct *params,
   sw_shader_t pre_shader,
   sw_shader_t post_shader) {
-  zone_header *header;
   zone_world *worlds, *world;
   poly_id *poly_ids;
   poly_id poly_id;
   vert_id vert_id;
-  wgeo_polygon *polys, *poly;
+  wgeo_polygon *poly;
   wgeo_vertex *verts, *vert, *poly_verts[3];
   wgeo_texinfo *texinfos, *wgeo_info;
   texinfo info;
   eid_t *tpags, tpag;
-  vec trans, u_verts[3], r_verts[3], v_verts[3];
+  vec u_verts[3], r_verts[3];
   rgb8 colors[3];
   fvec uvs[4]; /* only first 3 are used */
   poly3i *prim, *next;
   int32_t z_sum;
-  int texid, z_idx, min_z_idx, offs;
+  int texid, z_idx, min_z_idx;
   int i, ii, world_idx, poly_idx, info_idx;
 
   worlds = params->worlds;
@@ -699,11 +690,9 @@ static void SwTransformAndShadeWorlds(
     poly_id = poly_ids[i];
     world_idx = poly_id.world_idx;
     world = &worlds[world_idx];
-    polys = world->polygons;
     verts = world->vertices;
     texinfos = world->texinfos;
     tpags = world->header->tpags;
-    trans = world->trans;
     poly_idx = poly_id.poly_idx;
     poly = &world->polygons[poly_idx];
     poly_verts[0] = &verts[poly->a_idx];
@@ -776,7 +765,7 @@ static void SwTransformAndShadeWorlds(
 }
 
 static void SwFogShader(vert_id vert_id, vec *vert, rgb8 *color, sw_transform_struct *params) {
-  zone_header *header;
+  /* zone_header *header; */
   zone_world *world;
   srgb c1, c2, cd;
   int32_t t, far;
@@ -964,7 +953,6 @@ void SwTransformWorldsDark2(
 #ifdef CFLAGS_DRAW_EXTENSIONS
 
 #include "level.h"
-extern vec cam_trans;
 extern mat16 ms_cam_rot;
 const int rface_vert_idxes[6][4] = { { 0, 1, 2, 3 },
                                      { 1, 5, 3, 7 },
@@ -1055,7 +1043,7 @@ int wallmap_image = 0;
 void SwDrawWallMap(uint32_t *wall_bitmap, void *ot, void **prims_tail) {
   poly4i *prim, *next;
   rect2 rect;
-  uint32_t pixels[32*32], *p;
+  uint32_t pixels[32*32];
   uint32_t bits, tmp;
   int i,j,idx;
 
@@ -1064,7 +1052,6 @@ void SwDrawWallMap(uint32_t *wall_bitmap, void *ot, void **prims_tail) {
     bits = wall_bitmap[i];
     for (j=0;j<32;j++) {
       idx = (i*32)+(31-j);
-      p = &pixels[idx];
       pixels[idx] = bits & 1 ? -1: 0;
       bits >>= 1;
     }
@@ -1096,7 +1083,7 @@ void SwDrawWallMap(uint32_t *wall_bitmap, void *ot, void **prims_tail) {
 
 void SwTransformObjectBounds(gool_bound *bounds, int count, void *ot, void **prims_tail) {
   gool_bound *bound;
-  vec max_depth, u_vert, r_verts[8], zero;
+  vec u_vert, r_verts[8], zero;
   rgb8 color;
   poly4i *prim, *next;
   int i, ii, iii;

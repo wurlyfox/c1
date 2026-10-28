@@ -9,10 +9,10 @@
 #include <string.h>
 #endif
 
-/* compilation settings */
+/* default compilation settings */
 #define LID_BOOTLEVEL             LID_TITLE
 #ifndef PSX                       /* non-PSX target options */
-#define GFX_SW_PERSP
+#define CFLAGS_BUGFIXES
 #endif
 
 /* codes */

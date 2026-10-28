@@ -354,8 +354,8 @@ void ShaderParamsUpdate(int init) {
     }
     prev_light_src_obj = light_src_obj;
     if (dark_afx0_next != dark_afx0_tgt) {
-      if (dark_afx0_tgt > dark_afx0_next && (dark_afx0_next + dark_afx0_step >= dark_afx0_tgt)
-        || dark_afx0_next < dark_afx0_tgt && (dark_afx0_tgt >= dark_afx0_step + dark_afx0_next)) {
+      if ((dark_afx0_tgt > dark_afx0_next && (dark_afx0_next + dark_afx0_step >= dark_afx0_tgt))
+        || (dark_afx0_tgt < dark_afx0_next && (dark_afx0_tgt >= dark_afx0_next + dark_afx0_step))) {
         dark_afx0_next = dark_afx0_tgt;
         dark_afx0_step = 0;
       }
@@ -363,8 +363,8 @@ void ShaderParamsUpdate(int init) {
         dark_afx0_next = dark_afx0_next + dark_afx0_step;
     }
     if (dark_dist_tgt != dark_dist_next) {
-      if (dark_dist_tgt > dark_dist_next && (dark_dist_next + dark_dist_step >= dark_dist_tgt)
-        || dark_dist_next < dark_dist_tgt && (dark_dist_tgt >= dark_dist_step + dark_dist_next)) {
+      if ((dark_dist_tgt > dark_dist_next && (dark_dist_next + dark_dist_step >= dark_dist_tgt))
+        || (dark_dist_tgt < dark_dist_next && (dark_dist_tgt >= dark_dist_next + dark_dist_step))) {
         dark_dist_next = dark_dist_tgt;
         dark_dist_step = 0;
       }

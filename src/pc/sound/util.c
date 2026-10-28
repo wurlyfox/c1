@@ -55,7 +55,7 @@ size_t ADPCMToPCM16(uint8_t *adpcm, size_t size, uint8_t *pcm, int *loop) {
   start = pcm;
   s0 = 0; s1 = 0;
   if (loop) { *loop = -1; }
-  for (i=0;i<size/sizeof(VagLine);i++) {
+  for (i=0;i<(int)(size/sizeof(VagLine));i++) {
     Next(adpcm, VagLine, line);
     if ((line->flags & 4) && (i>1) && loop) { 
       *loop = (int)(pcm - start);
@@ -217,17 +217,16 @@ size_t VabToSf2(uint8_t *vab, uint8_t *sf2) {
   VabProg *prog, progs[128];
   VagBody *wave;
   VagAtr *atr;
-  VabA *va; VabB *vb; VabBody *vbd;
-  CK *ck0, *ck1, *ck2, *ck3;
+  VabA *va; VabB *vb;
+  CK *ck0, *ck1, *ck2;
   iRC irc; hRC hrc;
-  sfPresetHeader *presets[128];
   sfPresetBag *pbags[128], *tpbag;
   sfInst *insts[128], *tinst;
   sfInstBag *ibags[128][17], *tibag;
   size_t size;
   uint32_t wave_offs;
   uint8_t *waves[255], *wave_ends[255];
-  int i, j, prog_count, zone_count, sample_count;
+  int i, j, prog_count, zone_count;
 
   va = (VabA*)vab;
   vb = (VabB*)&va->vagatrs[va->hdr.ps];
@@ -284,7 +283,6 @@ size_t VabToSf2(uint8_t *vab, uint8_t *sf2) {
     hrc.phdr->dwLibrary = 0;
     hrc.phdr->dwGenre = 0;
     hrc.phdr->dwMorphology = 0;
-    presets[i] = hrc.phdr;
     ++prog_count;
   }
   Sf2Next(sf2, sfPresetHeader, hrc.phdr);

@@ -168,13 +168,13 @@ static gui_item *GuiReflScalar(refl_value *val) {
 }
 
 static gui_item *GuiReflGroup(gui_item **children, int flags) {
-  gui_item *item, *it, *content, *label;
+  gui_item *item, *it, *content;
   int i, once;
 
   if (!children) { return (gui_item*)-1; }
   item = GuiGroupNew();
   once = 0;
-  for (i=0;it=children[i];i++) {
+  for (i=0;(it=children[i]);i++) {
     /* skip children that we chose to not map */
     if ((int)it==-1) { continue; }
     content = GuiNodeContent(it);
@@ -195,7 +195,7 @@ static gui_item *GuiReflNode(gui_item **children) {
   int i;
 
   item = GuiNodeNew(0, 0);
-  for (i=0;it=children[i];i++) {
+  for (i=0;(it=children[i]);i++) {
     if ((int)it==-1) { continue; }
     GuiAddChild(item, it);
   }
@@ -278,7 +278,7 @@ static void FloatsToRgb(float in[3], void *out) {
 }
 
 static gui_item *GuiReflRgb8(gui_item **children) {
-  gui_item *item, *it, *content;
+  gui_item *item, *content;
   void *data;
   int i;
 
@@ -292,7 +292,7 @@ static gui_item *GuiReflRgb8(gui_item **children) {
 }
 
 static gui_item *GuiReflRgb16(gui_item **children) {
-  gui_item *item, *it, *content;
+  gui_item *item, *content;
   void *data;
   int i;
 
@@ -306,7 +306,7 @@ static gui_item *GuiReflRgb16(gui_item **children) {
 }
 
 static gui_item *GuiReflRgb(gui_item **children) {
-  gui_item *item, *it, *content;
+  gui_item *item, *content;
   void *data;
   int i;
 
@@ -351,7 +351,6 @@ static gui_item *GuiReflBound(gui_item **children) {
 }
 
 static gui_item *GuiReflObjPtr(refl_value *val) {
-  gool_object *obj;
   gui_item *item;
 
   item = GuiTextNew(0, 0);
@@ -366,7 +365,7 @@ static gui_item *GuiMapObjField(refl_value *val, refl_path *path, void **mapped)
     "colors_i", "vectors_v", "vectors_a", "l", "c", "a" };
   gui_item *node, *item, **children;
   refl_value pval;
-  char *name, *typename;
+  char *typename;
   int i, count, label;
 
   for (i=0;i<9;i++) { /* skip rejected fields */
@@ -447,7 +446,7 @@ static gui_item *GuiObjPropTree(void *obj) {
   if (obj==0) { return tree; }
   gool_object_type = ReflGetType(0, "gool_object");
   items = (gui_item**)ReflMap(obj, gool_object_type, (refl_map_t)GuiMapObjField);
-  for (i=0;it=items[i];i++) {
+  for (i=0;(it=items[i]);i++) {
     if ((int)it == -1) { continue; }
     GuiAddChild(tree, it);
   }
@@ -566,7 +565,7 @@ static gui_item *GuiObjCodeView(void *obj) {
 /** specific views **/
 static gui_item* GuiObjView(void*);
 static void GuiObjSelect(gui_item *item) {
-  gui_item *root, *old, *new;
+  gui_item *old, *new;
   gui_tree *tree;
   gool_handle *handle;
 
@@ -591,7 +590,6 @@ static gui_item *GuiObjTreeView(void *obj) {
 static gui_item *GuiObjView(void *obj) {
   gui_item *view, *top, *bot;
   gui_item *grid;
-  char str[0x1000];
 
   view = GuiWindowNew("object view");
   grid = GuiGridNew(1, 0);
@@ -607,12 +605,9 @@ static gui_item *GuiObjView(void *obj) {
 }
 
 static gui_item *GuiDebugView() {
-  gui_item *root, *text;
+  gui_item *root;
   gui_item *grid;
   gui_item *tree_view, *obj_view;
-  gui_item *tmp;
-  refl_value val;
-  void *obj;
 
   root = GuiWindowNew("debug view");
   grid = GuiGridNew(0, 1);

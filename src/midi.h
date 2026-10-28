@@ -22,7 +22,7 @@ typedef struct {
   int16_t volr;
 } midi_seq;
 
-extern int MidiResetSeqVol(int16_t val);
+extern void MidiResetSeqVol(int16_t val);
 extern int MidiInit();
 extern void MidiResetFadeStep();
 extern void MidiTogglePlayback(int a1);

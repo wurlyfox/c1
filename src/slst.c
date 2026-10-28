@@ -61,8 +61,6 @@ typedef struct {
   int count;
 } slst_context;
 
-static const int16_t null_poly_id_val = -1;
-
 static inline void SlstRemNext(slst_context *rem, uint16_t *nodes) {
   if (rem->len > 0) {
     rem->poly = *(poly_id*)&nodes[rem->i++];
