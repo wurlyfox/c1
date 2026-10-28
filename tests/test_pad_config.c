@@ -69,3 +69,30 @@ UTEST(pad_config, reset_restores_defaults) {
   ASSERT_EQ((uint32_t)PAD_CROSS, held_for(SDL_SCANCODE_Z));
   ASSERT_EQ(0u, held_for(SDL_SCANCODE_V));
 }
+
+UTEST(pad_config, repeated_lines_add_keys) {
+  PadResetBindings();
+  write_config("cross = V\ncross = B\n");
+  ASSERT_EQ(2, PadLoadConfig(CONFIG_PATH));
+  ASSERT_EQ((uint32_t)PAD_CROSS, held_for(SDL_SCANCODE_V));
+  ASSERT_EQ((uint32_t)PAD_CROSS, held_for(SDL_SCANCODE_B));
+  ASSERT_EQ(0u, held_for(SDL_SCANCODE_Z));
+}
+
+UTEST(pad_config, one_key_can_press_several_buttons) {
+  PadResetBindings();
+  write_config("cross = V\nsquare = V\n");
+  ASSERT_EQ(2, PadLoadConfig(CONFIG_PATH));
+  ASSERT_EQ((uint32_t)(PAD_CROSS | PAD_SQUARE), held_for(SDL_SCANCODE_V));
+}
+
+UTEST(pad_config, reloading_replaces_previous_file) {
+  PadResetBindings();
+  write_config("cross = V\ncross = B\n");
+  PadLoadConfig(CONFIG_PATH);
+  write_config("cross = N\n");
+  ASSERT_EQ(1, PadLoadConfig(CONFIG_PATH));
+  ASSERT_EQ((uint32_t)PAD_CROSS, held_for(SDL_SCANCODE_N));
+  ASSERT_EQ(0u, held_for(SDL_SCANCODE_V));
+  ASSERT_EQ(0u, held_for(SDL_SCANCODE_B));
+}
