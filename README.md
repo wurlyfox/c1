@@ -1,17 +1,17 @@
-# C1 #
+# C1
 
 This is a port of the game *Crash Bandicoot* to C.
 
 The code is designed to compile for both psx and pc. At the moment only pc-specific code is working.
 
-## Status ##
+## Status
 
 - Code - 100% ported
 - Functionality - 78%
 
 At the moment the game is only partially playable with a number of currently identified [issues](doc/issues.md).
 
-## Compiling ##
+## Compiling
 
 As of currently, compilation has only been tested on Ubuntu/Debian and on Windows (MSYS2 MinGW32). However, the game should build on any system with a working 32-bit GNU toolchain and other dependencies listed below.
 
@@ -19,9 +19,9 @@ Note that only 32-bit target executables are currently supported. If you are not
 
 To compile c1, install the dependencies listed below, `cd` into the main project directory, and run `make`.
 
-### Dependencies ###
+### Dependencies
 
-#### pc ####
+#### pc
 - gcc / binutils / glibc
 - GNU make
 - OpenGL 2.0 or higher
@@ -44,12 +44,12 @@ Windows (MSYS2):
 
 `c1.exe` links dynamically against SDL2, FluidSynth (and its audio codec dependencies) and the GCC runtime. Windows only looks for DLLs next to the executable or on `PATH`, so outside the MINGW32 shell the game fails to start with an error such as *"libfluidsynth-3.dll was not found"*. To avoid this, the Windows build has an extra `dlls` step that runs after linking. It recursively follows `c1.exe`'s imports and copies each one found in the MinGW32 `bin` directory (currently 17 DLLs) into `build/`. To re-copy them on their own, run `make dlls`. The `build` directory is ignored by git, and `make clean` removes it. To run the game on another machine, copy the `build` directory with the `streams` directory beside it (or inside it).
 
-#### psx ####
+#### psx
 (note: psx build currently does not work)
 
 - Psy-Q
 
-## Running ##
+## Running
 
 To run c1, `cd` into the main project directory and run `./c1` (`build/c1.exe` on Windows).
 
@@ -65,7 +65,7 @@ If an asset file is missing, the game shows a *"Could not open ./streams/…"* e
 
 The game is hardcoded to boot into level `25` (aka. title sequence/main menu screen(s)). To choose a different boot level, redefine the `LID_BOOTLEVEL` constant in `common.h` and recompile.
 
-## Controls ##
+## Controls
 
 - X - <kbd>Z</kbd>
 - square - <kbd>X</kbd>
@@ -88,7 +88,7 @@ The game is hardcoded to boot into level `25` (aka. title sequence/main menu scr
 
 Key bindings are defined in the `pad_mappings` table in `src/pc/pad.c`; edit it and recompile to change them.
 
-## Structure ##
+## Structure
 Project structure is listed below, including descriptions for each file.
 
 Note that further documentation can be found in the `doc` directory.
