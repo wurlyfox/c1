@@ -4,7 +4,8 @@
 
 ### Added
 
-- Windows build support via MSYS2 MinGW32, including copying the required DLLs next to `c1.exe`
+- Windows build support via MSYS2 MinGW32; `c1.exe` and the DLLs it needs are output to `build/`
+- `streams/` is also found next to or one directory above the executable, so it no longer has to be run from the project directory
 - `tools/extract_streams.py` for extracting asset files from a `.bin`/`.iso` disc image
 - error message naming the missing file when an asset file cannot be opened
 

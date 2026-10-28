@@ -1,4 +1,5 @@
 #include <SDL2/SDL.h>
+#include <unistd.h>
 #ifdef CFLAGS_GUI
 #define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
 #define CIMGUI_USE_SDL
@@ -104,10 +105,36 @@ void SDLInput(gl_input *input) {
   }
 }
 
+/*
+ * change to the directory containing streams/, so the game also works
+ * when the executable is launched from elsewhere (e.g. build/c1.exe).
+ * checks the working directory, the executable's directory, then its parent.
+ */
+static void FindDataDir() {
+  char *base, path[1024];
+
+  if (access("streams", 0) == 0) { return; }
+  base = SDL_GetBasePath();
+  if (!base) { return; }
+  snprintf(path, sizeof(path), "%sstreams", base);
+  if (access(path, 0) == 0) {
+    chdir(base);
+  }
+  else {
+    snprintf(path, sizeof(path), "%s../streams", base);
+    if (access(path, 0) == 0) {
+      snprintf(path, sizeof(path), "%s..", base);
+      chdir(path);
+    }
+  }
+  SDL_free(base);
+}
+
 int init() {
   gl_callbacks callbacks;
   int i;
 
+  FindDataDir();
   PadInit(2); /* initialize 2 joypad structs */
   SetTicksElapsed(0);
   SDLInit();
