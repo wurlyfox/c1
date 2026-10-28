@@ -204,6 +204,12 @@ These are here for now but will likely moved into code as function comments in t
 - `PadInit` - initialize structures for holding current joypad state and detecting changes in joypad state
 - `PadUpdate` - update joypad state and detect changes in joypad state
 
+### pc
+- `SwPadRead` - get the buttons held on a joypad, from the keys currently pressed and the current key bindings
+- `PadParseBinding` - parse one `button = key name` line of a controls file into a button and an SDL scancode
+- `PadResetBindings` - restore the built-in default key bindings
+- `PadLoadConfig` - load key bindings from a controls file (`controls.cfg`), skipping and reporting invalid lines
+
 ## pbak.c
 - `PbakInit` - initialize demo playback
 - `PbakStart` - begin demo playback
