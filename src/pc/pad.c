@@ -1,30 +1,30 @@
 #include <SDL2/SDL.h>
 #include "pc/pad.h"
 
-extern uint8_t keys[512];
+extern uint8_t keys[512]; /* indexed by SDL scancode */
 
 typedef struct {
-  SDL_Keycode code;
+  SDL_Scancode code;
   uint32_t bits;
 } sw_pad_mapping;
 
 const sw_pad_mapping pad_mappings[16] = {
-  { .code = SDLK_SPACE,      .bits = PAD_SELECT   },
-  { .code = SDLK_1,          .bits = PAD_L3       },
-  { .code = SDLK_3,          .bits = PAD_R3       },
-  { .code = SDLK_RETURN,     .bits = PAD_START    },
-  { .code = SDLK_UP+0x80,    .bits = PAD_UP       },
-  { .code = SDLK_RIGHT+0x80, .bits = PAD_RIGHT    },
-  { .code = SDLK_DOWN+0x80,  .bits = PAD_DOWN     },
-  { .code = SDLK_LEFT+0x80,  .bits = PAD_LEFT     },
-  { .code = SDLK_q,          .bits = PAD_L2       },
-  { .code = SDLK_e,          .bits = PAD_R2       },
-  { .code = SDLK_a,          .bits = PAD_L1       },
-  { .code = SDLK_d,          .bits = PAD_R1       },
-  { .code = SDLK_s,          .bits = PAD_TRIANGLE },
-  { .code = SDLK_c,          .bits = PAD_CIRCLE   },
-  { .code = SDLK_z,          .bits = PAD_CROSS    },
-  { .code = SDLK_x,          .bits = PAD_SQUARE   },
+  { .code = SDL_SCANCODE_SPACE,  .bits = PAD_SELECT   },
+  { .code = SDL_SCANCODE_1,      .bits = PAD_L3       },
+  { .code = SDL_SCANCODE_3,      .bits = PAD_R3       },
+  { .code = SDL_SCANCODE_RETURN, .bits = PAD_START    },
+  { .code = SDL_SCANCODE_UP,     .bits = PAD_UP       },
+  { .code = SDL_SCANCODE_RIGHT,  .bits = PAD_RIGHT    },
+  { .code = SDL_SCANCODE_DOWN,   .bits = PAD_DOWN     },
+  { .code = SDL_SCANCODE_LEFT,   .bits = PAD_LEFT     },
+  { .code = SDL_SCANCODE_Q,      .bits = PAD_L2       },
+  { .code = SDL_SCANCODE_E,      .bits = PAD_R2       },
+  { .code = SDL_SCANCODE_A,      .bits = PAD_L1       },
+  { .code = SDL_SCANCODE_D,      .bits = PAD_R1       },
+  { .code = SDL_SCANCODE_S,      .bits = PAD_TRIANGLE },
+  { .code = SDL_SCANCODE_C,      .bits = PAD_CIRCLE   },
+  { .code = SDL_SCANCODE_Z,      .bits = PAD_CROSS    },
+  { .code = SDL_SCANCODE_X,      .bits = PAD_SQUARE   },
 };
 
 uint32_t SwPadRead(int idx) {
@@ -36,7 +36,7 @@ uint32_t SwPadRead(int idx) {
   count = sizeof(pad_mappings)/sizeof(sw_pad_mapping);
   for (i=0;i<count;i++) {
     code = pad_mappings[i].code;
-    if (keys[code & 0xFF]) {
+    if (keys[code]) {
       bits = pad_mappings[i].bits;
       held |= bits;
     }

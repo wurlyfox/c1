@@ -18,7 +18,7 @@
 
 SDL_Window *window = 0;
 SDL_GLContext ogl_context;
-uint8_t keys[512] = { 0 };
+uint8_t keys[SDL_NUM_SCANCODES] = { 0 }; /* indexed by SDL scancode */
 int32_t mousex, mousey;
 int mousel;
 
@@ -61,16 +61,10 @@ void SDLUpdate() {
       done = 1;
       break;
     case SDL_KEYDOWN:
-      if (e.key.keysym.sym & 0x40000000)
-        keys[(int)(e.key.keysym.sym & 0xFF) + 0x80] = 1;
-      else
-        keys[(int)(e.key.keysym.sym & 0x7F)] = 1;
+      keys[e.key.keysym.scancode] = 1;
       break;
     case SDL_KEYUP:
-      if (e.key.keysym.sym & 0x40000000)
-        keys[(e.key.keysym.sym & 0xFF) + 0x80] = 0;
-      else
-        keys[(e.key.keysym.sym & 0x7F)] = 0;
+      keys[e.key.keysym.scancode] = 0;
       break;
     case SDL_MOUSEBUTTONUP:
     case SDL_MOUSEBUTTONDOWN:
