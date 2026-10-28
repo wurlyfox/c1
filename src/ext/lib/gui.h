@@ -159,6 +159,7 @@ extern gui_item *GuiItemNew();
 
 extern void GuiAddChild(gui_item *item, gui_item *child);
 extern void GuiRemoveChild(gui_item *item, gui_item *child);
+extern void GuiRemoveNode(gui_item *item);
 extern void GuiInsertChild(gui_item *item, gui_item *prev, gui_item *child);
 extern void GuiAddLabel(gui_item *item, char *str);
 
