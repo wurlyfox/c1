@@ -17,6 +17,11 @@ extern gool_handle handles[8];
 extern gool_object *objects;
 extern gool_object *player;
 
+#ifdef CFLAGS_EXTENSIONS
+#include "./ext/ext.h"
+extern ext_config_t ext_config; 
+#endif
+
 void GuiItemReplace(gui_item *item, gui_item *repl) {
   gui_item *parent, *prev;
 
@@ -150,6 +155,38 @@ static gui_item *GuiNodeContent(gui_item *item) {
   return it;
 }
 
+static int GuiEIDParse(char *str, void *data) {
+  *(eid_t*)data = NSStringToEID(str);
+  return 1;
+}
+
+static int GuiEIDUnparse(void *data, char *str) {
+  entry *en;
+  char *res;
+  uint32_t val;
+  
+  val = *(uint32_t*)data;
+  if (val&1) {
+    res = NSEIDToString(*(eid_t*)data);
+    strcpy(str, res);
+  }
+  else if (val) {
+    en = *((entry**)data);
+    res = NSEIDToString(en->eid);
+    sprintf(str, "%s [loaded]", res);
+  }
+  else {
+    strcpy(str, "zero");
+  }
+  return 1;
+}
+
+gui_dtype gui_eid = {
+  .is_prim = 0,
+  .parse = (gui_data_parse_t)GuiEIDParse,
+  .unparse = (gui_data_unparse_t)GuiEIDUnparse
+};
+
 /** structure field => gui item mappers **/
 static gui_item *GuiReflScalar(refl_value *val) {
   gui_item *item;
@@ -157,6 +194,13 @@ static gui_item *GuiReflScalar(refl_value *val) {
   char *typename;
 
   typename = val->field->type->name;
+  if (strcmp(typename, "eid_t") == 0) {
+    item = GuiTextNew(0, 0);
+    item->flags |= GUI_FLAGS_READONLY;
+    item->t->data = val->res;
+    item->t->dtype = gui_eid;
+    return item;
+  }
   if (strcmp(typename, "uint32_t") == 0)
     ptype = &gui_u32;
   else if (strcmp(typename, "int32_t") == 0
@@ -170,6 +214,7 @@ static gui_item *GuiReflScalar(refl_value *val) {
     ptype = &gui_u8;
   else if (strcmp(typename, "int8_t") == 0)
     ptype = &gui_s8;
+  else { ptype = &gui_u8; } /* default to uint8_t */
   item = GuiScalarNew(0, val->res, ptype, 0);
   return item;
 }
@@ -185,6 +230,7 @@ static gui_item *GuiReflGroup(gui_item **children, int flags) {
     /* skip children that we chose to not map */
     if ((int)it==-1) { continue; }
     content = GuiNodeContent(it);
+    if (!content) { continue; }
     content->label = it->label;
     it->label = 0;
     content->flags |= it->flags;
@@ -367,18 +413,12 @@ static gui_item *GuiReflObjPtr(refl_value *val) {
   return item;
 }
 
-static gui_item *GuiMapObjField(refl_value *val, refl_path *path, void **mapped) {
-  const char *rnames[9] = { "data", "regs", "memory",
-    "colors_i", "vectors_v", "vectors_a", "l", "c", "a" };
+static gui_item *GuiMapField(refl_value *val, refl_path *path, void **mapped) {
   gui_item *node, *item, **children;
   refl_value pval;
   char *typename;
-  int i, count, label;
+  int count, label;
 
-  for (i=0;i<9;i++) { /* skip rejected fields */
-    if (strcmp(val->field->name, rnames[i]) == 0)
-      return (gui_item*)-1;
-  }
   label = 1; /* all items will have a label unless specified otherwise */
   children = (gui_item**)mapped;
   typename = val->field->type->name;
@@ -425,6 +465,18 @@ static gui_item *GuiMapObjField(refl_value *val, refl_path *path, void **mapped)
   if (label)
     GuiAddLabel(node, val->field->name);
   return node;
+}
+
+static gui_item *GuiMapObjField(refl_value *val, refl_path *path, void **mapped) {
+  const char *rnames[9] = { "data", "regs", "memory",
+    "colors_i", "vectors_v", "vectors_a", "l", "c", "a" };
+  int i;
+
+  for (i=0;i<9;i++) { /* skip rejected fields */
+    if (strcmp(val->field->name, rnames[i]) == 0)
+      return (gui_item*)-1;
+  }
+  return GuiMapField(val, path, mapped);
 }
 
 static gui_item *GuiObjTree(void *obj, gui_handler_t select) {
@@ -598,7 +650,8 @@ static gui_item *GuiObjView(void *obj) {
   gui_item *view, *top, *bot;
   gui_item *grid;
 
-  view = GuiWindowNew("object view");
+  view = GuiGroupNew();
+  GuiAddLabel(view, "object view");
   grid = GuiGridNew(1, 0);
   grid->flags |= GUI_FLAGS_CELL_CW;
   top = GuiObjPropTree(obj);
@@ -607,6 +660,45 @@ static gui_item *GuiObjView(void *obj) {
   bot = GuiObjCodeView(obj);
   GuiAddChild(grid, bot);
 #endif
+  GuiAddChild(view, grid);
+  return view;
+}
+
+static gui_item *GuiDisplayConfigView() {
+  gui_item *view, *grid, *item, *list;
+  static const char *fps_modes[] = {
+    "30 FPS (PS1 Native)",
+    "60 FPS",
+    "120 FPS",
+    "Uncapped"
+  };
+  static const char *aspect_modes[] = {
+    "4:3 Original",
+    "10:7 Raw PS1 (320x224)",
+    "16:9 Widescreen"
+  };
+
+  view = GuiGroupNew();
+  GuiAddLabel(view, "Display Settings");
+  grid = GuiGridNew(1, 0);
+
+  list = GuiComboNew("Frame Rate", &ext_config.fps_mode, &gui_s32, fps_modes, 4);
+  list->flags |= GUI_FLAGS_RIGHTALIGN;
+  GuiAddChild(grid, list);
+  list = GuiComboNew("Aspect Ratio", &ext_config.aspect_mode, &gui_s32, aspect_modes, 3);
+  list->flags |= GUI_FLAGS_RIGHTALIGN;
+  GuiAddChild(grid, list);
+  
+  item = GuiTextNew("Polygon Raster Mode:", 0);
+  item->flags |= GUI_FLAGS_READONLY;
+  GuiAddChild(grid, item);
+  item = GuiCheckboxNew(&ext_config.enable_textures, "Enable Textures");
+  GuiAddChild(grid, item);
+  item = GuiCheckboxNew(&ext_config.enable_gouraud, "Enable Gouraud Shading");
+  GuiAddChild(grid, item);
+  item = GuiCheckboxNew(&ext_config.enable_wireframe, "Enable Wireframe");
+  GuiAddChild(grid, item);
+
   GuiAddChild(view, grid);
   return view;
 }
@@ -626,6 +718,79 @@ static gui_item *GuiDebugView() {
   return root;
 }
 
+static gui_item *GuiMapZoneField(refl_value *val, refl_path *path, void **mapped) {
+  const char *rnames[7] = { "nodes", "points", "path_points", "pad", "l", "c", "a" };
+  int i;
+
+  for (i=0;i<7;i++) { /* skip rejected fields */
+    if (strcmp(val->field->name, rnames[i]) == 0)
+      return (gui_item*)-1;
+  }
+  return GuiMapField(val, path, mapped);
+}
+
+static gui_item *GuiZoneTree(void *obj) {
+  refl_type *zone_type;
+  gui_item *tree, **items, *it;
+  int i;
+
+  tree = GuiTreeNew(0, 0);
+  GuiAddLabel(tree, "Zone");
+  tree->tr->column_count = 1;
+  if (obj==0) { return tree; }
+  zone_type = ReflGetType(0, "zone");
+  items = (gui_item**)ReflMap(obj, zone_type, (refl_map_t)GuiMapZoneField);
+  for (i=0;(it=items[i]);i++) {
+    if ((int)it == -1) { continue; }
+    GuiAddChild(tree, it);
+  }
+  free(items);
+  return tree;
+}
+
+extern entry *cur_zone;
+
+static entry *prev_zone;
+static gui_item *level_view;
+static gui_item *cur_zone_tree;
+
+static gui_item *GuiLevelView() {
+  gui_item *view, *grid;
+  gui_item *item;
+
+  view = GuiGroupNew();
+  GuiAddLabel(view, "Level and Spatial");
+  grid = GuiGridNew(1, 0);
+
+  item = GuiZoneTree(cur_zone);
+  cur_zone_tree = item;
+  GuiAddChild(grid, item);
+  GuiAddChild(view, grid);
+  return view;
+}
+
+static gui_item *GuiRoot() {
+  gui_item *root;
+  gui_item *tabs;
+  gui_item *disp_view, *debug_view;
+
+  root = GuiWindowNew("Diagnostics");
+
+  tabs = GuiTabNew(1, "##tabs");
+  GuiAddChild(root, tabs);
+
+  disp_view = GuiDisplayConfigView();
+  debug_view = GuiDebugView();
+  level_view = GuiLevelView();
+  GuiAddLabel(disp_view, "Display Settings");
+  GuiAddLabel(debug_view, "GOOL Processes");
+  GuiAddLabel(level_view, "Level and Spatial");
+  GuiAddChild(tabs, disp_view);
+  GuiAddChild(tabs, debug_view);
+  GuiAddChild(tabs, level_view);
+  return root;
+}
+
 /** main **/
 gui_item *root;
 int gui_lock = 0;
@@ -635,10 +800,18 @@ void GuiInit() {
   pad_lock = 0;
   GuiIgInit();
   ReflInit(types);
-  root = GuiDebugView();
+  root = GuiRoot();
+  prev_zone = 0;
 }
 
 void GuiUpdate() {
+  gui_item *old_tree;
+  if (cur_zone != prev_zone) {
+    old_tree = cur_zone_tree;
+    cur_zone_tree = GuiZoneTree(cur_zone);
+    GuiItemReplace(old_tree, cur_zone_tree);
+    prev_zone = cur_zone;
+  }
   if (GuiIgKeyPressed(526)) {
     root->flags = (~root->flags & GUI_FLAGS_VISIBLE);
   }

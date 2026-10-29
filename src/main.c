@@ -71,14 +71,23 @@ extern gool_handle handles[8];
 extern int bonus_return;
 extern level_state savestate;
 
-#ifdef CFLAGS_DRAW_EXTENSIONS
+#ifdef CFLAGS_EXTENSIONS
+#include "ext/ext.h"
+ext_config_t ext_config;
+
 extern zone_query cur_zone_query;
 extern uint32_t *wall_bitmap;
 extern gool_bound object_bounds[96];
 extern int object_bound_count;
-int draw_octrees = 0;
-int draw_wallmap = 0;
-int draw_objbounds = 0;
+
+void ExtInit() {
+  ext_config.enable_textures = 1;
+  ext_config.enable_gouraud = 1;
+  ext_config.enable_wireframe = 0;
+  ext_config.show_octrees = 0;
+  ext_config.show_objbounds = 0;
+  ext_config.show_wallmap = 0;
+}
 #endif
 
 #ifdef PSX
@@ -142,6 +151,9 @@ void CoreLoop(lid_t lid) {
   int ticks_elapsed;
 #endif
 
+#ifdef CFLAGS_EXTENSIONS
+  ExtInit();
+#endif
   LevelInitGlobals();
   NSInit(&ns, lid);
   CoreObjectsCreate();
@@ -266,18 +278,18 @@ void CoreLoop(lid_t lid) {
         GfxTransformWorlds(ot);
     }
     GoolUpdateObjects(!paused);
-#if defined(CFLAGS_DRAW_EXTENSIONS) && !defined(PSX)
+#if defined(CFLAGS_EXTENSIONS) && !defined(PSX)
     if (pads[0].tapped & 4)
-      draw_octrees = !draw_octrees;
-    if (draw_octrees)
+       ext_config.show_octrees = !ext_config.show_octrees;
+    if (ext_config.show_octrees)
       SwTransformZoneQuery(&cur_zone_query, ot, GLGetPrimsTail());
     if (pads[0].tapped & 8)
-      draw_wallmap = !draw_wallmap;
-    if (draw_wallmap)
+      ext_config.show_wallmap = !ext_config.show_wallmap;
+    if (ext_config.show_wallmap)
       SwDrawWallMap(wall_bitmap, ot, GLGetPrimsTail());
     if (pads[0].tapped & 1)
-      draw_objbounds = !draw_objbounds;
-    if (draw_objbounds)
+      ext_config.show_objbounds = !ext_config.show_objbounds;
+    if (ext_config.show_objbounds)
       SwTransformObjectBounds(object_bounds, object_bound_count, ot, GLGetPrimsTail());
 #endif
 #ifndef PSX

@@ -19,6 +19,11 @@
 #include "cimgui_impl.h"
 #endif
 
+#ifdef CFLAGS_EXTENSIONS
+#include "ext/ext.h"
+extern ext_config_t ext_config;
+#endif
+
 int GLCreateTexture(dim2 dim, uint8_t *buf) {
   GLuint texid;
 
@@ -218,7 +223,11 @@ void GLDrawPrims(void *data, int count) {
   glDisable(GL_TEXTURE_2D);
   glEnable(GL_BLEND);
   for (i=0;i<count;i++,poly++) {
-    if (poly->type == 3)
+    if (poly->type == 3 
+#ifdef CFLAGS_EXTENSIONS
+     || ext_config.enable_wireframe
+#endif
+    )
       glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     else
       glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -243,6 +252,9 @@ void GLDrawPrims(void *data, int count) {
       if (poly->texid == -1) { glDisable(GL_TEXTURE_2D); }
       else {
         if (texid == -1) { glEnable(GL_TEXTURE_2D); }
+#ifdef CFLAGS_EXTENSIONS
+        if (!ext_config.enable_textures) { glDisable(GL_TEXTURE_2D); }
+#endif
         glBindTexture(GL_TEXTURE_2D, poly->texid);
         glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE);
         glTexEnvf(GL_TEXTURE_ENV, GL_COMBINE_RGB, GL_MODULATE);
@@ -253,6 +265,10 @@ void GLDrawPrims(void *data, int count) {
     }
     glBegin(GL_TRIANGLES);
     for (ii=0;ii<3;ii++) {
+#ifdef CFLAGS_EXTENSIONS
+      if (!ext_config.enable_gouraud) { glColor3ub(255, 255, 255); }
+      else
+#endif
       glColor3ui(poly->colors[ii].r, poly->colors[ii].g, poly->colors[ii].b);
       glTexCoord2f(poly->uvs[ii].x, poly->uvs[ii].y);
       glVertex3i(poly->verts[ii].x, poly->verts[ii].y, -1);

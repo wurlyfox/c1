@@ -950,7 +950,7 @@ void SwTransformWorldsDark2(
   SwTransformAndShadeWorlds(poly_id_list,ot,proj,anim_phase,prims_tail,params,0,SwDark2Shader);
 }
 
-#ifdef CFLAGS_DRAW_EXTENSIONS
+#ifdef CFLAGS_EXTENSIONS
 
 #include "level.h"
 extern mat16 ms_cam_rot;

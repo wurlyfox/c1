@@ -31,9 +31,13 @@ size_t EntrySize(void *data, refl_field *field, int idx) {
    though, it is based on the entry 'type' field value.
    we also don't want to confuse with the entry type -object- */
 refl_type *EntrySubtype(void *data, refl_type *type) {
+  refl_typefn_t subtype_fn;  /* subtype func if type is inherited from */
   int en_type;
 
+  subtype_fn = type->subtype_fn;
+  type->subtype_fn = 0;
   en_type = ReflGetInt(data, type, "type");
+  type->subtype_fn = subtype_fn;
   switch (en_type) {
   case 7:
     return ReflGetType(0, "zone");
@@ -124,10 +128,15 @@ int GoolAnimCount(void *data, refl_field *field) {
   int count;
 
   size = ItemSize(data, field, 5);
+  if (size <= 0) { return 0; }
+  
   gool_anim_type = ReflGetType(0, "gool_anim");
   count = 0;
   while (size) {
     value = ReflGet(data, gool_anim_type, 0);
+    if (value.size == 0 || value.size > size) {
+      break;
+    }
     size -= value.size;
     data += value.size;
     ++count;
@@ -160,15 +169,15 @@ int GoolFragCount(void *data, refl_field *field) {
 }
 
 int OctreeNodeCount(void *data, refl_field *field) {
-  refl_value value;
-  refl_type *ptype;
   int count;
-
+  /*
   ptype = ReflGetType(0, "zone_rect");
   value = ReflGetParent(data, field, ptype, "octree");
   ptype = ReflGetType(0, "zone");
   value = ReflGetParent(value.res, value.field, ptype, "rect");
   count = ReflGetInt(value.res, value.field->type, "unk");
+  */
+  count = (int)*(uint32_t*)((uint8_t*)data - sizeof(uint32_t)) + 2;
   return count;
 }
 
@@ -573,10 +582,11 @@ refl_type zone_gfx_type = {
     REFL_FIELD(zone_gfx,eid_t,midi),
     REFL_FIELD(zone_gfx,uint32_t,unknown_g),
     REFL_FIELD(zone_gfx,rgb8,unknown_h),
-    REFL_FIELD(zone_gfx,rgb8,vram_fill),
     REFL_FIELD(zone_gfx,uint8_t,unused_a),
-    REFL_FIELD(zone_gfx,rgb8,far_color),
+    REFL_FIELD(zone_gfx,rgb8,vram_fill),
     REFL_FIELD(zone_gfx,uint8_t,unused_b),
+    REFL_FIELD(zone_gfx,rgb8,far_color),
+    REFL_FIELD(zone_gfx,uint8_t,unused_c),
     REFL_FIELD(zone_gfx,gool_colors,object_colors),
     REFL_FIELD(zone_gfx,gool_colors,player_colors),
     REFL_TERM
@@ -585,7 +595,8 @@ refl_type zone_gfx_type = {
 
 refl_type zone_header_type = {
   .name = "zone_header",
-  .flags = REFL_FLAGS_STATIC,
+  .flags = REFL_FLAGS_STATIC | REFL_FLAGS_FIXED,
+  .size = sizeof(zone_header),
   .fields = {
     REFL_FIELD(zone_header,uint32_t,world_count),
     REFL_ARRAY_FIELD(zone_header,zone_world,worlds,8),
@@ -649,8 +660,8 @@ refl_type zone_path_point_type = {
     REFL_FIELD(zone_path_point,int16_t,x),
     REFL_FIELD(zone_path_point,int16_t,y),
     REFL_FIELD(zone_path_point,int16_t,z),
-    REFL_FIELD(zone_path_point,int16_t,rot_x),
     REFL_FIELD(zone_path_point,int16_t,rot_y),
+    REFL_FIELD(zone_path_point,int16_t,rot_x),
     REFL_FIELD(zone_path_point,int16_t,rot_z),
     REFL_TERM
   }
@@ -668,8 +679,8 @@ refl_type zone_path_type = {
     REFL_FIELD(zone_path,uint8_t,exit_index),
     REFL_FIELD(zone_path,uint16_t,length),
     REFL_FIELD(zone_path,uint16_t,cam_mode),
-    REFL_FIELD(zone_path,uint16_t,avg_node_dist),
-    REFL_FIELD(zone_path,uint16_t,cam_zoom),
+    REFL_FIELD(zone_path,int16_t,avg_node_dist),
+    REFL_FIELD(zone_path,int16_t,cam_zoom),
     REFL_FIELD(zone_path,uint16_t,unknown_a),
     REFL_FIELD(zone_path,uint16_t,unknown_b),
     REFL_FIELD(zone_path,uint16_t,unknown_c),
@@ -677,6 +688,7 @@ refl_type zone_path_type = {
     REFL_FIELD(zone_path,int16_t,direction_y),
     REFL_FIELD(zone_path,int16_t,direction_z),
     REFL_DYNARRAY_FIELD(zone_path,zone_path_point,points,length),
+    REFL_FIELD_A(zone_path,int16_t,pad,points),
     REFL_TERM
   }
 };
@@ -692,6 +704,15 @@ refl_type zone_entity_path_point_type = {
   }
 };
 
+static int ZoneEntityPadCount(void *data, refl_field *field) {
+  int count;
+
+  count = ReflGetIntF(data, field);
+  if (count==1) return 1;
+  if (count%2==0) return 2;
+  return 1;
+}
+
 refl_type zone_entity_type = {
   .name = "zone_entity",
   .flags = REFL_FLAGS_STATIC,
@@ -701,12 +722,13 @@ refl_type zone_entity_type = {
     REFL_FIELD(zone_entity,uint16_t,group),
     REFL_FIELD(zone_entity,uint16_t,id),
     REFL_FIELD(zone_entity,uint16_t,path_length),
-    REFL_FIELD(zone_entity,uint16_t,init_flags_a),
-    REFL_FIELD(zone_entity,uint16_t,init_flags_b),
-    REFL_FIELD(zone_entity,uint16_t,init_flags_c),
+    REFL_FIELD(zone_entity,int16_t,init_flags_a),
+    REFL_FIELD(zone_entity,int16_t,init_flags_b),
+    REFL_FIELD(zone_entity,int16_t,init_flags_c),
     REFL_FIELD(zone_entity,uint8_t,type),
     REFL_FIELD(zone_entity,uint8_t,subtype),
     REFL_DYNARRAY_FIELD(zone_entity,zone_entity_path_point,path_points,path_length),
+    REFL_DYNARRAY_FIELD_AF(zone_entity,int16_t,pad,path_points,path_length,ZoneEntityPadCount),
     REFL_TERM
   }
 };
@@ -718,8 +740,8 @@ refl_type zone_type = {
   .fields = {
     REFL_FIELD_A(entry,zone_header,header,item_offsets),
     REFL_FIELD_A(entry,zone_rect,rect,header),
-    REFL_DYNARRAY_FIELD_AF(entry,zone_path,paths,rect,0,ZonePathCount),
-    REFL_DYNARRAY_FIELD_AF(entry,zone_entity,entities,paths,0,ZoneEntityCount),
+    REFL_DYNARRAY_FIELD_AF(entry,zone_path,paths,rect,,ZonePathCount),
+    REFL_DYNARRAY_FIELD_AF(entry,zone_entity,entities,paths,,ZoneEntityCount),
     REFL_TERM
   }
 };

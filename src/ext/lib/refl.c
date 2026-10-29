@@ -478,6 +478,7 @@ int ReflGetCount(void *data, refl_field *field) {
   count = -1;
   if (field->count_fn) {
     type = field->parent;
+    fcount = field;
     if (field->fcount[0])
       fcount = ReflGetField(type, field->fcount, data);
     count = (*field->count_fn)(data, fcount);
@@ -914,12 +915,19 @@ int ReflSetAF(void *data, refl_field *field, int idx, void *src) {
  */
 refl_value ReflGetParent(void *data, refl_field *field, refl_type *ptype, char *pname) {
    refl_field *pfield;
-   refl_common common;
+   refl_value value = { 0 };
 
    pfield = ReflGetField(ptype, pname, 0);
-   data = (uint8_t*)data - field->offset - pfield->offset;
-   ReflGetCommon(data, ptype, pname, &common);
-   return ReflGetValue(data, &common);
+   if (!pfield) { return null_value; }
+
+   /* Calculate the base of the parent struct */
+   value.res = (uint8_t*)data - field->offset - pfield->offset;
+   value.field = pfield;
+   value.offset = pfield->offset;
+   value.size = pfield->type->size;
+   value.idx = -1;
+   value.valid = 1;
+   return value;
 }
 
 /**
@@ -1122,7 +1130,7 @@ static void **ReflTraverseR(refl_context *context) {
     context->leaf = (f->type->flags & REFL_FLAGS_PRIM)
                  || (f->flags & REFL_FLAGS_POINTER);
     count = ReflGetCount(data, f);
-    if (count != -1) { /* array field? */
+    if (count >= 0) { /* array field? */
       a_mapped = malloc(sizeof(void*)*(count+1));
       a_mapped[count] = 0;
       context->mapped = 0;

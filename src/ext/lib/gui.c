@@ -71,6 +71,30 @@ gui_scalar def_scalar = { 0 };
 gui_list def_list = { 0 };
 gui_tree_sync def_tree_sync = { 0 };
 
+int GuiGetInt(void *data, gui_ptype *ptype) {
+  if (ptype->is_float) {
+    return (int)*(float*)data;
+  }
+  switch(ptype->size) {
+  case 1: return *(int8_t*)data;
+  case 2: return *(int16_t*)data;
+  case 4: return *(int32_t*)data;
+  }
+  return 0;
+}
+
+void GuiSetInt(void *data, gui_ptype *ptype, int value) {
+  if (ptype->is_float) {
+    *(float*)data = (float)value;
+    return;
+  }
+  switch(ptype->size) {
+  case 1: *(int8_t*)data = value; break;
+  case 2: *(int16_t*)data = value; break;
+  case 4: *(int32_t*)data = value; break;
+  }
+}
+
 ImGuiDataType GuiIgType(gui_ptype *ptype) {
   if (ptype->is_float)
     return ImGuiDataType_Float;
@@ -207,6 +231,17 @@ gui_item *GuiButtonNew(char *str, gui_handler_t click) {
   return item;
 }
 
+gui_item *GuiCheckboxNew(void *data, char *label) {
+  gui_item *item;
+
+  item = GuiItemNew();
+  item->type = checkbox;
+  item->cb = (gui_checkbox*)malloc(sizeof(gui_checkbox));
+  item->cb->data = data;
+  if (label) { GuiAddLabel(item, label); }
+  return item;
+}
+
 gui_item *GuiScalarNew(int type, void *data, gui_ptype *ptype, char *label) {
   gui_item *item;
 
@@ -231,6 +266,37 @@ gui_item *GuiListNew(int type, char *label) {
   item->l->type = type;
   item->l->selected = 0;
   if (label) { GuiAddLabel(item, label); }
+  return item;
+}
+
+gui_item *GuiTabNew(int type, char *label) {
+  gui_item *item;
+
+  item = GuiItemNew();
+  item->type = tab;
+  item->tb = (gui_tab*)malloc(sizeof(gui_tab));
+  item->tb->type = type;
+  item->tb->selected = 0;
+  item->tb->data = 0;
+  item->tb->ptype = 0;
+  if (label) { GuiAddLabel(item, label); }
+  return item;
+}
+
+void GuiListSync(gui_item *item, int flags);
+gui_item *GuiComboNew(char *label, void *data, gui_ptype *ptype, const char **options, int count) {
+  gui_item *item, *child;
+  int i;
+
+  item = GuiListNew(1, label);
+  for (i=0;i<count;i++) {
+    child = GuiTextNew((char*)options[i], 0);
+    child->flags |= GUI_FLAGS_READONLY;
+    GuiAddChild(item, child);
+  }
+  item->l->data = data;
+  item->l->ptype = ptype;
+  GuiListSync(item, 3);
   return item;
 }
 
@@ -318,6 +384,85 @@ gui_item *GuiGridNew(int column_count, int row_count) {
   item->g->column_count = column_count;
   item->g->row_count = row_count;
   return item;
+}
+
+static void GuiItemLabel(gui_item *item, char *id) {
+  float x;
+  x = 0.0f;
+  if (item->label && item->label->str[0] != '#') {
+    if (item->flags & GUI_FLAGS_RIGHTALIGN) {
+      x = igGetCursorPosX();
+      igSetCursorPosX(igGetStyle()->WindowPadding.x);
+    }
+    igAlignTextToFramePadding();
+    igText(item->label->str);
+    igSameLine(x, 6.0f);
+  }
+  sprintf(id, "##%i", (uint32_t)item);
+}
+
+static void GuiItemRightAlign(gui_item *item) {
+  ImVec2 avail, size;
+  float w, x, m;
+
+  igGetContentRegionAvail(&avail);
+  switch (item->type) {
+  case text:
+    igCalcTextSize(&size, item->t->str, 0, 0, -1.0f);
+    w = size.x;
+    break;
+  case button:
+    /* measure button text + default frame padding */
+    igCalcTextSize(&size, item->b->str, 0, 0, -1.0f);
+    w = size.x + igGetStyle()->FramePadding.x * 2.0f;
+    break;
+  case checkbox:
+    /* box size + padding + label text width */
+    w = igGetFrameHeight();
+    if (item->label && item->label->str[0] != '#') {
+      igCalcTextSize(&size, item->label->str, 0, 0, -1.0f);
+      w += size.x + igGetStyle()->ItemInnerSpacing.x;
+    }
+    break;
+  case list:
+  case scalar:
+  case color:
+  default:
+    w = igCalcItemWidth();
+    break;
+  }
+  m = igGetStyle()->ItemSpacing.x > 0.0f ? igGetStyle()->ItemSpacing.x : 0.0f;
+  x = igGetCursorPosX() + avail.x - w - 2*m;
+  if (x > igGetCursorPosX()) {
+    igSetCursorPosX(x);
+  }
+}
+
+void GuiListSync(gui_item *item, int flags) {
+  gui_list *list;
+  gui_item *it;
+  int i, cur_idx;
+
+  list = item->l;
+  if (!list->data) { return; }
+  if (flags & 1) {
+    cur_idx = GuiGetInt(list->data, list->ptype);
+    for_each_child_indexed(item, it, i) {
+      if (i == cur_idx) {
+        list->selected = it;
+        break;
+      }
+    }
+  }
+  if (flags & 2) {
+    for_each_child_indexed(item, it, i) {
+      if (list->selected == it) {
+        cur_idx = i;
+        break;
+      }
+    }
+    GuiSetInt(list->data, list->ptype, cur_idx);
+  }
 }
 
 void *GuiNodeData(gui_item *item) { /* default _node_unmap */
@@ -505,14 +650,28 @@ static void GuiButton(gui_item *item) {
   }
 }
 
+static void GuiCheckbox(gui_item *item) {
+  gui_checkbox *cb;
+  char *label;
+  int value;
+
+  cb = item->cb;
+  label = item->label ? item->label->str : "";
+  value = (*(int*)cb->data != 0);
+  if (igCheckbox(label, (_Bool*)&value)) {
+    *(int*)cb->data = value;
+  }
+}
+
 static void GuiScalar(gui_item *item) {
   ImGuiDataType data_type;
   gui_scalar *scalar;
   void *p_data, *p_step, *p_min, *p_max;
-  char *label, *fmt;
+  char id[32];
+  char *fmt;
 
   scalar = item->s;
-  label = item->label ? item->label->str : "";
+  GuiItemLabel(item, id);
   p_data = scalar->data;
   p_step = &scalar->step;
   fmt = scalar->ptype->fmt;
@@ -524,32 +683,84 @@ static void GuiScalar(gui_item *item) {
   }
   data_type = GuiIgType(scalar->ptype);
   if (scalar->type == 0) /* input */
-    igInputScalar(label, data_type, p_data, p_step, 0, fmt, 0);
+    igInputScalar(id, data_type, p_data, p_step, 0, fmt, 0);
   else if (scalar->type == 1) /* drag */
-    igDragScalar(label, data_type, p_data, 1.0, p_min, p_max, fmt, 0);
+    igDragScalar(id, data_type, p_data, 1.0, p_min, p_max, fmt, 0);
   else if (scalar->type == 2) /* slider */
-    igSliderScalar(label, data_type, p_data, p_min, p_max,  fmt, 0);
+    igSliderScalar(id, data_type, p_data, p_min, p_max,  fmt, 0);
 }
 
 static void GuiList(gui_item *item) {
   gui_list *list;
   gui_item *it;
-  char *label;
+  char id[32];
+  char *preview;
   int res;
 
   list = item->l;
-  label = item->label ? item->label->str : 0;
+  GuiItemLabel(item, id);
+  preview = list->selected ? list->selected->label ? 
+            list->selected->label->str : list->selected->t->str : "";
+  res = 0;
+  GuiListSync(item, 1);
   if (list->type == 0) /* list box */
-    res = igBeginListBox(label, def_size);
+    res = igBeginListBox(id, def_size);
   else if (list->type == 1) /* combo box */
-    res = igBeginCombo(label, 0, 0);
+    res = igBeginCombo(id, preview, 0);
+  if (!res) { return; }
   for (it=item->child;it;it=it->next)
     GuiItem(it);
-  if (!res) { return; }
   if (list->type == 0)
     igEndListBox();
   else if (list->type == 1)
     igEndCombo();
+  GuiListSync(item, 2);
+}
+
+static void GuiTab(gui_item *item) {
+  ImVec2 avail;
+  gui_tab *tab;
+  gui_item *it;
+  char *label, id[32];
+  float side_w, page_w;
+  int is_sel;
+
+  tab = item->tb;
+  if (!tab->selected) 
+    tab->selected = item->child;
+  GuiItemLabel(item, id);
+  if (tab->type == 0) { /* tab bar */
+    if (!igBeginTabBar(id, 0)) { return; }
+    for (it=item->child;it;it=it->next) {
+      label = it->label ? it->label->str : "";
+      if (igBeginTabItem(label, 0, 0)) {
+        tab->selected = it;
+        GuiItem(it);
+        igEndTabItem();
+      }
+    }
+    igEndTabBar();
+  }
+  else if (tab->type == 1) {
+    igGetContentRegionAvail(&avail);
+    side_w = 140.0f;
+    page_w = avail.x - side_w - igGetStyle()->ItemSpacing.x;
+    igBeginChild_Str(id, (ImVec2){side_w, avail.y}, 0, 0);
+    for_each_child(item, it) {
+      label = it->label ? it->label->str : "";
+      is_sel = it == tab->selected;
+      if (igSelectable_Bool(label, is_sel, 0, def_size)) {
+        tab->selected = it;
+      }
+    }
+    igEndChild();
+    igSameLine(0.0f, -1.0f);
+    id[strlen(id)-1] += 1;
+    igBeginChild_Str(id, (ImVec2){page_w, avail.y}, 0, 0);
+    if (tab->selected)
+      GuiItem(tab->selected);
+    igEndChild();
+  }
 }
 
 ImGuiTableFlags table_flags =
@@ -626,7 +837,9 @@ static void GuiTree(gui_item *item) {
                          table_flags, def_size, 0.0);
     if (!tbl) { return; }
   }
+  igPushStyleVar_Float(ImGuiStyleVar_IndentSpacing, 9.0f);
   GuiNode(item);
+  igPopStyleVar(1);
   if (tbl)
     igEndTable();
 }
@@ -697,14 +910,24 @@ static void GuiGrid(gui_item *item) {
 }
 
 void GuiItem(gui_item *item) {
+  gui_list *plist;
   if (!(item->flags & GUI_FLAGS_VISIBLE)) { return; }
   if (item->flags & GUI_FLAGS_SAMELINE)
     igSameLine(0.0, 0.0);
+  if (item->flags & GUI_FLAGS_RIGHTALIGN)
+    GuiItemRightAlign(item);
   if (item->parent && item->parent->type == list) {
     char id[16];
+    plist = item->parent->l;
     sprintf(id, "##%i", (uint32_t)item);
-    if (igSelectable_Bool(id, item == item->parent->l->selected, 0, def_size))
-      item->parent->l->selected = item;
+    if (plist->type == 2) {
+      if (igRadioButton_Bool(id, item == plist->selected))
+        plist->selected = item;
+    }
+    else {
+      if (igSelectable_Bool(id, item == plist->selected, 0, def_size))
+        plist->selected = item;
+    }
     igSameLine(0.0, 0.0);
   }
   if (item->label)
@@ -728,6 +951,9 @@ void GuiItem(gui_item *item) {
   case list:
     GuiList(item);
     break;
+  case tab:
+    GuiTab(item);
+    break;
   case node:
     GuiNode(item);
     break;
@@ -743,11 +969,32 @@ void GuiItem(gui_item *item) {
   case button:
     GuiButton(item);
     break;
+  case checkbox:
+    GuiCheckbox(item);
+    break;
   }
   igPopID();
 }
 
 void GuiIgInit() {
+  ImGuiStyle *style;
+  style = igGetStyle();
+  style->Colors[ImGuiCol_WindowBg].w = 0.94f; 
+  style->Colors[ImGuiCol_ChildBg].w  = 0.40f;
+  style->WindowRounding    = 4.0f;
+  style->FrameRounding     = 3.0f;
+  style->PopupRounding     = 3.0f;
+  style->ScrollbarRounding = 4.0f;
+  style->GrabRounding      = 3.0f;
+  style->TabRounding       = 3.0f;
+  style->WindowPadding     = (ImVec2){ 10.0f, 10.0f };
+  style->FramePadding      = (ImVec2){ 6.0f, 3.5f };
+  style->ItemSpacing       = (ImVec2){ 8.0f, 6.0f };
+  style->ItemInnerSpacing  = (ImVec2){ 6.0f, 4.0f };
+  style->IndentSpacing     = 10.0f;
+  style->WindowBorderSize  = 1.0f;
+  style->FrameBorderSize   = 1.0f;
+  style->Colors[ImGuiCol_Border] = (ImVec4){ 0.18f, 0.35f, 0.55f, 0.70f };
 }
 
 void GuiIgDraw(gui_item *item) {

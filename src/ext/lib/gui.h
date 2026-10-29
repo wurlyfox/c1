@@ -12,6 +12,7 @@
 #define GUI_FLAGS_VISIBLE      8
 #define GUI_FLAGS_NODE_CONTENT 16
 #define GUI_FLAGS_CELL_CW      32
+#define GUI_FLAGS_RIGHTALIGN   64
 
 typedef struct _gui_item gui_item;
 
@@ -21,12 +22,14 @@ typedef enum {
   group = 2,
   text = 3,
   button = 4,
-  scalar = 5,
-  list = 6,
-  tree = 7,
-  node = 8,
-  color = 9,
-  grid = 10,
+  checkbox = 5,
+  scalar = 6,
+  list = 7,
+  tab = 8,
+  tree = 9,
+  node = 10,
+  color = 11,
+  grid = 12,
 } gui_type;
 
 typedef union {
@@ -84,9 +87,24 @@ typedef struct {
 } gui_scalar;
 
 typedef struct {
+  void *data;
+} gui_checkbox;
+
+typedef struct {
   int type;
   gui_item *selected;
+  /* bound index for the selected item */
+  void *data;
+  gui_ptype *ptype;
 } gui_list;
+
+typedef struct {
+  int type;
+  gui_item *selected;
+  /* bound index for the selected item */
+  void *data;
+  gui_ptype *ptype;
+} gui_tab;
 
 typedef struct {
   /* internal data tree */
@@ -136,8 +154,10 @@ typedef struct _gui_item {
   union {
     gui_text *t;
     gui_button *b;
+    gui_checkbox *cb;
     gui_scalar *s;
     gui_list *l;
+    gui_tab *tb;
     gui_tree *tr;
     gui_color *c;
     gui_grid *g;
@@ -171,8 +191,11 @@ extern gui_item *GuiWindowNew(char *label);
 extern gui_item *GuiGroupNew();
 extern gui_item *GuiTextNew(char *str, char *label);
 extern gui_item *GuiButtonNew(char *str, gui_handler_t click);
+extern gui_item *GuiCheckboxNew(void *data, char *label);
 extern gui_item *GuiScalarNew(int type, void *data, gui_ptype *ptype, char *label);
 extern gui_item *GuiListNew(int type, char *label);
+extern gui_item *GuiTabNew(int type, char *label);
+extern gui_item *GuiComboNew(char *label, void *data, gui_ptype *ptype, const char **options, int count);
 extern gui_item *GuiNodeNew(void *data, gui_data_unparse_t unparse);
 extern gui_item *GuiTreeNew(gui_handler_t select, gui_tree_sync *sync);
 extern gui_item *GuiColorNew(void *data, void (*unparse)(void*, float[3]), void (*parse)(float[3], void*));
