@@ -699,6 +699,17 @@ static gui_item *GuiDisplayConfigView() {
   item = GuiCheckboxNew(&ext_config.enable_wireframe, "Enable Wireframe");
   GuiAddChild(grid, item);
 
+  item = GuiTextNew("Debug Overlays:", 0);
+  item->flags |= GUI_FLAGS_READONLY;
+  GuiAddChild(grid, item);
+
+  item = GuiCheckboxNew(&ext_config.show_octrees, "Show Octree Volumes");
+  GuiAddChild(grid, item);
+  item = GuiCheckboxNew(&ext_config.show_objbounds, "Show Object Bounding Boxes");
+  GuiAddChild(grid, item);
+  item = GuiCheckboxNew(&ext_config.show_wallmap, "Show Wall Collision Bitmap");
+  GuiAddChild(grid, item);
+
   GuiAddChild(view, grid);
   return view;
 }
