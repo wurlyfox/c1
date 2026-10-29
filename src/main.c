@@ -90,6 +90,10 @@ void ExtInit() {
 }
 #endif
 
+#ifdef CFLAGS_HIRES_TEST
+int hires = 1;
+#endif
+
 #ifdef PSX
 extern gfx_context_db context;
 extern int ticks_elapsed;
@@ -291,6 +295,10 @@ void CoreLoop(lid_t lid) {
       ext_config.show_objbounds = !ext_config.show_objbounds;
     if (ext_config.show_objbounds)
       SwTransformObjectBounds(object_bounds, object_bound_count, ot, GLGetPrimsTail());
+#endif
+#if defined(CFLAGS_HIRES_TEST)
+    if (pads[0].tapped & 2)
+      hires = !hires;
 #endif
 #ifndef PSX
     GLClear();

@@ -10,7 +10,7 @@
 #endif
 
 /* default compilation settings */
-#define LID_BOOTLEVEL             LID_TITLE
+#define LID_BOOTLEVEL             LID_NSANITYBEACH
 #ifndef PSX                       /* non-PSX target options */
 #define CFLAGS_BUGFIXES
 #endif

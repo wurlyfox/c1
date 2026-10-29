@@ -16,6 +16,7 @@ option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 
 # Preprocessor definitions
 add_compile_definitions(
+    CFLAGS_HIRES_TEST
     CFLAGS_GFX_SW_PERSP
     CFLAGS_EXTENSIONS
     CFLAGS_GUI

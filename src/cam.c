@@ -10,6 +10,11 @@
 #include "formats/tgeo.h"
 #include "formats/zdat.h"
 
+#ifdef CFLAGS_HIRES_TEST
+#include "pc/gfx/gl.h"
+extern gl_context context;
+#endif
+
 /* .sdata */
 int32_t cam_offset_z  = -0x12C00; /* 800564A4; gp[0x2A] */
 int32_t cam_zoom      =  0x6A400; /* 800564A8; gp[0x2B] */
@@ -312,24 +317,36 @@ static void CamFollow(gool_object *obj, uint32_t flag) {
   }
   else
     cam_offset_dir_x = 0; /* offset cam left */
+#ifdef CFLAGS_HIRES_TEST
+  int32_t STEP_3200 = (0x3200 * context.ticks_per_frame) / 34;
+  int32_t STEP_25600 = (25600 * context.ticks_per_frame) / 34;
+  int32_t STEP_1900 = (0x1900 * context.ticks_per_frame) / 34;
+  int32_t STEP_6400 = (0x6400 * context.ticks_per_frame) / 34;
+#else
+  #define STEP_3200 0x3200
+  #define STEP_25600 25600
+  #define STEP_1900 0x1900
+  #define STEP_6400 0x6400
+#endif
+  
   if (cam_offset_dir_z == 0) /* cam offset is forward? */
-    cam_offset_z = max(cam_offset_z - 0x3200, -0x12C00); /* seek towards -0x12C00 */
+    cam_offset_z = max(cam_offset_z - STEP_3200, -0x12C00); /* seek towards -0x12C00 */
   else /* cam offset is backward; so seek towards 0x12C00, cortex power 0x4B000 */
-    cam_offset_z = min(cam_offset_z + 0x3200, (ns.ldat->lid != 3 ? 0x12C00: 0x4B000));
+    cam_offset_z = min(cam_offset_z + STEP_3200, (ns.ldat->lid != 3 ? 0x12C00: 0x4B000));
   if (!(header->flags & 0x4000)) /* not a left/right direction zone? */
     cam_offset_x = 0; /* no x offset */
   else if (cur_path->direction_x) { /* path runs left or right? */
     if (cam_offset_dir_x == 0) { /* cam offset is left? */
       if (cur_path->direction_x < 0) /* path runs left? */
-        cam_offset_x = max(cam_offset_x - 25600, -307200); /* seek towards -307200 */
+        cam_offset_x = max(cam_offset_x - STEP_25600, -307200); /* seek towards -307200 */
       else
-        cam_offset_x = max(cam_offset_x - 25600, 0); /* seek towards 0 */
+        cam_offset_x = max(cam_offset_x - STEP_25600, 0); /* seek towards 0 */
     }
     else { /* cam offset is right */
       if (cur_path->direction_x > 0) /* path runs right? */
-        cam_offset_x = min(cam_offset_x + 25600, 307200); /* seek towards 307200 */
+        cam_offset_x = min(cam_offset_x + STEP_25600, 307200); /* seek towards 307200 */
       else
-        cam_offset_x = min(cam_offset_x + 25600, 0); /* seek towards 0 */
+        cam_offset_x = min(cam_offset_x + STEP_25600, 0); /* seek towards 0 */
     }
   }
   seek_pan = 0; new_pan = 0; /* seek_pan/seek_zoom boolean vals are inverted in orig impl */
@@ -354,15 +371,16 @@ static void CamFollow(gool_object *obj, uint32_t flag) {
   }
   /* current or at least one neighbor path is forward/backward
      and we are at least more than 10 units from either end of the path? */
+  
   if (new_zoom && (path_idx >= 11) && (path_idx < ((int)cur_path->length-10))) {
     if (seek_zoom)
-      cam_zoom = GoolSeek(cam_zoom, new_zoom, 0x1900); /* seek to new_zoom 25.0 increments */
+      cam_zoom = GoolSeek(cam_zoom, new_zoom, STEP_1900); /* seek to new_zoom 25.0 increments */
     else
       cam_zoom = new_zoom;
   }
   if (new_pan) { /* current or at least one neighbor path is up/down? */
     if (seek_pan)
-      cam_offset_y = GoolSeek(cam_offset_y, new_pan, 0x6400); /* seek to new_pan at 100.0 increments */
+      cam_offset_y = GoolSeek(cam_offset_y, new_pan, STEP_6400); /* seek to new_pan at 100.0 increments */
     else
       cam_offset_y = new_pan;
   }
@@ -474,6 +492,9 @@ static void CamFollow(gool_object *obj, uint32_t flag) {
       cam_speed = 0x200; /* limit to 2 */
     else /* > 5 */ 
       cam_speed = min((cam_nearest->delta_progress/2), cam_speed)+0x100;
+#ifdef CFLAGS_HIRES_TEST
+    cam_speed = cam_speed * context.ticks_per_frame / 34;
+#endif
     CamAdjustProgress(cam_speed, cam_nearest);
   }
 }
@@ -517,7 +538,13 @@ int CamUpdate() {
       pt_idx = (cur_progress >> 8) + 1;
       /* auto-cam hasn't reached end of path and not skipping? */
       if (pt_idx < cur_path->length && !skip) {
-        LevelUpdate(cur_zone, cur_path, cur_progress + 0x100, 0);
+        
+#ifdef CFLAGS_HIRES_TEST
+        int STEP_100 = (0x100 * context.ticks_per_frame) / 40;
+#else
+#define STEP_100 0x100
+#endif
+        LevelUpdate(cur_zone, cur_path, cur_progress + STEP_100, 0);
         return 1;
       }
       neighbor_path = cur_path->neighbor_paths[0];

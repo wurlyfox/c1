@@ -664,6 +664,8 @@ static gui_item *GuiObjView(void *obj) {
   return view;
 }
 
+extern int hires;
+
 static gui_item *GuiDisplayConfigView() {
   gui_item *view, *grid, *item, *list;
   static const char *fps_modes[] = {
@@ -682,7 +684,10 @@ static gui_item *GuiDisplayConfigView() {
   GuiAddLabel(view, "Display Settings");
   grid = GuiGridNew(1, 0);
 
-  list = GuiComboNew("Frame Rate", &ext_config.fps_mode, &gui_s32, fps_modes, 4);
+  
+  //list = GuiComboNew("Frame Rate", &ext_config.fps_mode, &gui_s32, fps_modes, 4);
+  list = GuiComboNew("Frame Rate", &hires, &gui_s32, fps_modes, 4);
+  
   list->flags |= GUI_FLAGS_RIGHTALIGN;
   GuiAddChild(grid, list);
   list = GuiComboNew("Aspect Ratio", &ext_config.aspect_mode, &gui_s32, aspect_modes, 3);
@@ -792,13 +797,13 @@ static gui_item *GuiRoot() {
 
   disp_view = GuiDisplayConfigView();
   debug_view = GuiDebugView();
-  level_view = GuiLevelView();
+  // level_view = GuiLevelView();
   GuiAddLabel(disp_view, "Display Settings");
   GuiAddLabel(debug_view, "GOOL Processes");
-  GuiAddLabel(level_view, "Level and Spatial");
+  // GuiAddLabel(level_view, "Level and Spatial");
   GuiAddChild(tabs, disp_view);
   GuiAddChild(tabs, debug_view);
-  GuiAddChild(tabs, level_view);
+  //GuiAddChild(tabs, level_view);
   return root;
 }
 
@@ -817,12 +822,12 @@ void GuiInit() {
 
 void GuiUpdate() {
   gui_item *old_tree;
-  if (cur_zone != prev_zone) {
-    old_tree = cur_zone_tree;
-    cur_zone_tree = GuiZoneTree(cur_zone);
-    GuiItemReplace(old_tree, cur_zone_tree);
-    prev_zone = cur_zone;
-  }
+  //if (cur_zone != prev_zone) {
+  //  old_tree = cur_zone_tree;
+  //  cur_zone_tree = GuiZoneTree(cur_zone);
+  //  GuiItemReplace(old_tree, cur_zone_tree);
+  //  prev_zone = cur_zone;
+ //  }
   if (GuiIgKeyPressed(526)) {
     root->flags = (~root->flags & GUI_FLAGS_VISIBLE);
   }
