@@ -22,6 +22,16 @@
           "type": "FILEPATH"
         },
         {
+          "name": "CMAKE_C_COMPILER_TARGET",
+          "value": "i686-pc-windows-msvc",
+          "type": "STRING"
+        },
+        {
+          "name": "CMAKE_CXX_COMPILER_TARGET",
+          "value": "i686-pc-windows-msvc",
+          "type": "STRING"
+        },
+        {
           "name": "CMAKE_BUILD_TYPE",
           "value": "Debug",
           "type": "STRING"
