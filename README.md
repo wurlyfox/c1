@@ -116,7 +116,7 @@ The game is hardcoded to boot into level `25` (title sequence and main menu scre
 | **Toggle in-game GUI keyboard focus** | <kbd>Tab</kbd> |
 
 ## Structure ##
-Project structure is listed below, including descriptions for each file.
+The project structure is listed below, including descriptions for each file.
 
 Note that further documentation can be found in the `doc` directory.
 ```
@@ -143,7 +143,7 @@ Note that further documentation can be found in the `doc` directory.
 │   │   ├── tgeo.h           # tgeo type entry item formats
 │   │   ├── wgeo.h           # wgeo type entry item formats
 │   │   └── zdat.h           # zdat type entry item formats
-│   ├── pc                   # pc-specific code (non-inline)
+│   ├── Windows                   # pc-specific code (non-inline)
 │   │   ├── gfx              # pc graphics
 │   │   │   ├── gl.c,h       # OpenGL backend (2D primitive rasterization)
 │   │   │   ├── tex.c,h      # texture cache
