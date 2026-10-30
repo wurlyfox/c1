@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-29
+
+- migrated build system to CMake
+- added windows support (music playback/FluidSynth not working yet)
+- fixed a significant number of issues
+
 ## 2022-12-28
 
 ### Fixed

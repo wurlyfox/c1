@@ -381,7 +381,7 @@ else()
 endif()
 
 # Core source files
-file(GLOB c1core_SOURCES
+file(GLOB C1_CORE_SOURCES
     "src/*.c"
 )
 
@@ -397,7 +397,7 @@ file(GLOB_RECURSE C1_EXT_SOURCES
 )
 
 add_library(c1core STATIC
-    ${c1core_SOURCES}
+    ${C1_CORE_SOURCES}
     ${C1_EXT_SOURCES}
 )
 
