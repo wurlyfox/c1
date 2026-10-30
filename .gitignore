@@ -3,9 +3,13 @@
 c1
 *.dll
 *.exe
+*.pdb
 build/
 
 # user files
 streams/*
 imgui.ini
 !README.MD
+
+# visual studio user settings
+.vs/*
