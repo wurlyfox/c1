@@ -1,7 +1,13 @@
 /*
  * opengl pc gfx backend
  */
+#ifdef _WIN32
+#include <windows.h>
+#include <SDL_opengl.h>
+#else
 #include <GL/gl.h>
+#endif
+
 #include "gl.h"
 #include "pcgfx.h"
 #include "globals.h"

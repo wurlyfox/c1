@@ -3941,57 +3941,61 @@ int GoolObjectInterrupt(gool_object *obj, uint32_t addr, int argc, uint32_t *arg
 #define GOOL_DEBUG_DISLEN 8
 extern char *GoolDisassemble(uint32_t, uint32_t);
 
-void GoolObjectPrint(gool_object *obj, FILE *stream) {
+int GoolObjectSummary(gool_object *obj, char *str) {
   gool_header *header;
   uint8_t *stack;
   uint32_t fp, sp, base_sp, offs;
-  int i;
+  int cur, i;
 
   header = (gool_header*)obj->global->items[0];
   base_sp = header->init_sp*4;
   stack = ((uint8_t*)&obj->process) + base_sp;
   fp = (uint32_t)obj->fp - (uint32_t)stack;
   sp = (uint32_t)obj->sp - (uint32_t)stack;
-  // fprintf(stream, "stack start: %x+60\n", base_sp);
-  // fprintf(stream, "stack size: %x\n", sp);
-  // fprintf(stream, "stack frame: %x | %x\n", base_sp+fp, base_sp+sp);
-  fprintf(stream, "memory contents: \n");
+  cur = 0;
+  // cur += sprintf(str+cur, "stack start: %x+60\n", base_sp);
+  // cur += sprintf(str+cur, "stack size: %x\n", sp);
+  // cur += sprintf(str+cur, "stack frame: %x | %x\n", base_sp+fp, base_sp+sp);
+  cur += sprintf(str+cur, "memory contents: \n");
   for (i=0;i<(int)sp;i++) {
     offs = i % 16;
     if (offs == 0)
-      fprintf(stream, "%03x+60:", base_sp+i);
+      cur += sprintf(str+cur, "%03x+60:", base_sp+i);
     if (i == (int)fp)
-      fprintf(stream, "(%02x", stack[i]);
+      cur += sprintf(str+cur, "(%02x", stack[i]);
     else if (i == (int)sp-1)
-      fprintf(stream, " %02x)", stack[i]);
+      cur += sprintf(str+cur, " %02x)", stack[i]);
     else
-      fprintf(stream, " %02x", stack[i]);
+      cur += sprintf(str+cur, " %02x", stack[i]);
     if (offs == 15)
-      fprintf(stream, "\n");
+      cur += sprintf(str+cur, "\n");
   }
   if (offs != 15)
-    fprintf(stream, "\n");
-  fprintf(stream, "\n");
+    cur += sprintf(str+cur, "\n");
+  cur += sprintf(str+cur, "\n");
+  return cur;
 }
 
-void GoolObjectPrintDebug(gool_object *obj, FILE *stream) {
+int GoolObjectSummaryDebug(gool_object *obj, char *str) {
   char *line;
   uint32_t *code, ins, pc, pcins, pcs, pcn;
+  int cur;
 
-  GoolObjectPrint(obj, stream);
+  cur = GoolObjectSummary(obj, str);
   code = (uint32_t*)obj->external->items[1];
   pcins = (uint32_t)obj->pc - (uint32_t)code;
   pcs = max(pcins - ((GOOL_DEBUG_DISLEN/2)*4), 0);
   pcn = pcs + (GOOL_DEBUG_DISLEN*4);
-  // fprintf(stream, "current code window:\n");
+  // cur += sprintf(str+cur, "current code window:\n");
   for (pc=pcs;pc<pcn;pc+=4) {
     ins = code[pc/4];
     line = GoolDisassemble(ins, pc);
     if (pc == pcins)
-      fprintf(stream, "*** %s\n", line);
+      cur += sprintf(str+cur, "*** %s\n", line);
     else
-      fprintf(stream, "    %s\n", line);
+      cur += sprintf(str+cur, "    %s\n", line);
   }
+  return cur;
 }
 
 static void GoolObjectPreserveFrames(gool_object *obj) {

@@ -14,4 +14,4 @@ clean:
 	@rm -f c1 c1.exe
 
 distclean:
-	@rm -rf $(BUILD_DIR) c1 c1.exe
+	@rm -rf $(BUILD_DIR) c1 c1.exe *.dll

@@ -124,9 +124,6 @@ static int GuiUnparseObjPtr(void *data, char *str) {
 extern void GoolObjectPrintDebug(gool_object*, FILE*);
 static int GuiObjCodeUnparse(void *data, char *str) {
   gool_object *obj;
-  FILE *stream;
-  size_t size;
-  char *code;
 
   if (data == 0) {
     sprintf(str, "no object selected");
@@ -137,11 +134,7 @@ static int GuiObjCodeUnparse(void *data, char *str) {
     sprintf(str, "non-handle object selected");
     return 1;
   }
-  stream = open_memstream(&code, &size);
-  GoolObjectPrintDebug(obj, stream);
-  fclose(stream);
-  memcpy(str, code, size);
-  str[size] = 0;
+  GoolObjectSummaryDebug(obj, str);
   return 1;
 }
 #endif

@@ -549,7 +549,7 @@ refl_type zone_world_type = {
   .flags = REFL_FLAGS_STATIC,
   .fields = {
     REFL_FIELD(zone_world,eid_t,eid),
-    REFL_FIELD(zone_world,entry*,entry),
+    REFL_FIELD(zone_world,entry*,en),
     REFL_FIELD(zone_world,uint32_t,key),
     REFL_FIELD(zone_world,uint32_t,tag),
     REFL_FIELD(zone_world,vec,trans),

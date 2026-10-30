@@ -588,15 +588,33 @@ typedef struct { /* texture region information; also clut_y */
 } rgninfo;
 
 typedef struct {
-  colinfo;
+  union {
+    colinfo;
+#ifdef _WIN32
+    colinfo colinfo;
+#endif
+  };
   uint32_t tpage;
-  rgninfo;
+  union {
+    rgninfo;
+#ifdef _WIN32
+    rgninfo rgninfo;
+#endif
+  };
 } texinfo;
 
 typedef struct {
-  colinfo;
+  union {
+    colinfo;
+#ifdef _WIN32
+    colinfo colinfo;
+#endif
+  };
   union {
     rgninfo;
+#ifdef _WIN32
+    rgninfo rgninfo;
+#endif
     rgninfo rgninfos[0];
   };
 } texinfo2;

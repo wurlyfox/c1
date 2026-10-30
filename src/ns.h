@@ -167,7 +167,7 @@ typedef struct _page_struct {
 #define NS_VIRTUAL_PAGE_COUNT  38
 #else
 #define NS_PHYSICAL_PAGE_COUNT 128
-#define NS_VIRTUAL_PAGE_COUNT  0
+#define NS_VIRTUAL_PAGE_COUNT  1 
 #endif
 
 typedef struct {

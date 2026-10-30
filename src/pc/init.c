@@ -27,6 +27,9 @@ extern eid_t insts[8];
 extern page_struct texture_pages[16];
 
 void SDLInit() {
+#ifdef _WIN32
+  SDL_SetMainReady();
+#endif
   SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
   window = SDL_CreateWindow("c1",
     SDL_WINDOWPOS_UNDEFINED,

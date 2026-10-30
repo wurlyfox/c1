@@ -1,71 +1,119 @@
 # C1 #
 
-This is a port of the game *Crash Bandicoot* to C.
+This is a decompilation and native PC port of the game *Crash Bandicoot* in C.
 
-The code is designed to compile for both psx and pc. At the moment only pc-specific code is working.
+The code is designed to compile for both PS1 and PC. At the moment only PC-specific code is working.
 
 ## Status ##
 
-- Code - 100% ported
-- Functionality - 78%
+- **Code:** 100% ported
+- **Functionality:** 95%
 
-At the moment the game is only partially playable with a number of currently identified [issues](doc/issues.md).
+The game is mostly playable with only a small number of remaining [issues](doc/issues.md).
 
 ## Compiling ##
 
-As of currently, compilation has only been tested on Ubuntu/Debian. However, the game should build on any system with a working 32-bit GNU toolchain and other dependencies listed below.
+C1 uses **CMake (3.20+)** for its build system. The game engine strictly relies on 32-bit pointer layouts and arithmetic; **only 32-bit (x86 / i686 / Win32) target binaries are currently supported.**
 
-Note that only 32-bit target executables are currently supported. If you are not already running a 32-bit OS, you will need multilib versions of gcc and g++ and 32-bit versions of the dependencies.
+### Linux (Ubuntu / Debian) ###
 
-To compile c1, install the dependencies listed below, `cd` into the main project directory, and run `make`.
+A 32-bit multilib toolchain is required on 64-bit hosts. Ensure a multilib compiler toolchain is installed:
+```bash
+sudo apt update
+sudo apt install cmake build-essential gcc-multilib g++-multilib
+```
 
-### Dependencies ###
+Then simply build the project:
+```bash
+make
+```
 
-#### pc ####
-- gcc / binutils / glibc
-- GNU make
-- OpenGL 2.0 or higher
-- SDL 2
-- FluidSynth
-- Dear ImGui / cimgui (embedded in project)
-- g++ / libstdc++ (for ImGui compilation)
+A wrapper `Makefile` is provided in the project root that automatically invokes CMake with the correct multiarch arguments and target configuration. By default, CMake will automatically query `dpkg` / `apt-get` during configuration to install all required packages.
 
-Ubuntu/Debian:
+### Windows (Visual Studio 2019 / 2022) ###
 
-- 64-bit: `sudo apt install build-essential gcc-multilib g++-multilib libstdc++6:i386 libgl1-mesa-dev:i386 libsdl2-dev:i386 libfluidsynth-dev:i386`
-- 32-bit: `sudo apt install build-essential libstdc++6 libgl1-mesa-dev libsdl2-dev libfluidsynth-dev`
+> C1 requires the **LLVM Clang-CL** toolchain (`clang-cl.exe`). **Building with standard MSVC (`cl.exe`) is currently unsupported.**
 
-#### psx ####
-(note: psx build currently does not work)
+Ensure the **C++ Clang Compiler for Windows** component is installed via the Visual Studio Installer (under *Desktop development with C++*).
 
-- Psy-Q
+1. Open Visual Studio.
+2. Select **Open a local folder** and choose the `c1` repository directory.
+3. Visual Studio will automatically detect `CMakeLists.txt` and generate the project cache.
+4. Select **Build All** (`Ctrl+Shift+B`).
+
+When building with pre-compiled packages (`BUILD_DEPS=OFF`), CMake automatically downloads pre-compiled 32-bit binaries for SDL2 and FluidSynth into `deps/`. On post-build, all runtime DLLs (SDL2, FluidSynth, and its companion GLib/Intl libraries) are staged directly alongside `c1.exe` in the root project folder.
+
+### Dependencies Summary ###
+#### PC ####
+- C11 and C++17 compilers (GCC, Clang, or Clang-CL; `cl.exe` unsupported)
+- CMake 3.20 or newer
+- OpenGL 2.0+
+- SDL 2 (2.30.x)
+- FluidSynth (2.3.x)
+- Dear ImGui / cimgui (fetched and built automatically from source)
+
+On Ubuntu/Debian, all dependencies can be pre-retrieved (as an optional step before running `make`):
+
+- **64-bit:**
+  ```bash
+  sudo dpkg --add-architecture i386
+  sudo apt update
+  sudo apt install build-essential gcc-multilib g++-multilib libstdc++6:i386 libgl1-mesa-dev:i386 libsdl2-dev:i386 libfluidsynth-dev:i386
+  ```
+- **32-bit:**
+  ```bash
+  sudo apt install cmake build-essential libstdc++6 libgl1-mesa-dev libsdl2-dev libfluidsynth-dev
+  ```
+
+#### PS1 ####
+*(Note: PS1 target build is currently non-functional)*
+- Psy-Q SDK
+
+### Build Options ###
+
+The build system provides the following configuration toggles via CMake:
+
+| Option | Default | Description |
+| :--- | :--- | :--- |
+| `BUILD_DEPS` | `OFF` | When `OFF`, searches locally or automatically downloads/installs pre-compiled libraries (APT multiarch on Linux, pre-compiled packages on Windows). When `ON`, fetches and compiles SDL2 and FluidSynth from source via FetchContent. |
+| `BUILD_SHARED_LIBS` | `OFF` | When building dependencies from source (`BUILD_DEPS=ON`), controls whether dependencies are built as shared DLLs/SOs or static libraries. |
 
 ## Running ##
 
-To run c1, `cd` into the main project directory and run `./c1`.
+To run C1, ensure the asset files are present, then execute the binary from the root project directory:
 
-Copies of the asset files from the Crash Bandicoot game disc are needed for the game to function. Asset files are the (.NSD/.NSF) files located in the `/S0`, `/S1`, `/S2`, and `/S3` directories, respectively. Each of these files must be copied from its respective `/S*` directory into the `/streams` directory. Additionally, after copying files to the `/streams` directory, they must renamed from the uppercase format `S00000%%.NS[F,D]` to the lowercase format `s00000%%.ns[f,d]`.
+- **Linux:** `./c1`
+- **Windows:** `c1.exe`
 
-The game is hardcoded to boot into level `25` (aka. title sequence/main menu screen(s)). To choose a different boot level, redefine the `LID_BOOTLEVEL` constant in `common.h` and recompile.
+Asset files (`.NSD` and `.NSF`) from a *Crash Bandicoot* PS1 game disc are required:
+1. Locate the files in the `/S0`, `/S1`, `/S2`, and `/S3` directories on the game disc.
+2. Copy all `.NSD` and `.NSF` files into the local `streams/` directory.
+3. Rename all copied asset filenames from uppercase (`S00000%%.NS[F,D]`) to lowercase (`s00000%%.ns[f,d]`).
+
+The game is hardcoded to boot into level `25` (title sequence and main menu screen(s)) by default. To select a different boot level, adjust `LID_BOOTLEVEL` in `src/common.h` and recompile.
 
 ## Controls ##
 
-- X - <kbd>Z</kbd>
-- square - <kbd>X</kbd>
-- circle - <kbd>C</kbd>
-- triangle - <kbd>V</kbd>
-- L1 - <kbd>A</kbd>
-- R1 - <kbd>S</kbd>
-- L2 - <kbd>Q</kbd>
-- R2 - <kbd>W</kbd>
-- d-pad up - <kbd>&#8593;</kbd>
-- d-pad down - <kbd>&#8595;</kbd>
-- d-pad left - <kbd>&#8592;</kbd>
-- d-pad right - <kbd>&#8594;</kbd>
-- start - <kbd>Enter</kbd>
-- select - <kbd>Space</kbd>
-- toggle in-game GUI - <kbd>Esc</kbd>
-- toggle in-game GUI keyboard focus - <kbd>Tab</kbd>
+### Joystick
+
+| Control         | Key                | Control         | Key                |
+| :---            | :---               | :---            | :---               |
+| **X**           | <kbd>Z</kbd>       | **L1**          | <kbd>A</kbd>       | 
+| **Square**      | <kbd>X</kbd>       | **R1**          | <kbd>S</kbd>       | 
+| **Circle**      | <kbd>C</kbd>       | **L2**          | <kbd>Q</kbd>       | 
+| **Triangle**    | <kbd>V</kbd>       | **R2**          | <kbd>W</kbd>       |
+| **D-Pad Up**    | <kbd>&#8593;</kbd> | **Start**       | <kbd>Enter</kbd>   |
+| **D-Pad Down**  | <kbd>&#8595;</kbd> | **Select**      | <kbd>Space</kbd>   |
+| **D-Pad Left**  | <kbd>&#8592;</kbd> |
+| **D-Pad Right** | <kbd>&#8594;</kbd> |
+
+
+### Other
+
+| Control                               | Key            |
+| :---                                  | :---           |
+| **Toggle in-game GUI**                | <kbd>Esc</kbd> |
+| **Toggle in-game GUI keyboard focus** | <kbd>Tab</kbd> |
 
 ## Structure ##
 Project structure is listed below, including descriptions for each file.
@@ -150,6 +198,8 @@ Note that further documentation can be found in the `doc` directory.
 │       ├── refl.c,h         # game-specific type metadata
 │       └── disgool.c,h      # GOOL disassembler
 ├── streams                  # game assets (.NSD/.NSF files)
+├── CMakeLists.txt           # CMake build script
+├── CMakeSettings.json       # Visual Studio CMake presets
 ├── Makefile                 # project makefile
 └── README.md                # project overview; this file
 ```
