@@ -52,7 +52,7 @@ static inline void PadUpdatePbak(pad *pad) {
     ++cur_pbak_frame;
     count = cur_pbak_header->frame_count;
     if (held & 0x9F0 || (cur_pbak_frame >= &cur_pbak_header->frames[count])) { /* X, [], /\, O, start, or select pressed? */
-      if (island_cam_rot_x) {
+      if (caption_obj) {
         arg = 0;
         GoolSendEvent(0, caption_obj, 0xE00, 1, &arg);
         pad_lock = 3;
