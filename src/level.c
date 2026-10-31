@@ -269,7 +269,7 @@ void LevelUpdate(entry *zone, zone_path *path, int32_t progress, uint32_t flags)
   if (change || !header->world_count) {
     if (zone != cur_zone) { /* change in zone? */
       flag = 1;
-      item_pool1 = 0;
+      is_first_zone = 0;
       cur_header = 0;
       if (game_state == GAME_STATE_TITLE)
         flag = (flags & 2);
