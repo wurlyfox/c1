@@ -122,6 +122,10 @@ static void AudioCallback(void *userdata, uint8_t *stream, size_t size) {
   }
 }
 
+#ifdef __EMSCRIPTEN__
+static int web_audio_open = 0;
+#endif
+
 void SwAudioInit() {
   SDL_AudioSpec spec;
   int i;
@@ -129,6 +133,15 @@ void SwAudioInit() {
   m_amp = 1.0;
   for (i=0;i<24;i++)
     svoices[i] = def_svoice;
+#ifdef __EMSCRIPTEN__
+  /* The device is opened once and kept for the whole session (see
+     SwAudioKill); later calls only start it again. */
+  if (web_audio_open) {
+    SDL_PauseAudio(0);
+    return;
+  }
+#endif
+  memset(&spec, 0, sizeof(spec));
   spec.freq = 44100;
   spec.callback = (SDL_AudioCallback)AudioCallback;
   spec.format = AUDIO_S16;
@@ -144,6 +157,9 @@ void SwAudioInit() {
     printf("Error initializing audio: %s\n", SDL_GetError());
     return;
   }
+#ifdef __EMSCRIPTEN__
+  web_audio_open = 1;
+#endif
   SDL_PauseAudio(0);  
 }
 
@@ -154,7 +170,15 @@ void SwAudioKill() {
     SwUnloadSample(i);
   }
   SDL_PauseAudio(1);
+#ifndef __EMSCRIPTEN__
   SDL_CloseAudio();
+#endif
+  /* Web: the device is not closed. The audio subsystem is restarted on every
+     level change, and closing the device frees it while the browser can
+     still have one more audio callback queued for it; that callback then
+     reads the freed device ("Web Audio output buffer length mismatch") and
+     stops the game. Pausing is enough: the callback is not run while
+     paused. */
 }
 
 void SwSetMVol(uint32_t vol) {
