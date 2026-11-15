@@ -83,6 +83,10 @@ committed.
   pixel ratio (capped at 2) and the engine sets the GL viewport from it every
   frame. In portrait with the touch controller shown, the game sits in a 4:3
   band at the top with the controls below.
+- **Volume.** The ☰ menu has a master volume slider (0 to 500%; the game's mix is quiet), applied to
+  the final mix by `WebSetVolume` in `src/pc/sound/audio.c` and remembered
+  between visits. It is separate from the game's own effects and music
+  volumes in Options.
 - **Audio.** The audio buffer is 2048 frames (web audio runs its callback on
   the main thread between frames), and the page resumes the audio context on
   input and when the tab becomes visible again.

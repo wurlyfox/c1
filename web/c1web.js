@@ -701,7 +701,7 @@
   /* ---- preferences ---------------------------------------------------- */
 
   var PREFS_KEY = 'c1web.prefs.v1';
-  var prefs = { touch: 'auto', debug: false };
+  var prefs = { touch: 'auto', debug: false, volume: 100 };
   try { Object.assign(prefs, JSON.parse(localStorage.getItem(PREFS_KEY) || '{}')); } catch (_) { /* defaults */ }
   function savePrefs() {
     try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch (_) { /* ignore */ }
@@ -922,7 +922,16 @@
     updateTouchVisibility();
   }
 
+  /* master volume, in percent of the game's own mix (up to 500%) */
+  function applyVolume() {
+    var v = Math.max(0, Math.min(500, +prefs.volume || 0));
+    $('opt-volume').value = v;
+    $('opt-volume-value').textContent = v + '%';
+    try { Module._WebSetVolume(v); } catch (_) { /* engine not ready */ }
+  }
+
   function openMenu() {
+    applyVolume();
     $('opt-touch').value = prefs.touch;
     $('opt-fullscreen').textContent = isFullscreen() ? 'Exit fullscreen' : 'Fullscreen';
     $('menu').hidden = false;
@@ -935,6 +944,11 @@
     $('menu-btn').addEventListener('click', function () { if ($('menu').hidden) { openMenu(); } else { closeMenu(); } this.blur(); });
     $('opt-close').addEventListener('click', closeMenu);
     $('opt-fullscreen').addEventListener('click', function () { toggleFullscreen(); closeMenu(); });
+    $('opt-volume').addEventListener('input', function () {
+      prefs.volume = +this.value;
+      savePrefs();
+      applyVolume();
+    });
     $('opt-edit').addEventListener('click', openTouchEditor);
     $('opt-debug').addEventListener('click', function () { closeMenu(); toggleDebug(); });
     $('opt-log').addEventListener('click', function () {
@@ -1002,6 +1016,7 @@
     document.body.classList.add('playing');
     waitingFor = null;
     wireGameUi();
+    applyVolume();
     applyDebug();
     debugTimer = setInterval(pollDebug, 250);
     updateTouchVisibility();

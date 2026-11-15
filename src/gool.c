@@ -628,8 +628,8 @@ gool_object *GoolObjectSpawn(entry *zone, int entity_idx) {
     entity = (zone_entity*)zone->items[entity_idx];
   is_main = entity->group == 3 && (entity->type == 0
              || (entity->id > 0 && entity->id < 5)
-             || (entity->type == 0x2C && entity->subtype == 0)
-             || entity->type == 0x30);
+             || ((entity->type == 0x2C || entity->type == 0x30)
+              && entity->subtype == 0));
   // if (!is_main) { return ERROR; }
   if (is_main && main_obj) /* trying to spawn the main obj (crash, etc.) but already spawned? */
     return (gool_object*)ERROR; /* return error */

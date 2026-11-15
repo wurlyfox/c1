@@ -43,6 +43,18 @@ const svoice_t def_svoice = {
 double m_amp = 1.0;
 svoice_t svoices[24];
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+static float web_volume = 1.0f;
+
+/* master volume in percent (100 = as mixed by the game), set by the page */
+EMSCRIPTEN_KEEPALIVE void WebSetVolume(int percent) {
+  if (percent < 0) { percent = 0; }
+  if (percent > 1000) { percent = 1000; }
+  web_volume = percent / 100.0f;
+}
+#endif
+
 static void SampleNext(sampler_t *sampler, int len, int16_t *data) {
   sample_t *sample;
   double t;
@@ -116,10 +128,21 @@ static void AudioCallback(void *userdata, uint8_t *stream, size_t size) {
   } 
   p32 = buf32;
   p16 = (int16_t*)stream; 
+#ifdef __EMSCRIPTEN__
+  /* master volume chosen on the page; above 100% the mix is amplified and
+     clipped to the 16 bit range */
+  for (i=0;i<len*2;i++) {
+    int32_t sample = (int32_t)((*(p32++) / 24) * web_volume);
+    if (sample > 32767) { sample = 32767; }
+    if (sample < -32768) { sample = -32768; }
+    *(p16++) = (int16_t)sample;
+  }
+#else
   for (i=0;i<len;i++) {
     *(p16++) = *(p32++) / 24;
     *(p16++) = *(p32++) / 24;
   }
+#endif
 }
 
 #ifdef __EMSCRIPTEN__
