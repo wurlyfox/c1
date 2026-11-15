@@ -644,6 +644,15 @@ void GLDrawPrims(void *data, int count) {
   glUniform1f(gl_u_texscale, 0.0f);
   glEnable(GL_BLEND);
   for (i=0;i<count;i++,poly++) {
+    /* The console's GPU does not draw a primitive that is more than 1023
+       units wide or 511 high. The game relies on that: geometry right in
+       front of the camera, which projects to enormous triangles, simply
+       disappears there instead of covering the picture. */
+    if (max3(poly->verts[0].x, poly->verts[1].x, poly->verts[2].x)
+      - min(min(poly->verts[0].x, poly->verts[1].x), poly->verts[2].x) > 1023
+     || max3(poly->verts[0].y, poly->verts[1].y, poly->verts[2].y)
+      - min(min(poly->verts[0].y, poly->verts[1].y), poly->verts[2].y) > 511)
+      continue;
     poly_mode = poly->type == 3 ? GL_LINES : GL_TRIANGLES; /* type 3 = wireframe */
     vert_count = poly->type == 3 ? 6 : 3;
     if (poly->flags != flags || poly->texid != texid || poly_mode != mode

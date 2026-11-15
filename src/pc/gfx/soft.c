@@ -85,14 +85,36 @@ int SwRotTransPers(vec *in, vec *out, vec *trans, mat16 *m_rot, vec2 *offs, uint
   vec s_vert;
   int res;
 
+  int64_t quotient, sx, sy;
+
   res = SwRotTrans(in, &r_vert, trans, m_rot);
-  if (r_vert.z == 0) { r_vert.z = 1; }
-  s_vert.x = ((int64_t)(offs->x<<16)+(((int64_t)r_vert.x*(proj<<16))/r_vert.z))>>16;
-  s_vert.y = ((int64_t)(offs->y<<16)+(((int64_t)r_vert.y*(proj<<16))/r_vert.z))>>16;
-  s_vert.z = r_vert.z;
-  if (s_vert.x < -0x400 || s_vert.x > 0x3FF
-   || s_vert.y < -0x400 || s_vert.y > 0x3FF)
+  /*
+   * The GTE does not divide by an arbitrarily small depth. Its perspective
+   * factor h/z is a 16.16 value that saturates at 0x1FFFF (just under 2),
+   * which happens for any point nearer than half the projection distance,
+   * including points at or behind the camera (their depth is clamped to 0
+   * first); and the resulting screen coordinates saturate to -1024..1023.
+   *
+   * Without those limits a point close to the camera lands thousands of
+   * units off screen, and one behind it is mirrored through the center, so
+   * a wall that the camera brushes past turns into streaks across the whole
+   * picture.
+   */
+  if (r_vert.z <= 0)
+    quotient = 0x1FFFF;
+  else {
+    quotient = ((int64_t)proj<<16)/r_vert.z;
+    if (quotient > 0x1FFFF) { quotient = 0x1FFFF; }
+  }
+  sx = ((int64_t)offs->x<<16)+((int64_t)r_vert.x*quotient);
+  sy = ((int64_t)offs->y<<16)+((int64_t)r_vert.y*quotient);
+  sx >>= 16;
+  sy >>= 16;
+  if (sx < -0x400 || sx > 0x3FF || sy < -0x400 || sy > 0x3FF)
     res = 0;
+  s_vert.x = (int32_t)limit(sx, -0x400, 0x3FF);
+  s_vert.y = (int32_t)limit(sy, -0x400, 0x3FF);
+  s_vert.z = r_vert.z;
   *out=s_vert;
   return res;
 }

@@ -279,6 +279,8 @@
   var bootLevel = '';
   try { bootLevel = (new URLSearchParams(location.search).get('level') || '').toLowerCase().replace(/^0x/, ''); } catch (_) { /* none */ }
 
+  var requestedLevel = bootLevel;
+
   function levelFiles(hexId) {
     var base = 's' + ('0000000' + hexId).slice(-7);
     return [base + '.nsd', base + '.nsf'];
@@ -350,6 +352,8 @@
     var names = storedAssets();
     var levelsStored = storedLevels(names);
     var titleId = TITLE_LEVEL.slice(1).replace(/^0+/, '');
+    /* a level asked for in the address applies as soon as its files are there */
+    if (requestedLevel && levelsStored.indexOf(requestedLevel) >= 0) { bootLevel = requestedLevel; requestedLevel = ''; }
     if (levelsStored.indexOf(bootLevel) < 0) { bootLevel = levelsStored.indexOf(titleId) >= 0 || !levelsStored.length ? '' : levelsStored[0]; }
     var bootPick = $('boot-level');
     bootPick.innerHTML = '';
