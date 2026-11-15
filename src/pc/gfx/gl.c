@@ -216,34 +216,128 @@ static void GLSetProjection(float sx, float sy, float ox, float oy) {
   glUniform2f(gl_u_offset, ox, oy);
 }
 
+/*
+ * Render quality, set by the page (WebSetRender):
+ *
+ * web_res   internal resolution in percent of the canvas size (100 = one
+ *           rendered pixel per canvas pixel, 200 = twice as many each way),
+ *           or 0 for the low resolution of the original console (240 rows)
+ * web_aa    1 = antialiasing by supersampling: the frame is drawn at twice
+ *           the internal resolution in each direction and averaged down
+ *           when it is copied to the canvas, which smooths polygon edges
+ */
+static int web_res = 100;
+static int web_aa = 1;
+static int gl_max_size = 0;
+
+EMSCRIPTEN_KEEPALIVE void WebSetRender(int res_percent, int antialiasing) {
+  web_res = res_percent;
+  web_aa = antialiasing;
+}
+
+/* program that copies the offscreen target to the canvas, averaging four
+   samples spread over the area that one canvas pixel covers in the target */
+static const char *present_fs_src =
+  "precision mediump float;\n"
+  "uniform sampler2D u_tex;\n"
+  "uniform vec2 u_spread;\n"
+  "varying vec2 v_uv;\n"
+  "void main() {\n"
+  "  vec4 c = texture2D(u_tex, v_uv + vec2(-u_spread.x, -u_spread.y))\n"
+  "         + texture2D(u_tex, v_uv + vec2( u_spread.x, -u_spread.y))\n"
+  "         + texture2D(u_tex, v_uv + vec2(-u_spread.x,  u_spread.y))\n"
+  "         + texture2D(u_tex, v_uv + vec2( u_spread.x,  u_spread.y));\n"
+  "  gl_FragColor = vec4(c.rgb * 0.25, 1.0);\n"
+  "}\n";
+
+static GLuint gl_present_prog = 0;
+static GLint gl_present_u_spread;
+
+static void GLInitPresentProgram() {
+  GLuint vs, fs;
+  GLint ok;
+  char log[512];
+
+  vs = GLCompileShader(GL_VERTEX_SHADER, vs_src);
+  fs = GLCompileShader(GL_FRAGMENT_SHADER, present_fs_src);
+  gl_present_prog = glCreateProgram();
+  glAttachShader(gl_present_prog, vs);
+  glAttachShader(gl_present_prog, fs);
+  glBindAttribLocation(gl_present_prog, 0, "a_pos");
+  glBindAttribLocation(gl_present_prog, 1, "a_color");
+  glBindAttribLocation(gl_present_prog, 2, "a_uv");
+  glLinkProgram(gl_present_prog);
+  glGetProgramiv(gl_present_prog, GL_LINK_STATUS, &ok);
+  if (!ok) {
+    glGetProgramInfoLog(gl_present_prog, sizeof(log), 0, log);
+    printf("Error linking present program: %s\n", log);
+  }
+  glUseProgram(gl_present_prog);
+  glUniform1i(glGetUniformLocation(gl_present_prog, "u_tex"), 0);
+  glUniform2f(glGetUniformLocation(gl_present_prog, "u_scale"), 1, 1);
+  glUniform2f(glGetUniformLocation(gl_present_prog, "u_offset"), 0, 0);
+  gl_present_u_spread = glGetUniformLocation(gl_present_prog, "u_spread");
+  glUseProgram(gl_prog);
+}
+
+/* size of the offscreen target for a canvas of cw x ch pixels */
+static void GLTargetSize(int cw, int ch, int *tw, int *th) {
+  float w, h, fit;
+
+  if (!gl_max_size) {
+    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &gl_max_size);
+    if (gl_max_size > 4096) { gl_max_size = 4096; } /* enough, and kind to slow GPUs */
+    if (gl_max_size < 256) { gl_max_size = 256; }
+  }
+  if (web_res <= 0) { /* original console: 240 rows, same shape as the canvas */
+    h = 240;
+    w = (240.0f * cw) / ch;
+  }
+  else {
+    w = (cw * web_res) / 100.0f;
+    h = (ch * web_res) / 100.0f;
+  }
+  if (web_aa) { w *= 2; h *= 2; }
+  fit = 1;
+  if (w > gl_max_size) { fit = gl_max_size / w; }
+  if (h*fit > gl_max_size) { fit = gl_max_size / h; }
+  *tw = (int)(w*fit + 0.5f);
+  *th = (int)(h*fit + 0.5f);
+  if (*tw < 16) { *tw = 16; }
+  if (*th < 16) { *th = 16; }
+}
+
 /* binds the offscreen target, resizing it when the page resized the canvas
-   (device pixel ratio, rotations, fullscreen, debug panel) */
+   (device pixel ratio, rotations, fullscreen, debug panel) or the render
+   quality changed */
 static void GLBindTarget() {
-  int cw, ch;
+  int cw, ch, tw, th;
 
   if (emscripten_get_canvas_element_size("#canvas", &cw, &ch) != EMSCRIPTEN_RESULT_SUCCESS
    || cw <= 0 || ch <= 0) {
-    cw = gl_fbo_w ? gl_fbo_w : 1024;
-    ch = gl_fbo_h ? gl_fbo_h : 768;
+    cw = 1024;
+    ch = 768;
   }
+  GLTargetSize(cw, ch, &tw, &th);
   if (!gl_fbo) {
     glGenFramebuffers(1, &gl_fbo);
     glGenTextures(1, &gl_fbo_tex);
+    GLInitPresentProgram();
   }
   glBindFramebuffer(GL_FRAMEBUFFER, gl_fbo);
-  if (cw != gl_fbo_w || ch != gl_fbo_h) {
+  if (tw != gl_fbo_w || th != gl_fbo_h) {
     glBindTexture(GL_TEXTURE_2D, gl_fbo_tex);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, cw, ch, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tw, th, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
     glBindTexture(GL_TEXTURE_2D, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gl_fbo_tex, 0);
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-      printf("Error: offscreen render target is incomplete (%dx%d)\n", cw, ch);
-    gl_fbo_w = cw;
-    gl_fbo_h = ch;
+      printf("Error: offscreen render target is incomplete (%dx%d)\n", tw, th);
+    gl_fbo_w = tw;
+    gl_fbo_h = th;
+    web_debug[14] = tw;
+    web_debug[15] = th;
     glClearColor(0, 0, 0, 1);
     glClear(GL_COLOR_BUFFER_BIT);
   }
@@ -252,20 +346,34 @@ static void GLBindTarget() {
 
 /* copies the finished frame to the canvas */
 static void GLPresent() {
-  int cw, ch;
+  float rx, ry;
+  int cw, ch, filter;
 
   if (!gl_fbo) { return; }
-  if (emscripten_get_canvas_element_size("#canvas", &cw, &ch) != EMSCRIPTEN_RESULT_SUCCESS) {
+  if (emscripten_get_canvas_element_size("#canvas", &cw, &ch) != EMSCRIPTEN_RESULT_SUCCESS
+   || cw <= 0 || ch <= 0) {
     cw = gl_fbo_w;
     ch = gl_fbo_h;
   }
+  /* target pixels per canvas pixel */
+  rx = (float)gl_fbo_w / cw;
+  ry = (float)gl_fbo_h / ch;
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   glViewport(0, 0, cw, ch);
   glDisable(GL_BLEND);
-  GLSetProjection(1, 1, 0, 0); /* positions are clip space coordinates */
-  glUniform1f(gl_u_texscale, 1.0f);
+  glUseProgram(gl_present_prog);
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, gl_fbo_tex);
+  /* a low resolution frame without antialiasing keeps its hard pixels */
+  filter = (!web_aa && rx < 1.0f) ? GL_NEAREST : GL_LINEAR;
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
+  /* When shrinking, each of the four samples is itself a bilinear average of
+     2x2 target pixels; a quarter of the ratio apart they cover the whole
+     footprint of the canvas pixel. No spread when not shrinking. */
+  glUniform2f(gl_present_u_spread,
+    rx > 1.0f ? (rx*0.25f)/gl_fbo_w : 0.0f,
+    ry > 1.0f ? (ry*0.25f)/gl_fbo_h : 0.0f);
   GLBatchVertex(-1, -1, 1, 1, 1, 1, 0, 0);
   GLBatchVertex( 1, -1, 1, 1, 1, 1, 1, 0);
   GLBatchVertex( 1,  1, 1, 1, 1, 1, 1, 1);
@@ -274,8 +382,7 @@ static void GLPresent() {
   GLBatchVertex(-1,  1, 1, 1, 1, 1, 0, 1);
   GLBatchFlush(GL_TRIANGLES);
   glBindTexture(GL_TEXTURE_2D, 0);
-  glUniform1f(gl_u_texscale, 0.0f);
-  GLSetProjection(gl_scale[0], gl_scale[1], gl_offset[0], gl_offset[1]);
+  glUseProgram(gl_prog);
 }
 
 extern rect2 screen;
@@ -927,7 +1034,8 @@ extern gool_object *crash;
    [2] work time of the last frame, in microseconds
    [3] level id  [4] draw count  [5] paused  [6] ticks per frame
    [7] lives  [8] wumpa fruit  [9] boxes
-   [10] 1 if the player object exists, then [11..13] its position */
+   [10] 1 if the player object exists, then [11..13] its position
+   [14] [15] size of the offscreen render target */
 EMSCRIPTEN_KEEPALIVE int32_t *WebDebugInfo() {
   web_debug[3] = (int32_t)cur_lid;
   web_debug[4] = draw_count;

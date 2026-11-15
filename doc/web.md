@@ -88,6 +88,16 @@ committed.
   middle. *Fill window (stretched)* stretches the 4:3 picture instead.
   *Original 4:3* keeps the picture as it was. All three follow the window
   size as it changes.
+- **Resolution and antialiasing** (☰ menu). The frame is drawn into the
+  offscreen target at an internal resolution: the window's (default), 1.5 or
+  2 times that, or the 240 rows of the original console. Antialiasing (on by
+  default) draws at twice the internal resolution in each direction and
+  averages it down when the frame is copied to the canvas, which smooths
+  polygon edges. The target is capped at 4096 pixels a side. Both cost GPU
+  time; the debug panel shows the target size as "Render".
+- **Menu link.** The last entry of the ☰ menu opens a web page in a new tab.
+  Its label and address are `MENU_LINK` at the top of `web/c1web.js`; an
+  empty address hides it.
 - **Display.** The page sizes the canvas to its on-screen size times the device
   pixel ratio (capped at 2) and the engine sets the GL viewport from it every
   frame. In portrait with the touch controller shown, the game sits in a 4:3

@@ -3,6 +3,10 @@
 
 (function () {
   var $ = function (id) { return document.getElementById(id); };
+  /* Last entry of the in-game menu: a link that opens in a new tab.
+     Change the two values to point it somewhere else; an empty url hides it. */
+  var MENU_LINK = { label: 'Project page ↗', url: 'https://github.com/gabom88/crash1' };
+
   var STREAMS = '/streams';
   var SAVES = '/save';
   var TITLE_LEVEL = 's0000019'; /* level 0x19: title sequence, the boot level */
@@ -701,7 +705,7 @@
   /* ---- preferences ---------------------------------------------------- */
 
   var PREFS_KEY = 'c1web.prefs.v1';
-  var prefs = { touch: 'auto', debug: false, volume: 100, aspect: 'fill' };
+  var prefs = { touch: 'auto', debug: false, volume: 100, aspect: 'fill', res: 100, aa: 1 };
   try { Object.assign(prefs, JSON.parse(localStorage.getItem(PREFS_KEY) || '{}')); } catch (_) { /* defaults */ }
   function savePrefs() {
     try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch (_) { /* ignore */ }
@@ -828,7 +832,8 @@
       'Lives ' + d[7] + '   Fruit ' + d[8] + '   Boxes ' + d[9],
       'Crash ' + (d[10] ? d[11] + ', ' + d[12] + ', ' + d[13] : '(no player object)'),
       'Pad ' + heldNames(),
-      'Canvas ' + canvas + ' @' + window.devicePixelRatio + '   Mem ' + (Module.HEAP8.length / 1048576).toFixed(0) + ' MB',
+      'Render ' + d[14] + 'x' + d[15] + '   Canvas ' + canvas + ' @' + window.devicePixelRatio,
+      'Mem ' + (Module.HEAP8.length / 1048576).toFixed(0) + ' MB',
       'Audio ' + audio,
       'Build ' + BUILD.id + ' ' + BUILD.commit
     ].join('\n');
@@ -944,8 +949,19 @@
     settle();
   }
 
+  /* internal resolution (percent of the window size, 0 = original 240 rows)
+     and antialiasing (supersampling) */
+  function applyRender() {
+    var res = [0, 100, 150, 200].indexOf(+prefs.res) >= 0 ? +prefs.res : 100;
+    var aa = prefs.aa === 0 || prefs.aa === '0' ? 0 : 1;
+    $('opt-res').value = String(res);
+    $('opt-aa').value = String(aa);
+    try { Module._WebSetRender(res, aa); } catch (_) { /* engine not ready */ }
+  }
+
   function openMenu() {
     applyVolume();
+    applyRender();
     $('opt-touch').value = prefs.touch;
     $('opt-fullscreen').textContent = isFullscreen() ? 'Exit fullscreen' : 'Fullscreen';
     $('menu').hidden = false;
@@ -968,6 +984,15 @@
       savePrefs();
       applyAspect();
     });
+    $('opt-res').addEventListener('change', function () { prefs.res = +this.value; savePrefs(); applyRender(); });
+    $('opt-aa').addEventListener('change', function () { prefs.aa = +this.value; savePrefs(); applyRender(); });
+    if (MENU_LINK.url) {
+      $('opt-link').href = MENU_LINK.url;
+      $('opt-link').textContent = MENU_LINK.label;
+      $('opt-link').addEventListener('click', closeMenu);
+    } else {
+      $('opt-link').hidden = true;
+    }
     $('opt-edit').addEventListener('click', openTouchEditor);
     $('opt-debug').addEventListener('click', function () { closeMenu(); toggleDebug(); });
     $('opt-log').addEventListener('click', function () {
@@ -1037,6 +1062,7 @@
     wireGameUi();
     applyVolume();
     applyAspect();
+    applyRender();
     applyDebug();
     debugTimer = setInterval(pollDebug, 250);
     updateTouchVisibility();
