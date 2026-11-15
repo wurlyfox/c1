@@ -195,6 +195,89 @@ static inline void GLBatchVertex(float x, float y,
   vert->u = u; vert->v = v;
 }
 
+/*
+ * Frames are drawn into an offscreen target and copied to the canvas in one
+ * go when they are complete.
+ *
+ * A frame is not drawn in one uninterrupted run: GLClear paints the
+ * background, then GLUpdate waits for the frame time to elapse (yielding to
+ * the browser) and only afterwards draws the primitives. The browser shows
+ * whatever is on the canvas each time the code yields and then discards it,
+ * so drawing straight to the canvas showed the background alone and then the
+ * primitives on black, alternating: a constant flicker. Nothing reaches the
+ * canvas now until GLPresent.
+ */
+static GLuint gl_fbo = 0, gl_fbo_tex = 0;
+static int gl_fbo_w = 0, gl_fbo_h = 0;
+static float gl_scale[2] = { 1, 1 }, gl_offset[2] = { 0, 0 };
+
+static void GLSetProjection(float sx, float sy, float ox, float oy) {
+  glUniform2f(gl_u_scale, sx, sy);
+  glUniform2f(gl_u_offset, ox, oy);
+}
+
+/* binds the offscreen target, resizing it when the page resized the canvas
+   (device pixel ratio, rotations, fullscreen, debug panel) */
+static void GLBindTarget() {
+  int cw, ch;
+
+  if (emscripten_get_canvas_element_size("#canvas", &cw, &ch) != EMSCRIPTEN_RESULT_SUCCESS
+   || cw <= 0 || ch <= 0) {
+    cw = gl_fbo_w ? gl_fbo_w : 1024;
+    ch = gl_fbo_h ? gl_fbo_h : 768;
+  }
+  if (!gl_fbo) {
+    glGenFramebuffers(1, &gl_fbo);
+    glGenTextures(1, &gl_fbo_tex);
+  }
+  glBindFramebuffer(GL_FRAMEBUFFER, gl_fbo);
+  if (cw != gl_fbo_w || ch != gl_fbo_h) {
+    glBindTexture(GL_TEXTURE_2D, gl_fbo_tex);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, cw, ch, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gl_fbo_tex, 0);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+      printf("Error: offscreen render target is incomplete (%dx%d)\n", cw, ch);
+    gl_fbo_w = cw;
+    gl_fbo_h = ch;
+    glClearColor(0, 0, 0, 1);
+    glClear(GL_COLOR_BUFFER_BIT);
+  }
+  glViewport(0, 0, gl_fbo_w, gl_fbo_h);
+}
+
+/* copies the finished frame to the canvas */
+static void GLPresent() {
+  int cw, ch;
+
+  if (!gl_fbo) { return; }
+  if (emscripten_get_canvas_element_size("#canvas", &cw, &ch) != EMSCRIPTEN_RESULT_SUCCESS) {
+    cw = gl_fbo_w;
+    ch = gl_fbo_h;
+  }
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  glViewport(0, 0, cw, ch);
+  glDisable(GL_BLEND);
+  GLSetProjection(1, 1, 0, 0); /* positions are clip space coordinates */
+  glUniform1f(gl_u_texscale, 1.0f);
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_2D, gl_fbo_tex);
+  GLBatchVertex(-1, -1, 1, 1, 1, 1, 0, 0);
+  GLBatchVertex( 1, -1, 1, 1, 1, 1, 1, 0);
+  GLBatchVertex( 1,  1, 1, 1, 1, 1, 1, 1);
+  GLBatchVertex(-1, -1, 1, 1, 1, 1, 0, 0);
+  GLBatchVertex( 1,  1, 1, 1, 1, 1, 1, 1);
+  GLBatchVertex(-1,  1, 1, 1, 1, 1, 0, 1);
+  GLBatchFlush(GL_TRIANGLES);
+  glBindTexture(GL_TEXTURE_2D, 0);
+  glUniform1f(gl_u_texscale, 0.0f);
+  GLSetProjection(gl_scale[0], gl_scale[1], gl_offset[0], gl_offset[1]);
+}
+
 /* draw a quad with vertices in fan order; uvs are those used by GLDrawImage */
 static void GLDrawQuad(quad *q, int r, int g, int b, int a) {
   static const int idxs[6] = { 0, 1, 2, 0, 2, 3 };
@@ -247,6 +330,7 @@ int GLInit(gl_callbacks *_callbacks) {
 #endif
 #ifdef C1_GLES2
   GLInitProgram();
+  GLBindTarget();
 #endif
   TexturesInit(GLCreateTexture, GLDeleteTexture, GLUpdateTexture);
   textures_inited=1;
@@ -654,17 +738,14 @@ void GLClear() {
   int fh;
 
 #ifdef C1_GLES2
-  {
-    /* the page resizes the canvas to match the screen (device pixel ratio,
-       rotations, fullscreen): follow it */
-    int cw, ch;
-    if (emscripten_get_canvas_element_size("#canvas", &cw, &ch) == EMSCRIPTEN_RESULT_SUCCESS)
-      glViewport(0, 0, cw, ch);
-  }
+  GLBindTarget();
   glClear(GL_COLOR_BUFFER_BIT);
   /* equivalent of the glFrustum call below for vertices at z=-1 */
-  glUniform2f(gl_u_scale, 2.0f/screen.w, 2.0f/screen.h);
-  glUniform2f(gl_u_offset, screen.x+(screen.w/2.0f), screen.y+(screen.h/2.0f));
+  gl_scale[0] = 2.0f/screen.w;
+  gl_scale[1] = 2.0f/screen.h;
+  gl_offset[0] = screen.x+(screen.w/2.0f);
+  gl_offset[1] = screen.y+(screen.h/2.0f);
+  GLSetProjection(gl_scale[0], gl_scale[1], gl_offset[0], gl_offset[1]);
 #else
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glLoadIdentity();
@@ -721,12 +802,21 @@ void GLUpdate() {
     web_debug[2] = (int32_t)((emscripten_get_now() - web_resume_time) * 1000.0);
   web_debug[0]++;
 #endif
-  while (ticks_elapsed - context.draw_stamp < 34) {
 #ifdef __EMSCRIPTEN__
+  /* The wait advances one display refresh at a time, and refresh times
+     jitter by a millisecond or so. Waiting for the full 34 ticks (32.8 ms)
+     would miss the second refresh of a 60 Hz display (33.3 ms) whenever it
+     came slightly early, and take a third one: 20 fps for that frame. 32
+     ticks leave room for the jitter and select the same refresh. */
+  while (ticks_elapsed - context.draw_stamp < 32) {
     WebWaitFrame(); /* a busy wait would freeze the browser tab */
-#endif
     ticks_elapsed = GetTicksElapsed();
   }
+#else
+  while (ticks_elapsed - context.draw_stamp < 34) {
+    ticks_elapsed = GetTicksElapsed();
+  }
+#endif
 #ifdef __EMSCRIPTEN__
   web_resume_time = emscripten_get_now();
 #endif
@@ -766,8 +856,16 @@ void GLUpdate() {
   GuiDraw();
   ImGui_ImplOpenGL2_RenderDrawData(igGetDrawData());
 #endif
+#ifdef C1_GLES2
+  GLPresent();
+#endif
   if (callbacks.post_update)
     (*callbacks.post_update)();
+#ifdef C1_GLES2
+  /* anything drawn from here on belongs to the next frame */
+  glBindFramebuffer(GL_FRAMEBUFFER, gl_fbo);
+  glViewport(0, 0, gl_fbo_w, gl_fbo_h);
+#endif
 }
 
 #ifdef __EMSCRIPTEN__

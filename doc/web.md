@@ -45,6 +45,11 @@ so they only have to be chosen once. Nothing is uploaded.
   Title card images are drawn at 1x; on desktop they inherit the 2x scale left
   behind by the primitives, which is the likely cause of the "too bright"
   entry in [issues.md](issues.md).
+- **Presentation.** Frames are drawn into an offscreen target and copied to
+  the canvas when complete. The engine paints the background, waits for the
+  frame time and only then draws the primitives; a browser shows the canvas
+  at every yield and then discards it, so drawing directly flickered between
+  the background alone and the primitives on black.
 - **Main loop.** The game loop is unchanged. The link uses Asyncify, and the
   frame limiter in `GLUpdate` waits on `requestAnimationFrame` instead of
   spinning, so frames are presented in step with the display.
