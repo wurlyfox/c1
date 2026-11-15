@@ -701,7 +701,7 @@
   /* ---- preferences ---------------------------------------------------- */
 
   var PREFS_KEY = 'c1web.prefs.v1';
-  var prefs = { touch: 'auto', debug: false, volume: 100 };
+  var prefs = { touch: 'auto', debug: false, volume: 100, aspect: 'fill' };
   try { Object.assign(prefs, JSON.parse(localStorage.getItem(PREFS_KEY) || '{}')); } catch (_) { /* defaults */ }
   function savePrefs() {
     try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch (_) { /* ignore */ }
@@ -930,6 +930,20 @@
     try { Module._WebSetVolume(v); } catch (_) { /* engine not ready */ }
   }
 
+  /* Picture modes:
+     fill    - the canvas takes the whole window and the engine shows more of
+               the scene at the sides (nothing is stretched);
+     stretch - the canvas takes the whole window and the 4:3 picture is
+               stretched over it;
+     4:3     - the original picture, as large as fits. */
+  function applyAspect() {
+    var mode = ['fill', 'stretch', '4:3'].indexOf(prefs.aspect) >= 0 ? prefs.aspect : 'fill';
+    $('opt-aspect').value = mode;
+    document.body.classList.toggle('wide', mode !== '4:3' && playing);
+    try { Module._WebSetWide(mode === 'fill' ? 1 : 0); } catch (_) { /* engine not ready */ }
+    settle();
+  }
+
   function openMenu() {
     applyVolume();
     $('opt-touch').value = prefs.touch;
@@ -948,6 +962,11 @@
       prefs.volume = +this.value;
       savePrefs();
       applyVolume();
+    });
+    $('opt-aspect').addEventListener('change', function () {
+      prefs.aspect = this.value;
+      savePrefs();
+      applyAspect();
     });
     $('opt-edit').addEventListener('click', openTouchEditor);
     $('opt-debug').addEventListener('click', function () { closeMenu(); toggleDebug(); });
@@ -1017,6 +1036,7 @@
     waitingFor = null;
     wireGameUi();
     applyVolume();
+    applyAspect();
     applyDebug();
     debugTimer = setInterval(pollDebug, 250);
     updateTouchVisibility();

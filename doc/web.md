@@ -79,6 +79,15 @@ committed.
 - **Main loop.** The game loop is unchanged. The link uses Asyncify, and the
   frame limiter in `GLUpdate` waits on `requestAnimationFrame` instead of
   spinning, so frames are presented in step with the display.
+- **Picture modes** (☰ menu). *Fill window (wider view)*, the default: the
+  canvas takes the whole window and `GLUpdateScreen` in `gl.c` widens the
+  visible area from 512 screen units to match, so more of the scene shows at
+  the sides and nothing is stretched. The game only draws what the original
+  4:3 camera could see, so inside levels the extra area is partly empty and
+  ends in ragged edges; 2D screens (menus, title cards) stay 4:3 in the
+  middle. *Fill window (stretched)* stretches the 4:3 picture instead.
+  *Original 4:3* keeps the picture as it was. All three follow the window
+  size as it changes.
 - **Display.** The page sizes the canvas to its on-screen size times the device
   pixel ratio (capped at 2) and the engine sets the GL viewport from it every
   frame. In portrait with the touch controller shown, the game sits in a 4:3

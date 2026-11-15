@@ -47,6 +47,10 @@ body.playing { overflow: hidden; touch-action: none; -webkit-user-select: none; 
   width: min(100vw - var(--side), 133.333vh); height: min((100vw - var(--side)) * .75, 100vh);
   width: min(100vw - var(--side), 133.333dvh); height: min((100vw - var(--side)) * .75, 100dvh);
   display: block; background: #000; outline: none; touch-action: none; }
+/* Fill mode: the whole window; the engine then shows more of the scene at
+   the sides. Never narrower than 4:3. */
+body.wide #canvas { width: calc(100vw - var(--side)); height: min(100vh, (100vw - var(--side)) * .75);
+  height: min(100dvh, (100vw - var(--side)) * .75); }
 /* Portrait play: the game sits in a 4:3 band at the top, controls below. */
 body.portrait-play { background: #101014; }
 body.portrait-play #canvas { top: var(--safe-t); transform: translateX(-50%);

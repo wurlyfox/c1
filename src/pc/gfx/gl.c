@@ -278,6 +278,37 @@ static void GLPresent() {
   GLSetProjection(gl_scale[0], gl_scale[1], gl_offset[0], gl_offset[1]);
 }
 
+extern rect2 screen;
+static int web_wide = 1;
+
+/* 1 = show more of the scene at the sides when the canvas is wider than 4:3;
+   0 = always the original 4:3 view. Set by the page. */
+EMSCRIPTEN_KEEPALIVE void WebSetWide(int wide) {
+  web_wide = wide;
+}
+
+/*
+ * Sets the visible part of the scene from the shape of the canvas.
+ *
+ * The game draws in screen units: 512x240 for a 4:3 picture, centered on
+ * (0,0). A wider canvas keeps the height and shows more units to the left
+ * and right; nothing is stretched. The projection of the 3D scene is not
+ * changed, so the 4:3 picture stays where it was, in the middle.
+ */
+static void GLUpdateScreen() {
+  int w;
+
+  w = 512;
+  if (web_wide && gl_fbo_h > 0) {
+    w = (int)((512.0f * gl_fbo_w * 3.0f) / (gl_fbo_h * 4.0f) + 0.5f);
+    w &= ~1;
+    if (w < 512) { w = 512; }
+    if (w > 1280) { w = 1280; }
+  }
+  screen.w = w;
+  screen.x = -(w/2);
+}
+
 /* draw a quad with vertices in fan order; uvs are those used by GLDrawImage */
 static void GLDrawQuad(quad *q, int r, int g, int b, int a) {
   static const int idxs[6] = { 0, 1, 2, 0, 2, 3 };
@@ -382,6 +413,22 @@ void GLDrawRect(int x, int y, int w, int h, int r, int g, int b) {
   q.p[1].x = x+w; q.p[1].y =   y;
   q.p[3].x =   x; q.p[2].y = y+h;
   q.p[2].x = x+w; q.p[3].y = y+h;
+#ifdef C1_GLES2
+  /* coordinates are relative to the top left of the original 512x240
+     screen; a rect that spans its width is a band across the whole view,
+     which can be wider (see GLUpdateScreen) */
+  if (x == 0 && w == 512) {
+    q.p[0].x = q.p[3].x = (screen.x + 256);
+    q.p[1].x = q.p[2].x = (screen.x + 256) + screen.w;
+  }
+  for (i=0;i<4;i++) {
+    q.p[i].x += -256;
+    q.p[i].y += -120;
+  }
+  GLDrawQuad(&q, r, g, b, 255);
+  (void)i;
+  return;
+#endif
   for (i=0;i<4;i++) {
     q.p[i].x += screen.x;
     q.p[i].y += screen.y;
@@ -415,6 +462,8 @@ void GLDrawOverlay(int brightness) {
     glEnable(GL_BLEND);
 #ifdef C1_GLES2
     (void)i;
+    q.p[0].x = q.p[3].x = screen.x;
+    q.p[1].x = q.p[2].x = screen.x + screen.w;
     GLDrawQuad(&q, 0, 0, 0, brightness);
     glDisable(GL_BLEND);
 #else
@@ -739,6 +788,7 @@ void GLClear() {
 
 #ifdef C1_GLES2
   GLBindTarget();
+  GLUpdateScreen();
   glClear(GL_COLOR_BUFFER_BIT);
   /* equivalent of the glFrustum call below for vertices at z=-1 */
   gl_scale[0] = 2.0f/screen.w;
