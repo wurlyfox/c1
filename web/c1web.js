@@ -430,7 +430,8 @@
     this.value = '';
   });
   $('files').addEventListener('change', function () {
-    if (this.files.length) { runImport(importFiles(this.files)); }
+    /* copy the list: clearing the input below empties the live FileList */
+    if (this.files.length) { runImport(importFiles(Array.prototype.slice.call(this.files))); }
     this.value = '';
   });
   $('boot-level').addEventListener('change', function () { bootLevel = this.value; refresh(); });
