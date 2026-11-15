@@ -90,6 +90,9 @@ extern gl_context context;
 #endif
 
 void CoreLoop(lid_t lid);
+#ifdef __EMSCRIPTEN__
+extern void WebMenuLinkUpdate();
+#endif
 
 //----- (80011D88) --------------------------------------------------------
 #ifdef __EMSCRIPTEN__
@@ -275,6 +278,9 @@ void CoreLoop(lid_t lid) {
       else
         GfxTransformWorlds(ot);
     }
+#ifdef __EMSCRIPTEN__
+    WebMenuLinkUpdate(); /* extra title menu entry, see web/menulink.c */
+#endif
     GoolUpdateObjects(!paused);
 #if defined(CFLAGS_DRAW_EXTENSIONS) && !defined(PSX)
     if (pads[0].tapped & 4)

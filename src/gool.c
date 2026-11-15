@@ -1100,6 +1100,11 @@ int GoolObjectUpdate(gool_object *obj, int flag) {
   if (obj->handle.subtype != 3) { return SUCCESS; }
   if (obj == crash)
     PadUpdate();
+#ifdef __EMSCRIPTEN__
+    /* extra title menu entry (web/menulink.c); it has to see the buttons
+       after they are read and before the objects do */
+    { extern void WebMenuLinkPad(); WebMenuLinkPad(); }
+#endif
   cur_obj = obj;
   status_b = obj->status_b;
   if ((cur_display_flags & GOOL_FLAG_ANIMATE) == 0)

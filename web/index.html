@@ -97,10 +97,12 @@
   </label>
   <label>Resolution
     <select id="opt-res">
-      <option value="0">Original (240p)</option>
-      <option value="100">Window</option>
-      <option value="150">Window ×1.5</option>
-      <option value="200">Window ×2</option>
+      <option value="0">Auto (window)</option>
+      <option value="2">2x</option>
+      <option value="4">4x</option>
+      <option value="6">6x</option>
+      <option value="8">8x</option>
+      <option value="10">10x</option>
     </select>
   </label>
   <label>Antialiasing
@@ -121,7 +123,6 @@
   <button id="opt-debug">Debug panel</button>
   <button id="opt-log">Show report</button>
   <button id="opt-close" class="primary">Back to game</button>
-  <a id="opt-link" class="button" target="_blank" rel="noopener"></a>
 </div>
 
 <!-- Touch layout editor toolbar -->
@@ -167,6 +168,12 @@
     <button id="report-close">Close</button>
   </div>
   <pre id="log"></pre>
+</div>
+
+<!-- Shown when the browser blocks the game menu's link from opening by itself -->
+<div id="link-bar" hidden>
+  <a id="link-open" target="_blank" rel="noopener"></a>
+  <button id="link-close" aria-label="Close">✕</button>
 </div>
 
 <script src="version.js?v=__C1_BUILD__"></script>

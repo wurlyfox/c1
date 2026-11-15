@@ -219,14 +219,14 @@ static void GLSetProjection(float sx, float sy, float ox, float oy) {
 /*
  * Render quality, set by the page (WebSetRender):
  *
- * web_res   internal resolution in percent of the canvas size (100 = one
- *           rendered pixel per canvas pixel, 200 = twice as many each way),
- *           or 0 for the low resolution of the original console (240 rows)
+ * web_res   internal resolution as a multiple of the original console's
+ *           240 rows (2 = 480 rows, 4 = 960, ... 10 = 2400), or 0 to draw
+ *           at the size of the canvas
  * web_aa    1 = antialiasing by supersampling: the frame is drawn at twice
  *           the internal resolution in each direction and averaged down
  *           when it is copied to the canvas, which smooths polygon edges
  */
-static int web_res = 100;
+static int web_res = 0;
 static int web_aa = 1;
 static int gl_max_size = 0;
 
@@ -286,16 +286,16 @@ static void GLTargetSize(int cw, int ch, int *tw, int *th) {
 
   if (!gl_max_size) {
     glGetIntegerv(GL_MAX_TEXTURE_SIZE, &gl_max_size);
-    if (gl_max_size > 4096) { gl_max_size = 4096; } /* enough, and kind to slow GPUs */
+    if (gl_max_size > 8192) { gl_max_size = 8192; }
     if (gl_max_size < 256) { gl_max_size = 256; }
   }
-  if (web_res <= 0) { /* original console: 240 rows, same shape as the canvas */
-    h = 240;
-    w = (240.0f * cw) / ch;
+  if (web_res <= 0) { /* the size of the canvas */
+    w = cw;
+    h = ch;
   }
-  else {
-    w = (cw * web_res) / 100.0f;
-    h = (ch * web_res) / 100.0f;
+  else { /* a multiple of 240 rows, in the shape of the canvas */
+    h = 240.0f * web_res;
+    w = (h * cw) / ch;
   }
   if (web_aa) { w *= 2; h *= 2; }
   fit = 1;

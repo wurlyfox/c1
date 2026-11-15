@@ -65,7 +65,11 @@ body.editing-touch #menu-btn { display: none; }
   width: min(320px, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 8px;
   background: rgba(31, 27, 24, .96); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
 #menu { max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); overflow-y: auto; }
-#menu a.button { text-align: center; text-decoration: none; color: var(--muted); }
+#link-bar { position: fixed; z-index: 45; left: 50%; bottom: calc(16px + var(--safe-b)); transform: translateX(-50%);
+  display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 16px; border-radius: 12px;
+  background: rgba(31, 27, 24, .96); border: 1px solid var(--accent); }
+#link-bar a { color: var(--accent); font-weight: 700; text-decoration: none; }
+#link-bar button { padding: 2px 8px; border-color: transparent; }
 #menu label.col { flex-wrap: wrap; }
 #menu label.col input[type=range] { width: 100%; }
 #menu label.col span { color: var(--muted); font-variant-numeric: tabular-nums; }

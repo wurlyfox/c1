@@ -44,6 +44,8 @@ while IFS= read -r f; do SOURCES+=("$f"); done < <(
   find "$ROOT/src/util" "$ROOT/src/pc" -name '*.c'
 )
 
+SOURCES+=("$ROOT/web/menulink.c")
+
 LIBS=()
 LINK_EH=()
 if [ "$MIDI" = "1" ]; then

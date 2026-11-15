@@ -3,9 +3,11 @@
 
 (function () {
   var $ = function (id) { return document.getElementById(id); };
-  /* Last entry of the in-game menu: a link that opens in a new tab.
-     Change the two values to point it somewhere else; an empty url hides it. */
-  var MENU_LINK = { label: 'Project page ↗', url: 'https://github.com/gabom88/crash1' };
+  /* Extra entry of the game's own title menu, below OPTIONS: choosing it
+     opens this address in a new tab. `label` is drawn with the game's font:
+     up to 16 characters, capital letters, digits and spaces. An empty url
+     removes the entry. */
+  var MENU_LINK = { label: 'WEBSITE', url: 'https://github.com/gabom88/crash1' };
 
   var STREAMS = '/streams';
   var SAVES = '/save';
@@ -182,6 +184,8 @@
     $('forget').disabled = busy;
   }
 
+  $('link-close').addEventListener('click', function () { $('link-bar').hidden = true; });
+  $('link-open').addEventListener('click', function () { $('link-bar').hidden = true; });
   $('report-close').addEventListener('click', function () { $('report').hidden = true; });
   $('report-copy').addEventListener('click', function () {
     var text = $('log').textContent;
@@ -220,6 +224,20 @@
       Module.FS.syncfs(false, function (err) {
         if (err) { debugLine('error', 'could not store the saved games: ' + err); }
       });
+    },
+    /* read by the engine (web/menulink.c): text of the extra menu entry */
+    c1MenuLabel: MENU_LINK.url ? String(MENU_LINK.label || 'WEBSITE').slice(0, 16) : '',
+    /* called by the engine when the extra menu entry is chosen */
+    c1OpenMenuLink: function () {
+      note('menu link chosen');
+      var win = null;
+      try { win = window.open(MENU_LINK.url, '_blank'); } catch (_) { /* blocked */ }
+      if (win) { try { win.opener = null; } catch (_) { /* cross origin */ } return; }
+      /* Blocked (a gamepad press does not count as a click for the browser):
+         offer the link to click instead. */
+      $('link-open').href = MENU_LINK.url;
+      $('link-open').textContent = 'Open ' + MENU_LINK.url.replace(/^https?:\/\//, '') + ' ↗';
+      $('link-bar').hidden = false;
     },
     onRuntimeInitialized: function () {
       var FS = Module.FS;
@@ -705,7 +723,7 @@
   /* ---- preferences ---------------------------------------------------- */
 
   var PREFS_KEY = 'c1web.prefs.v1';
-  var prefs = { touch: 'auto', debug: false, volume: 100, aspect: 'fill', res: 100, aa: 1 };
+  var prefs = { touch: 'auto', debug: false, volume: 100, aspect: 'fill', res: 0, aa: 1 };
   try { Object.assign(prefs, JSON.parse(localStorage.getItem(PREFS_KEY) || '{}')); } catch (_) { /* defaults */ }
   function savePrefs() {
     try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch (_) { /* ignore */ }
@@ -949,10 +967,10 @@
     settle();
   }
 
-  /* internal resolution (percent of the window size, 0 = original 240 rows)
-     and antialiasing (supersampling) */
+  /* internal resolution (a multiple of the original 240 rows, 0 = the size
+     of the window) and antialiasing (supersampling) */
   function applyRender() {
-    var res = [0, 100, 150, 200].indexOf(+prefs.res) >= 0 ? +prefs.res : 100;
+    var res = [0, 2, 4, 6, 8, 10].indexOf(+prefs.res) >= 0 ? +prefs.res : 0;
     var aa = prefs.aa === 0 || prefs.aa === '0' ? 0 : 1;
     $('opt-res').value = String(res);
     $('opt-aa').value = String(aa);
@@ -986,13 +1004,6 @@
     });
     $('opt-res').addEventListener('change', function () { prefs.res = +this.value; savePrefs(); applyRender(); });
     $('opt-aa').addEventListener('change', function () { prefs.aa = +this.value; savePrefs(); applyRender(); });
-    if (MENU_LINK.url) {
-      $('opt-link').href = MENU_LINK.url;
-      $('opt-link').textContent = MENU_LINK.label;
-      $('opt-link').addEventListener('click', closeMenu);
-    } else {
-      $('opt-link').hidden = true;
-    }
     $('opt-edit').addEventListener('click', openTouchEditor);
     $('opt-debug').addEventListener('click', function () { closeMenu(); toggleDebug(); });
     $('opt-log').addEventListener('click', function () {
