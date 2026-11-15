@@ -41,7 +41,7 @@
   window.Module = {
     canvas: $('canvas'),
     print: function (text) { console.log(text); },
-    printErr: function (text) { console.warn(text); },
+    printErr: function (text) { console.warn(text); if (started && /abort|assert|error/i.test(text)) { showLog(text); } },
     onAbort: function (what) {
       showLog('The game stopped unexpectedly: ' + what);
     },
@@ -61,10 +61,10 @@
   };
 
   window.addEventListener('error', function (e) {
-    if (started) { showLog('Error: ' + (e.message || e)); }
+    if (started) { showLog('Error: ' + (e.message || e) + (e.error && e.error.stack ? '\n' + e.error.stack : '')); }
   });
   window.addEventListener('unhandledrejection', function (e) {
-    if (started) { showLog('Error: ' + (e.reason && e.reason.message || e.reason)); }
+    if (started) { showLog('Error: ' + (e.reason && e.reason.message || e.reason) + (e.reason && e.reason.stack ? '\n' + e.reason.stack : '')); }
   });
 
   /* ---- stored assets ----------------------------------------------- */

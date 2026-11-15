@@ -20,6 +20,7 @@ Then open `http://localhost:8000`. The page has to be served over HTTP; opening
 | :--- | :--- | :--- |
 | `OPT` | `-O2` | Optimization level. Use `OPT=-O0` if the game misbehaves (see below). |
 | `MIDI` | `1` | `MIDI=0` builds without FluidSynth: no sequenced music, faster build. |
+| `DEBUG` | `0` | `DEBUG=1` adds runtime checks and function names to error call stacks. |
 | `OUT` | `build-web` | Output directory. The site is written to `$OUT/dist`. |
 
 SDL2 comes from the Emscripten ports; FluidSynth is cloned and built into

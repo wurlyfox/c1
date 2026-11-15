@@ -4,6 +4,7 @@
 #   web/build.sh            # release build into build-web/dist
 #   OPT=-O0 web/build.sh    # unoptimized build (see doc/web.md)
 #   MIDI=0 web/build.sh     # build without FluidSynth (no music)
+#   DEBUG=1 web/build.sh    # runtime checks and readable call stacks in errors
 #
 # Requires the Emscripten SDK (emcc, emcmake) and cmake in PATH.
 set -euo pipefail
@@ -12,6 +13,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="${OUT:-$ROOT/build-web}"
 OPT="${OPT:--O2}"
 MIDI="${MIDI:-1}"
+DEBUG="${DEBUG:-0}"
 JOBS="${JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
 FLUIDSYNTH_TAG="v2.5.0"
 GCEM_REV="012ae73c6d0a2cb09ffe86475f5c6fba3926e200"
@@ -42,10 +44,17 @@ while IFS= read -r f; do SOURCES+=("$f"); done < <(
 )
 
 LIBS=()
+LINK_EH=()
 if [ "$MIDI" = "1" ]; then
   SOURCES+=("$ROOT/web/stubs.c")
   FS_SRC="$DEPS/fluidsynth"
-  FS_LIB="$DEPS/fluidsynth-build/src/libfluidsynth.a"
+  # FluidSynth relies on C++ exceptions for ordinary failures (for example
+  # the file lookup done when a soundfont is loaded from memory). Emscripten
+  # turns a throw into abort() unless exceptions are enabled, both when
+  # building the library and at link time. The build directory is versioned
+  # so that a library built without them is not reused.
+  FS_LIB="$DEPS/fluidsynth-build-eh/src/libfluidsynth.a"
+  LINK_EH=(-fexceptions)
   if [ ! -f "$FS_LIB" ]; then
     [ -d "$FS_SRC" ] || git clone --depth 1 -b "$FLUIDSYNTH_TAG" https://github.com/FluidSynth/fluidsynth "$FS_SRC"
     if [ ! -f "$FS_SRC/gcem/include/gcem.hpp" ]; then
@@ -59,13 +68,14 @@ if [ "$MIDI" = "1" ]; then
              libinstpatch ladspa systemd opensles oboe portaudio aufile ipv6 lash; do
       FS_OPTS+=("-Denable-$o=OFF")
     done
-    emcmake cmake -S "$FS_SRC" -B "$DEPS/fluidsynth-build" \
+    emcmake cmake -S "$FS_SRC" -B "$DEPS/fluidsynth-build-eh" \
       -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -Dosal=cpp11 \
       -Denable-floats=ON -DBUILD_UNIT_TESTS=OFF -DBUILD_DOC=OFF \
+      -DCMAKE_C_FLAGS=-fexceptions -DCMAKE_CXX_FLAGS=-fexceptions \
       -DGCEM_INCLUDE_DIR="$FS_SRC/gcem/include" "${FS_OPTS[@]}"
-    cmake --build "$DEPS/fluidsynth-build" --target libfluidsynth -j"$JOBS"
+    cmake --build "$DEPS/fluidsynth-build-eh" --target libfluidsynth -j"$JOBS"
   fi
-  CFLAGS+=(-I"$FS_SRC/include" -I"$DEPS/fluidsynth-build/include")
+  CFLAGS+=(-I"$FS_SRC/include" -I"$DEPS/fluidsynth-build-eh/include")
   LIBS+=("$FS_LIB")
 else
   CFLAGS+=(-DC1_NO_MIDI)
@@ -84,8 +94,13 @@ for src in "${SOURCES[@]}"; do
 done
 for pid in "${pids[@]}"; do wait "$pid"; done
 
+LINK_DEBUG=()
+if [ "$DEBUG" = "1" ]; then
+  LINK_DEBUG=(-sASSERTIONS=1 --profiling-funcs)
+fi
+
 echo "linking..."
-em++ "$OPT" "${OBJECTS[@]}" "${LIBS[@]}" -o "$DIST/c1.js" \
+em++ "$OPT" "${OBJECTS[@]}" "${LIBS[@]}" "${LINK_EH[@]}" "${LINK_DEBUG[@]}" -o "$DIST/c1.js" \
   -sUSE_SDL=2 \
   -sASYNCIFY -sASYNCIFY_STACK_SIZE=262144 \
   -sSTACK_SIZE=8MB -sINITIAL_MEMORY=256MB -sALLOW_MEMORY_GROWTH \
