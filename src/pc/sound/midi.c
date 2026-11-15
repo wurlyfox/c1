@@ -117,7 +117,7 @@ static void SwPlayerProcess(midi_context_t *context, int ch, float amp[2], float
   fluid_synth_t *synth;
   float *vol;
   int16_t *s, *d;
-  int16_t buf[2048];
+  int16_t buf[4096];
   int i;
 
   vol = context->vol;
@@ -133,12 +133,12 @@ static void SwPlayerProcess(midi_context_t *context, int ch, float amp[2], float
 
 void SwMidiProcess(int ch, float amp[2], float freq, int len, int16_t *data) {
   midi_context_t *context;
-  int32_t *p32, buf32[2048];
-  int16_t *p16, buf16[2048];
+  int32_t *p32, buf32[4096];
+  int16_t *p16, buf16[4096];
   int i, j;
 
-  memset(buf32, 0, 2048*sizeof(int32_t));
-  memset(buf16, 0, 2048*sizeof(int16_t));
+  memset(buf32, 0, sizeof(buf32));
+  memset(buf16, 0, sizeof(buf16));
   for (i=0;i<2;i++) {
     context = &midi_contexts[i];
     if (context->fading) {

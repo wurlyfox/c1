@@ -95,4 +95,6 @@ em++ "$OPT" "${OBJECTS[@]}" "${LIBS[@]}" -o "$DIST/c1.js" \
   -sEXPORTED_RUNTIME_METHODS=FS,IDBFS,callMain
 
 cp "$ROOT/web/index.html" "$ROOT/web/c1web.js" "$ROOT/web/c1web.css" "$DIST/"
+mkdir -p "$DIST/js"
+cp "$ROOT/web/js/"*.js "$DIST/js/"
 echo "done: $DIST (serve it over http, e.g. python3 -m http.server -d \"$DIST\")"

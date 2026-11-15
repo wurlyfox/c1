@@ -232,7 +232,7 @@
     runImport(persist());
   });
 
-  /* ---- input: touch and gamepad ------------------------------------ */
+  /* ---- input: keyboard, gamepads and the touch overlay ---------------- */
 
   var held = {}; /* source:key -> bool, so sources do not release each other's keys */
 
@@ -242,26 +242,6 @@
     held[id] = down;
     var any = Object.keys(held).some(function (k) { return held[k] && k.split(':')[1] === key; });
     Module._WebSetKey(KEYS[key], any ? 1 : 0);
-  }
-
-  function setupTouch() {
-    if (!('ontouchstart' in window) && !(navigator.maxTouchPoints > 0)) { return; }
-    $('touch').hidden = false;
-    Array.prototype.forEach.call(document.querySelectorAll('#touch button'), function (btn) {
-      var key = btn.dataset.key;
-      var press = function (down) {
-        return function (e) {
-          e.preventDefault();
-          btn.classList.toggle('on', down);
-          setKey('touch', key, down);
-        };
-      };
-      btn.addEventListener('pointerdown', press(true));
-      btn.addEventListener('pointerup', press(false));
-      btn.addEventListener('pointercancel', press(false));
-      btn.addEventListener('pointerleave', press(false));
-      btn.addEventListener('contextmenu', function (e) { e.preventDefault(); });
-    });
   }
 
   /* standard gamepad layout */
@@ -274,21 +254,217 @@
   function pollGamepads() {
     var pads = navigator.getGamepads ? navigator.getGamepads() : [];
     var state = {};
+    var any = false;
     for (var p = 0; p < pads.length; p++) {
       var pad = pads[p];
-      if (!pad) { continue; }
+      if (!pad || !pad.connected) { continue; }
       for (var b in PAD_BUTTONS) {
-        if (pad.buttons[b] && pad.buttons[b].pressed) { state[PAD_BUTTONS[b]] = true; }
+        if (pad.buttons[b] && pad.buttons[b].pressed) { state[PAD_BUTTONS[b]] = true; any = true; }
       }
       if (pad.axes.length >= 2) {
-        if (pad.axes[0] < -0.5) { state.left = true; }
-        if (pad.axes[0] > 0.5) { state.right = true; }
-        if (pad.axes[1] < -0.5) { state.up = true; }
-        if (pad.axes[1] > 0.5) { state.down = true; }
+        if (pad.axes[0] < -0.5) { state.left = true; any = true; }
+        if (pad.axes[0] > 0.5) { state.right = true; any = true; }
+        if (pad.axes[1] < -0.5) { state.up = true; any = true; }
+        if (pad.axes[1] > 0.5) { state.down = true; any = true; }
       }
     }
     for (var key in KEYS) { setKey('pad', key, !!state[key]); }
+    if (any) { physicalInput(); }
     requestAnimationFrame(pollGamepads);
+  }
+
+  /* ---- preferences ---------------------------------------------------- */
+
+  var PREFS_KEY = 'c1web.prefs.v1';
+  var prefs = { touch: 'auto' };
+  try { Object.assign(prefs, JSON.parse(localStorage.getItem(PREFS_KEY) || '{}')); } catch (_) { /* defaults */ }
+  function savePrefs() {
+    try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch (_) { /* ignore */ }
+  }
+
+  /* ---- display: canvas size, orientation, fullscreen ------------------ */
+  /* (adapted from ReChan Web: input.js resizeCanvas, app.js orientation) */
+
+  var isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+  var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  var playing = false;
+
+  /* Match the canvas resolution to its size on screen. The engine reads the
+     canvas size every frame and sets the GL viewport from it. */
+  function resizeCanvas() {
+    var canvas = $('canvas');
+    if (!playing) { return; }
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var rect = canvas.getBoundingClientRect();
+    var w = Math.max(1, Math.round(rect.width * dpr));
+    var h = Math.max(1, Math.round(rect.height * dpr));
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+    }
+  }
+
+  /* Portrait on a phone/tablet: game in a 4:3 band at the top, touch controls
+     underneath (handheld layout). Landscape keeps the full screen. */
+  function updateOrientationLayout() {
+    var portrait = window.matchMedia ? window.matchMedia('(orientation: portrait)').matches
+      : window.innerHeight > window.innerWidth;
+    var handheld = C1Touch.shown || C1Touch.editing;
+    document.body.classList.toggle('portrait-play', portrait && playing && handheld);
+    resizeCanvas();
+  }
+
+  /* iOS fires "resize" before a rotation has settled: run again a bit later. */
+  function settle() {
+    updateOrientationLayout();
+    setTimeout(updateOrientationLayout, 250);
+    setTimeout(updateOrientationLayout, 600);
+  }
+
+  function isFullscreen() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement);
+  }
+
+  function toggleFullscreen() {
+    var el = document.documentElement;
+    try {
+      if (isFullscreen()) {
+        (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      } else if (el.requestFullscreen) {
+        var p = el.requestFullscreen({ navigationUI: 'hide' });
+        if (p && p.catch) { p.catch(function () {}); }
+      } else if (el.webkitRequestFullscreen) {
+        el.webkitRequestFullscreen();
+      } else {
+        showLog('Fullscreen is not available here. On iPhone, add the page to the home screen instead.');
+      }
+    } catch (_) { /* not allowed right now */ }
+  }
+
+  /* ---- audio ---------------------------------------------------------- */
+
+  /* Browsers start audio suspended until a user gesture, and iOS suspends it
+     again whenever the page goes to the background. */
+  function resumeAudio() {
+    var ctx = Module.SDL2 && Module.SDL2.audioContext;
+    if (ctx && ctx.state !== 'running' && ctx.resume) {
+      var p = ctx.resume();
+      if (p && p.catch) { p.catch(function () {}); }
+    }
+  }
+
+  /* ---- touch overlay --------------------------------------------------- */
+
+  var touchHiddenByPhysical = false;
+
+  function updateTouchVisibility() {
+    if (!playing || C1Touch.editing) { return; }
+    var show;
+    if (prefs.touch === 'on') { show = true; }
+    else if (prefs.touch === 'off') { show = false; }
+    else { show = isTouchDevice && !touchHiddenByPhysical; }
+    C1Touch.show(show);
+    updateOrientationLayout();
+  }
+
+  /* Hide the overlay when a real pad or keyboard is used; show it again on touch. */
+  function physicalInput() {
+    if (prefs.touch === 'auto' && !touchHiddenByPhysical && !C1Touch.editing) {
+      touchHiddenByPhysical = true;
+      updateTouchVisibility();
+    }
+  }
+
+  function onTouchState(names) {
+    for (var key in KEYS) { setKey('touch', key, names.indexOf(key) >= 0); }
+  }
+
+  function selectForEditor(c) {
+    $('ed-selected').classList.toggle('disabled', !c);
+    $('ed-name').textContent = c ? c.label : '—';
+    if (c) { $('ed-size').value = c.size; }
+  }
+
+  function openTouchEditor() {
+    closeMenu();
+    $('touch-editor').hidden = false;
+    document.body.classList.add('editing-touch');
+    var s = C1Touch.settings;
+    $('ed-opacity').value = s.opacity;
+    $('ed-mode').value = s.mode;
+    $('ed-haptics').checked = !!s.haptics;
+    selectForEditor(null);
+    C1Touch.setEditing(true, { onSelect: selectForEditor });
+    updateOrientationLayout();
+  }
+
+  function closeTouchEditor() {
+    C1Touch.setEditing(false);
+    $('touch-editor').hidden = true;
+    document.body.classList.remove('editing-touch');
+    C1Touch.show(false);
+    updateTouchVisibility();
+  }
+
+  function openMenu() {
+    $('opt-touch').value = prefs.touch;
+    $('opt-fullscreen').textContent = isFullscreen() ? 'Exit fullscreen' : 'Fullscreen';
+    $('menu').hidden = false;
+  }
+  function closeMenu() { $('menu').hidden = true; }
+
+  function wireGameUi() {
+    C1Touch.init($('touch-layer'), onTouchState);
+
+    $('menu-btn').addEventListener('click', function () { if ($('menu').hidden) { openMenu(); } else { closeMenu(); } this.blur(); });
+    $('opt-close').addEventListener('click', closeMenu);
+    $('opt-fullscreen').addEventListener('click', function () { toggleFullscreen(); closeMenu(); });
+    $('opt-edit').addEventListener('click', openTouchEditor);
+    $('opt-touch').addEventListener('change', function () {
+      prefs.touch = this.value;
+      touchHiddenByPhysical = false;
+      savePrefs();
+      updateTouchVisibility();
+    });
+
+    $('ed-size').addEventListener('input', function () { C1Touch.updateSelected({ size: parseFloat(this.value) }); });
+    $('ed-hide').addEventListener('click', function () { C1Touch.updateSelected({ visible: false }); selectForEditor(null); });
+    $('ed-opacity').addEventListener('input', function () { C1Touch.setSetting('opacity', parseFloat(this.value)); });
+    $('ed-mode').addEventListener('change', function () { C1Touch.setSetting('mode', this.value); });
+    $('ed-haptics').addEventListener('change', function () { C1Touch.setSetting('haptics', this.checked); });
+    $('ed-showall').addEventListener('click', function () { C1Touch.showAll(); });
+    $('ed-reset').addEventListener('click', function () {
+      C1Touch.reset();
+      var s = C1Touch.settings;
+      $('ed-opacity').value = s.opacity;
+      $('ed-mode').value = s.mode;
+      $('ed-haptics').checked = !!s.haptics;
+      selectForEditor(null);
+    });
+    $('ed-done').addEventListener('click', closeTouchEditor);
+
+    window.addEventListener('keydown', function (e) {
+      if (e.isTrusted && !e.repeat) { physicalInput(); }
+      resumeAudio();
+    }, true);
+    window.addEventListener('pointerdown', function (e) {
+      if (e.pointerType === 'touch' && touchHiddenByPhysical) {
+        touchHiddenByPhysical = false;
+        updateTouchVisibility();
+      }
+      resumeAudio();
+    }, true);
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible') { resumeAudio(); }
+    });
+
+    if (typeof ResizeObserver !== 'undefined') { new ResizeObserver(resizeCanvas).observe($('canvas')); }
+    window.addEventListener('resize', settle);
+    window.addEventListener('orientationchange', settle);
+    if (window.visualViewport) { window.visualViewport.addEventListener('resize', settle); }
+    document.addEventListener('fullscreenchange', settle);
+    document.addEventListener('webkitfullscreenchange', settle);
   }
 
   /* ---- start -------------------------------------------------------- */
@@ -296,17 +472,21 @@
   $('play').addEventListener('click', function () {
     if (started) { return; }
     started = true;
+    playing = true;
     $('setup').hidden = true;
-    $('game').hidden = false;
-    setupTouch();
+    $('canvas').hidden = false;
+    $('menu-btn').hidden = false;
+    document.body.classList.add('playing');
+    wireGameUi();
+    updateTouchVisibility();
     requestAnimationFrame(pollGamepads);
+    /* Android: go fullscreen with the tap that starts the game (iOS has no
+       fullscreen for pages; there the home-screen app is the way). */
+    if (!isIOS && isTouchDevice && document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(function () {});
+    }
     Module.callMain([]);
-  });
-
-  $('fullscreen').addEventListener('click', function () {
-    var el = $('game');
-    if (document.fullscreenElement) { document.exitFullscreen(); }
-    else if (el.requestFullscreen) { el.requestFullscreen(); }
-    this.blur();
+    /* SDL sets its own canvas size when it creates the window */
+    settle();
   });
 })();

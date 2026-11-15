@@ -2,7 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#14110f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="c1 web">
 <title>c1 web</title>
 <link rel="stylesheet" href="c1web.css">
 </head>
@@ -32,35 +37,57 @@
       <tr><th>✕ / □</th><td>Z / X</td><th>○ / △</th><td>C / S</td></tr>
       <tr><th>L1 / R1</th><td>A / D</td><th>L2 / R2</th><td>Q / E</td></tr>
     </table>
-    <p class="note">Gamepads and touch screens are supported too.</p>
+    <p class="note">Gamepads work too. On phones and tablets an on-screen controller appears;
+    you can move, resize or hide its buttons from the ☰ menu.</p>
   </section>
 </main>
 
-<div id="game" hidden>
-  <canvas id="canvas" width="1024" height="768" tabindex="-1"></canvas>
-  <button id="fullscreen" title="Fullscreen" aria-label="Fullscreen">⛶</button>
-  <div id="touch" hidden>
-    <div class="pad left">
-      <button data-key="up" class="up">▲</button>
-      <button data-key="left" class="left">◀</button>
-      <button data-key="right" class="right">▶</button>
-      <button data-key="down" class="down">▼</button>
-    </div>
-    <div class="pad mid">
-      <button data-key="select">SELECT</button>
-      <button data-key="start">START</button>
-    </div>
-    <div class="pad right">
-      <button data-key="triangle" class="up">△</button>
-      <button data-key="square" class="left">□</button>
-      <button data-key="circle" class="right">○</button>
-      <button data-key="cross" class="down">✕</button>
-    </div>
+<canvas id="canvas" width="1024" height="768" tabindex="-1" hidden></canvas>
+
+<!-- On-screen controller (js/touch.js) -->
+<div id="touch-layer" class="tc-hidden"></div>
+
+<button id="menu-btn" aria-label="Menu" hidden>☰</button>
+<div id="menu" hidden>
+  <label>Touch controls
+    <select id="opt-touch">
+      <option value="auto">Auto</option>
+      <option value="on">Always on</option>
+      <option value="off">Off</option>
+    </select>
+  </label>
+  <button id="opt-edit">Edit touch layout</button>
+  <button id="opt-fullscreen">Fullscreen</button>
+  <button id="opt-close" class="primary">Back to game</button>
+</div>
+
+<!-- Touch layout editor toolbar -->
+<div id="touch-editor" hidden>
+  <p class="hint">Drag a control to move it. Tap one to select it, then resize or hide it.</p>
+  <div class="ed-row" id="ed-selected">
+    <span id="ed-name">—</span>
+    <label>Size <input type="range" id="ed-size" min="0.06" max="0.6" step="0.01"></label>
+    <button id="ed-hide">Hide</button>
+  </div>
+  <div class="ed-row">
+    <label>Opacity <input type="range" id="ed-opacity" min="0.15" max="1" step="0.05"></label>
+    <select id="ed-mode" aria-label="Direction control">
+      <option value="dpad">D-pad</option>
+      <option value="stick">Stick</option>
+    </select>
+    <label class="chk"><input type="checkbox" id="ed-haptics"> Vibration</label>
+  </div>
+  <div class="ed-row">
+    <button id="ed-showall">Show all</button>
+    <button id="ed-reset">Reset</button>
+    <button id="ed-done" class="primary">Done</button>
   </div>
 </div>
 
 <pre id="log" hidden></pre>
 
+<script src="js/dpad-gemuboy.js"></script>
+<script src="js/touch.js"></script>
 <script src="c1web.js"></script>
 <script async src="c1.js"></script>
 </body>

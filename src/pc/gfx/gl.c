@@ -6,7 +6,18 @@
    batched into a vertex array and drawn with a single GLSL ES 1.00 program */
 #define C1_GLES2
 #include <emscripten.h>
+#include <emscripten/html5.h>
 #include <GLES2/gl2.h>
+
+/* Yields to the browser until the next display refresh, so frames are
+   presented in step with the screen and DOM events / audio callbacks get a
+   chance to run. A hidden tab gets no animation frames: poll slowly instead. */
+EM_ASYNC_JS(void, WebWaitFrame, (), {
+  await new Promise(function(resolve) {
+    if (document.hidden) { setTimeout(resolve, 100); return; }
+    requestAnimationFrame(function() { resolve(); });
+  });
+});
 #elif defined(_WIN32)
 #include <windows.h>
 #include <SDL_opengl.h>
@@ -636,6 +647,13 @@ void GLClear() {
   int fh;
 
 #ifdef C1_GLES2
+  {
+    /* the page resizes the canvas to match the screen (device pixel ratio,
+       rotations, fullscreen): follow it */
+    int cw, ch;
+    if (emscripten_get_canvas_element_size("#canvas", &cw, &ch) == EMSCRIPTEN_RESULT_SUCCESS)
+      glViewport(0, 0, cw, ch);
+  }
   glClear(GL_COLOR_BUFFER_BIT);
   /* equivalent of the glFrustum call below for vertices at z=-1 */
   glUniform2f(gl_u_scale, 2.0f/screen.w, 2.0f/screen.h);
@@ -692,7 +710,7 @@ void GLUpdate() {
     ticks_cur_frame = 17; /* default to 17 */
   while (ticks_elapsed - context.draw_stamp < 34) {
 #ifdef __EMSCRIPTEN__
-    emscripten_sleep(1); /* a busy wait would freeze the browser tab */
+    WebWaitFrame(); /* a busy wait would freeze the browser tab */
 #endif
     ticks_elapsed = GetTicksElapsed();
   }

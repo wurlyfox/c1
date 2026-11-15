@@ -83,8 +83,8 @@ static void SampleNext(sampler_t *sampler, int len, int16_t *data) {
 static void AudioCallback(void *userdata, uint8_t *stream, size_t size) {
   svoice_t *svoice;
   sampler_t *sampler;
-  int32_t *p32, buf32[2048];
-  int16_t *p16, buf16[2048];
+  int32_t *p32, buf32[4096];
+  int16_t *p16, buf16[4096];
   int i, j, len;
   
   len = size/(2*sizeof(int16_t));
@@ -133,7 +133,9 @@ void SwAudioInit() {
   spec.callback = (SDL_AudioCallback)AudioCallback;
   spec.format = AUDIO_S16;
 #ifdef __EMSCRIPTEN__
-  spec.samples = 512; /* web audio needs a larger power-of-two buffer */
+  /* web audio runs its callback on the main thread between frames, so it
+     needs a much deeper buffer than a native device */
+  spec.samples = 2048;
 #else
   spec.samples = 64;
 #endif
