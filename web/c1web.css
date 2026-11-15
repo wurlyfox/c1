@@ -162,6 +162,10 @@ select { font: inherit; color: var(--text); background: var(--bg); border: 1px s
 input[type=range] { width: 120px; accent-color: var(--accent); }
 .chk input { accent-color: var(--accent); width: 18px; height: 18px; }
 
-#log { position: fixed; left: 0; right: 0; bottom: 0; max-height: 40vh; overflow: auto; margin: 0;
-  padding: 12px 16px; background: rgba(40,8,8,0.95); color: #ffd7d2; font-size: 0.8125rem;
-  white-space: pre-wrap; z-index: 10; }
+#report { position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; max-height: 60vh; display: flex;
+  flex-direction: column; background: rgba(24, 10, 8, .97); border-top: 2px solid #b3382c; }
+.report-bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; }
+.report-bar strong { flex: 1; color: #ffb4aa; }
+.report-bar button { padding: 4px 10px; font-size: 0.8125rem; }
+#log { margin: 0; padding: 0 12px 12px; overflow: auto; color: #ffd7d2; font-size: 0.75rem; line-height: 1.4;
+  white-space: pre-wrap; word-break: break-word; -webkit-user-select: text; user-select: text; }

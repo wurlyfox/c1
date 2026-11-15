@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="c1 web">
 <title>c1 web</title>
-<link rel="stylesheet" href="c1web.css">
+<link rel="stylesheet" href="c1web.css?v=__C1_BUILD__">
 </head>
 <body>
 <main id="setup">
@@ -40,6 +40,7 @@
     <p class="note">Gamepads work too. On phones and tablets an on-screen controller appears;
     you can move, resize or hide its buttons from the ☰ menu.</p>
   </section>
+  <p class="note" id="build-info"></p>
 </main>
 
 <canvas id="canvas" width="1024" height="768" tabindex="-1" hidden></canvas>
@@ -58,6 +59,7 @@
   </label>
   <button id="opt-edit">Edit touch layout</button>
   <button id="opt-fullscreen">Fullscreen</button>
+  <button id="opt-log">Show log</button>
   <button id="opt-close" class="primary">Back to game</button>
 </div>
 
@@ -84,11 +86,20 @@
   </div>
 </div>
 
-<pre id="log" hidden></pre>
+<!-- Error report / log (c1web.js) -->
+<div id="report" hidden>
+  <div class="report-bar">
+    <strong id="report-title">Log</strong>
+    <button id="report-copy">Copy report</button>
+    <button id="report-close">Close</button>
+  </div>
+  <pre id="log"></pre>
+</div>
 
-<script src="js/dpad-gemuboy.js"></script>
-<script src="js/touch.js"></script>
-<script src="c1web.js"></script>
-<script async src="c1.js"></script>
+<script src="version.js?v=__C1_BUILD__"></script>
+<script src="js/dpad-gemuboy.js?v=__C1_BUILD__"></script>
+<script src="js/touch.js?v=__C1_BUILD__"></script>
+<script src="c1web.js?v=__C1_BUILD__"></script>
+<script async src="c1.js?v=__C1_BUILD__"></script>
 </body>
 </html>

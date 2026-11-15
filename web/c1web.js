@@ -23,11 +23,112 @@
     el.classList.toggle('error', !!isError);
   }
 
+  /* ---- diagnostics ----------------------------------------------------- */
+
+  var BUILD = window.C1_BUILD || { id: 'unknown', commit: 'unknown', flags: '' };
+  var output = [];      /* last lines printed by the engine */
+  var events = [];      /* what the page did, with timestamps */
+  var startedAt = 0;
+  var reported = false;
+
+  function stamp() {
+    return startedAt ? ((performance.now() - startedAt) / 1000).toFixed(2) + 's' : '-';
+  }
+  function note(text) {
+    events.push('[' + stamp() + '] ' + text);
+    if (events.length > 40) { events.shift(); }
+  }
+  function record(kind, text) {
+    output.push('[' + stamp() + '] ' + kind + ' ' + text);
+    if (output.length > 80) { output.shift(); }
+  }
+
+  /* A report must never fail itself: every item is read defensively. (With
+     runtime checks on, touching a Module member that was not exported aborts.) */
+  function safe(fn) {
+    try { return fn(); } catch (e) { return 'unavailable (' + (e && e.message || e) + ')'; }
+  }
+
+  function glInfo() {
+    try {
+      var c = $('canvas');
+      var gl = c.getContext('webgl2') || c.getContext('webgl');
+      if (!gl) { return 'no context'; }
+      var ext = gl.getExtension('WEBGL_debug_renderer_info');
+      return gl.getParameter(gl.VERSION) + ' / ' + (ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
+    } catch (e) { return 'unavailable (' + e.message + ')'; }
+  }
+
+  function filesInfo() {
+    try {
+      var FS = Module.FS;
+      var names = FS.readdir(STREAMS).filter(function (n) { return ASSET_NAME.test(n); });
+      var total = 0;
+      names.forEach(function (n) { total += FS.stat(STREAMS + '/' + n).size; });
+      var title = [TITLE_LEVEL + '.nsd', TITLE_LEVEL + '.nsf'].map(function (n) {
+        return n + '=' + (names.indexOf(n) >= 0 ? FS.stat(STREAMS + '/' + n).size + ' bytes' : 'MISSING');
+      });
+      return names.length + ' files, ' + (total / 1048576).toFixed(1) + ' MB; ' + title.join(', ');
+    } catch (e) { return 'unavailable (' + e.message + ')'; }
+  }
+
+  /* Wasm frames only: the interesting part of a call stack. */
+  function cleanStack(stack) {
+    if (!stack) { return '(no call stack)'; }
+    return String(stack).split('\n').map(function (l) { return l.trim(); })
+      .filter(function (l) { return l && !/^Error$/.test(l); })
+      .map(function (l) { return l.replace(/https?:\/\/[^ )]*\//g, ''); })
+      .slice(0, 40).join('\n');
+  }
+
+  function buildReport(title, detail, stack) {
+    var c = $('canvas');
+    var lines = [
+      '=== c1 web error report ===',
+      'Build: ' + BUILD.id + ' (' + BUILD.commit + ') ' + BUILD.flags,
+      'Error: ' + title,
+    ];
+    if (detail) { lines.push('Detail: ' + detail); }
+    lines.push('Time since Play: ' + stamp());
+    lines.push('', '--- Call stack ---', cleanStack(stack));
+    lines.push('', '--- Engine output (last lines) ---', output.length ? output.join('\n') : '(nothing printed)');
+    lines.push('', '--- Page events ---', events.join('\n'));
+    lines.push('', '--- Environment ---',
+      'Game files: ' + safe(filesInfo),
+      'Browser: ' + navigator.userAgent,
+      'WebGL: ' + safe(glInfo),
+      'Canvas: ' + c.width + 'x' + c.height + ', pixel ratio ' + window.devicePixelRatio,
+      'Memory: ' + safe(function () { return (Module.HEAP8.length / 1048576).toFixed(0) + ' MB'; }),
+      'Audio: ' + safe(function () {
+        var ctx = Module.SDL2 && Module.SDL2.audioContext;
+        return ctx ? ctx.state + ' @' + ctx.sampleRate + ' Hz' : 'not started';
+      }));
+    if (!/-sASSERTIONS/.test(BUILD.flags)) {
+      lines.push('', 'Tip: rebuild with DEBUG=1 web/build.sh for function names and runtime checks.');
+    }
+    return lines.join('\n');
+  }
+
+  function openReport(title, text) {
+    $('report-title').textContent = title;
+    $('log').textContent = text;
+    $('report').hidden = false;
+  }
+
+  /* The first failure is the one that matters; later ones are its fallout. */
+  function reportError(title, detail, stack) {
+    note('ERROR ' + title);
+    if (reported) { return; }
+    reported = true;
+    var text;
+    try { text = buildReport(title, detail, stack); }
+    catch (e) { text = 'Error: ' + title + '\n' + cleanStack(stack) + '\n(the full report failed: ' + (e && e.message || e) + ')'; }
+    openReport('The game stopped unexpectedly', text);
+  }
+
   function showLog(text) {
-    var el = $('log');
-    el.hidden = false;
-    el.textContent += text + '\n';
-    el.scrollTop = el.scrollHeight;
+    note(text);
+    openReport('Log', text);
   }
 
   function setBusy(busy) {
@@ -36,14 +137,37 @@
     $('forget').disabled = busy;
   }
 
+  $('report-close').addEventListener('click', function () { $('report').hidden = true; });
+  $('report-copy').addEventListener('click', function () {
+    var text = $('log').textContent;
+    var btn = this;
+    var done = function () { btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy report'; }, 1500); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () {});
+    } else {
+      var range = document.createRange();
+      range.selectNodeContents($('log'));
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      try { document.execCommand('copy'); done(); } catch (_) { /* select only */ }
+    }
+  });
+  $('build-info').textContent = 'Build ' + BUILD.id + ' (' + BUILD.commit + ')';
+
   /* ---- emscripten module ------------------------------------------- */
 
   window.Module = {
     canvas: $('canvas'),
-    print: function (text) { console.log(text); },
-    printErr: function (text) { console.warn(text); if (started && /abort|assert|error/i.test(text)) { showLog(text); } },
+    /* load the engine that belongs to this build, never a cached older one */
+    locateFile: function (path, dir) { return dir + path + '?v=' + encodeURIComponent(BUILD.id); },
+    print: function (text) { console.log(text); record('out', text); },
+    printErr: function (text) { console.warn(text); record('err', text); },
     onAbort: function (what) {
-      showLog('The game stopped unexpectedly: ' + what);
+      /* called from inside the failing call: the stack here shows where */
+      var stack = '';
+      try { throw new Error('abort'); } catch (e) { stack = e.stack; }
+      reportError('abort: ' + (what || '(no message: the C/C++ code called abort())'), '', stack);
     },
     onRuntimeInitialized: function () {
       var FS = Module.FS;
@@ -61,10 +185,15 @@
   };
 
   window.addEventListener('error', function (e) {
-    if (started) { showLog('Error: ' + (e.message || e) + (e.error && e.error.stack ? '\n' + e.error.stack : '')); }
+    if (!started) { return; }
+    var err = e.error;
+    reportError((err && err.name ? err.name + ': ' : '') + (e.message || String(err)),
+      (e.filename || '').replace(/^.*\//, '') + ':' + e.lineno, err && err.stack);
   });
   window.addEventListener('unhandledrejection', function (e) {
-    if (started) { showLog('Error: ' + (e.reason && e.reason.message || e.reason) + (e.reason && e.reason.stack ? '\n' + e.reason.stack : '')); }
+    if (!started) { return; }
+    var r = e.reason;
+    reportError((r && r.name ? r.name + ': ' : '') + (r && r.message || String(r)), 'unhandled promise rejection', r && r.stack);
   });
 
   /* ---- stored assets ----------------------------------------------- */
@@ -421,6 +550,10 @@
     $('opt-close').addEventListener('click', closeMenu);
     $('opt-fullscreen').addEventListener('click', function () { toggleFullscreen(); closeMenu(); });
     $('opt-edit').addEventListener('click', openTouchEditor);
+    $('opt-log').addEventListener('click', function () {
+      closeMenu();
+      openReport('Log', buildReport('(none: report opened from the menu)', '', '(not an error)'));
+    });
     $('opt-touch').addEventListener('change', function () {
       prefs.touch = this.value;
       touchHiddenByPhysical = false;
@@ -473,6 +606,8 @@
     if (started) { return; }
     started = true;
     playing = true;
+    startedAt = performance.now();
+    note('Play pressed');
     $('setup').hidden = true;
     $('canvas').hidden = false;
     $('menu-btn').hidden = false;
@@ -485,7 +620,12 @@
     if (!isIOS && isTouchDevice && document.documentElement.requestFullscreen) {
       document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(function () {});
     }
-    Module.callMain([]);
+    try {
+      Module.callMain([]);
+      note('engine started (main is running)');
+    } catch (e) {
+      reportError((e && e.name ? e.name + ': ' : '') + (e && e.message || String(e)), 'thrown while starting', e && e.stack);
+    }
     /* SDL sets its own canvas size when it creates the window */
     settle();
   });

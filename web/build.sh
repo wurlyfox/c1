@@ -4,7 +4,7 @@
 #   web/build.sh            # release build into build-web/dist
 #   OPT=-O0 web/build.sh    # unoptimized build (see doc/web.md)
 #   MIDI=0 web/build.sh     # build without FluidSynth (no music)
-#   DEBUG=1 web/build.sh    # runtime checks and readable call stacks in errors
+#   DEBUG=0 web/build.sh    # leaner build: no runtime checks or function names
 #
 # Requires the Emscripten SDK (emcc, emcmake) and cmake in PATH.
 set -euo pipefail
@@ -13,7 +13,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="${OUT:-$ROOT/build-web}"
 OPT="${OPT:--O2}"
 MIDI="${MIDI:-1}"
-DEBUG="${DEBUG:-0}"
+# on by default while the port is young: errors then say where they happened
+DEBUG="${DEBUG:-1}"
 JOBS="${JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
 FLUIDSYNTH_TAG="v2.5.0"
 GCEM_REV="012ae73c6d0a2cb09ffe86475f5c6fba3926e200"
@@ -107,9 +108,19 @@ em++ "$OPT" "${OBJECTS[@]}" "${LIBS[@]}" "${LINK_EH[@]}" "${LINK_DEBUG[@]}" -o "
   -sMIN_WEBGL_VERSION=1 -sMAX_WEBGL_VERSION=2 \
   -sINVOKE_RUN=0 -sEXIT_RUNTIME=0 -sFORCE_FILESYSTEM -lidbfs.js \
   -sEXPORTED_FUNCTIONS=_main,_WebSetKey \
-  -sEXPORTED_RUNTIME_METHODS=FS,IDBFS,callMain
+  -sEXPORTED_RUNTIME_METHODS=FS,IDBFS,callMain,HEAP8
 
-cp "$ROOT/web/index.html" "$ROOT/web/c1web.js" "$ROOT/web/c1web.css" "$DIST/"
+# Stamp the build so the page can show it in error reports and so browsers
+# never mix files cached from an older build with new ones.
+BUILD_ID="$(date -u +%Y%m%d-%H%M%S)"
+COMMIT="$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+if [ -n "$(git -C "$ROOT" status --porcelain 2>/dev/null)" ]; then COMMIT="$COMMIT+local"; fi
+FLAGS="$OPT MIDI=$MIDI ${LINK_DEBUG[*]:-}"
+printf 'window.C1_BUILD = { id: "%s", commit: "%s", flags: "%s" };\n' "$BUILD_ID" "$COMMIT" "$FLAGS" > "$DIST/version.js"
+
+cp "$ROOT/web/c1web.js" "$ROOT/web/c1web.css" "$DIST/"
+sed "s/__C1_BUILD__/$BUILD_ID/g" "$ROOT/web/index.html" > "$DIST/index.html"
 mkdir -p "$DIST/js"
 cp "$ROOT/web/js/"*.js "$DIST/js/"
+echo "build $BUILD_ID ($COMMIT)"
 echo "done: $DIST (serve it over http, e.g. python3 -m http.server -d \"$DIST\")"
