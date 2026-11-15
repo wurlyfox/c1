@@ -15,6 +15,7 @@ extern void TexturesKill();
 extern void TexturesUpdate();
 extern int TextureId();
 extern int TextureLoad(texinfo *texinfo, fvec(*uvs)[4]);
+extern int TextureCopyRegion(uint32_t tpag, texinfo2 *src, texinfo2 *dst, int copy_clut);
 // extern int TexturePageGlobal(tpage *tpage);
 extern void TextureCopy(uint8_t *src, uint8_t *dst, dim2 *sdim, dim2 *ddim,
   rect2 *srect, pnt2 *dloc,

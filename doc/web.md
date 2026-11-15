@@ -109,9 +109,10 @@ On the web that file is `/save/card.dat`, stored in IndexedDB. The start page
 shows how many saves there are and can download a backup, restore one or
 delete them. The desktop build writes `c1card.dat` in the working directory.
 
-Slot names and icons are not shown: the helpers that draw them are
-PlayStation-only in this port. Slots still show whether they are used and
-their progress.
+Used slots show the game's own save icon (Crash's face, animated), copied
+into the slot's texture region as the original does. Slot names are not
+shown: the text buffer for them is never set up in this port. Slots still
+show their progress.
 
 ## Debug panel
 

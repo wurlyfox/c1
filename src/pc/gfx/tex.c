@@ -392,6 +392,55 @@ static int TextureLookup(texinfo *texinfo, fvec(*uvs)[4]) {
 }
 
 /**
+ * copies the pixels (and optionally the palette) of one region of a texture
+ * page over another region of the same page, as LoadImage/StoreImage do with
+ * video memory on the PlayStation; cached copies of the page are dropped so
+ * that the change shows
+ *
+ * tpag - eid of the texture page
+ * src  - region to copy; its size is used for both
+ * dst  - region to overwrite
+ *
+ * returns 0 if the page is not loaded
+ */
+int TextureCopyRegion(uint32_t tpag, texinfo2 *src, texinfo2 *dst, int copy_clut) {
+  tpage *tpage;
+  quad28 quad;
+  uint8_t *data;
+  uint16_t *data16;
+  int idx, ppi, w, h, y, bytes, sx, sy, dx, dy, count;
+
+  idx = TexturePageIdx((entry_ref*)&tpag);
+  if (idx == -1) { return 0; }
+  tpage = (struct _tpage*)texture_pages[idx].page;
+  if (!tpage) { return 0; }
+  data = (uint8_t*)tpage;
+  data16 = (uint16_t*)tpage;
+  /* a page is 512 bytes (256 16-bit words) wide and 128 rows high; the
+     region location and size follow TextureNew */
+  ppi = (2 << (2 - src->color_mode));
+  quad = *(quad28*)&uv_map[src->uv_idx];
+  w = max3(quad.p[0].x,quad.p[1].x,quad.p[2].x)+1;
+  h = max3(quad.p[0].y,quad.p[1].y,quad.p[2].y)+1;
+  bytes = src->color_mode == 0 ? (w+1)/2 : (w << (src->color_mode-1));
+  sx = (((src->segment*32)+src->offs_x)*ppi) >> (src->color_mode == 0 ? 1 : 0);
+  dx = (((dst->segment*32)+dst->offs_x)*ppi) >> (dst->color_mode == 0 ? 1 : 0);
+  if (src->color_mode == 2) { sx <<= 1; dx <<= 1; }
+  sy = src->offs_y*4;
+  dy = dst->offs_y*4;
+  if (sy+h > 128 || dy+h > 128 || sx+bytes > 512 || dx+bytes > 512) { return 0; }
+  for (y=0;y<h;y++)
+    memmove(&data[((dy+y)*512)+dx], &data[((sy+y)*512)+sx], bytes);
+  if (copy_clut && src->color_mode != 2) {
+    count = src->color_mode == 0 ? 16 : 256;
+    memmove(&data16[(dst->clut_x*16)+(dst->clut_y*256)],
+            &data16[(src->clut_x*16)+(src->clut_y*256)], count*sizeof(uint16_t));
+  }
+  memset(cache.table[idx], 0, sizeof(cache.table[idx]));
+  return 1;
+}
+
+/**
 * creates a new texture for the given texinfo if one does not exist
 *
 * returns the id of the texture's parent atlas

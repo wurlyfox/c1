@@ -17,6 +17,8 @@
 #include "pc/card.h"
 #include "globals.h"
 #include "level.h"
+#include "formats/gool.h"
+#include "pc/gfx/tex.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -183,13 +185,45 @@ static void CardRequestLoad() {
 }
 
 /* The original also writes the name of each slot ("EMPTY", "CRASH (12%)")
-   into a text buffer (card_str) and its icon into video memory (card_icon).
-   Neither exists in the pc port: its text and icon helpers are PlayStation
-   only (see sub_8001A754 and sub_8001A850 in gfx.c). The screens still show
-   which slots are used and their progress from card_partinfos. */
+   into a text buffer (card_str). That buffer is never set up in the pc port,
+   so the names are left out; the screens still show which slots are used
+   and their progress from card_partinfos. */
 static void CardSetPartName(int idx, char *name) {
   (void)idx;
   (void)name;
+}
+
+/* the texture region of frame idx of the card icon animation, or 0 */
+static texinfo2 *CardIconFrame(gool_anim *icon, int idx) {
+  if (icon->type == GOOL_ANIM_TYPE_SPRITE)
+    return &icon->s.texinfos[idx];
+  if (icon->type == GOOL_ANIM_TYPE_FRAG)
+    return &icon->r.frags[idx].texinfo;
+  return 0;
+}
+
+/*
+ * Gives a slot its icon. The save screens draw each slot with 3 frames of the
+ * card icon animation (card_icon, set by the GOOL code): frames slot*3..+2.
+ * Those frames start out as a placeholder; the original fills them with the
+ * icon stored in each save file, which for a Crash save is the game's own
+ * icon, frames 45 and 46 of the same animation (see CardPartWrite and
+ * CardPartReadImages in src/psx/card.c). Here every save is a Crash save, so
+ * the game's icon is copied over the slot's frames directly.
+ */
+static void CardSetPartIcon(int part_idx) {
+  gool_anim *icon;
+  texinfo2 *src, *dst;
+  int i;
+
+  icon = (gool_anim*)card_icon;
+  if (!icon) { return; }
+  for (i=0;i<3;i++) {
+    src = CardIconFrame(icon, i < 2 ? 45 : 46);
+    dst = CardIconFrame(icon, (part_idx*3)+i);
+    if (!src || !dst) { return; }
+    TextureCopyRegion(icon->eid, src, dst, 1);
+  }
 }
 
 /* lists one save: its name and its part info, as the directory read of the
@@ -202,9 +236,11 @@ static void CardReadPart() {
   save = &file.saves[card.entry_idx];
   sprintf(name, "CRASH (%d%%)", (int)save->percent);
   CardSetPartName(card.part_count, name);
+  CardSetPartIcon(card.part_count);
   info = 3 << 1;                        /* image count */
   info |= 8 | (save->globals.progress << 5); /* crash save, with its progress */
-  info |= 0x20000;                      /* not damaged */
+  /* bit 0x20000 marks a damaged slot: the screens then draw a band-aid
+     instead of the icon (src/psx/card.c has the test the other way round) */
   info |= 1;                            /* done */
   card_partinfos[card.part_count] = info;
   card.entry_idx++;
