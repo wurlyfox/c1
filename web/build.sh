@@ -107,8 +107,8 @@ em++ "$OPT" "${OBJECTS[@]}" "${LIBS[@]}" "${LINK_EH[@]}" "${LINK_DEBUG[@]}" -o "
   -sSTACK_SIZE=8MB -sINITIAL_MEMORY=256MB -sALLOW_MEMORY_GROWTH \
   -sMIN_WEBGL_VERSION=1 -sMAX_WEBGL_VERSION=2 \
   -sINVOKE_RUN=0 -sEXIT_RUNTIME=0 -sFORCE_FILESYSTEM -lidbfs.js \
-  -sEXPORTED_FUNCTIONS=_main,_WebSetKey \
-  -sEXPORTED_RUNTIME_METHODS=FS,IDBFS,callMain,HEAP8
+  -sEXPORTED_FUNCTIONS=_main,_WebSetKey,_WebDebugInfo \
+  -sEXPORTED_RUNTIME_METHODS=FS,IDBFS,callMain,HEAP8,HEAP32
 
 # Stamp the build so the page can show it in error reports and so browsers
 # never mix files cached from an older build with new ones.

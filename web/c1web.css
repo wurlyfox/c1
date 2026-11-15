@@ -10,6 +10,7 @@
   --safe-r: env(safe-area-inset-right, 0px);
   --safe-t: env(safe-area-inset-top, 0px);
   --safe-b: env(safe-area-inset-bottom, 0px);
+  --side: 0px; /* width taken by the debug panel */
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
@@ -41,16 +42,16 @@ body.playing { overflow: hidden; touch-action: none; -webkit-user-select: none; 
   -webkit-touch-callout: none; background: #000; }
 
 /* The game is always 4:3. Landscape: as large as fits, centred. */
-#canvas { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
-  width: min(100vw, 133.333vh); height: min(75vw, 100vh);
-  width: min(100vw, 133.333dvh); height: min(75vw, 100dvh);
+#canvas { position: fixed; left: calc((100vw - var(--side)) / 2); top: 50%; transform: translate(-50%, -50%);
+  width: min(100vw - var(--side), 133.333vh); height: min((100vw - var(--side)) * .75, 100vh);
+  width: min(100vw - var(--side), 133.333dvh); height: min((100vw - var(--side)) * .75, 100dvh);
   display: block; background: #000; outline: none; touch-action: none; }
 /* Portrait play: the game sits in a 4:3 band at the top, controls below. */
 body.portrait-play { background: #101014; }
 body.portrait-play #canvas { top: var(--safe-t); transform: translateX(-50%);
   width: min(100vw, 69.333vh); height: min(75vw, 52vh); }
 
-#menu-btn { position: fixed; z-index: 30; top: calc(6px + var(--safe-t)); right: calc(6px + var(--safe-r));
+#menu-btn { position: fixed; z-index: 30; top: calc(6px + var(--safe-t)); right: calc(6px + var(--safe-r) + var(--side));
   width: 40px; height: 40px; padding: 0; border-radius: 50%; font-size: 18px;
   background: rgba(20, 17, 15, .55); border-color: rgba(255, 255, 255, .25); opacity: .7; }
 body.portrait-play #menu-btn { top: calc(min(75vw, 52vh) + 6px + var(--safe-t)); border-radius: 12px; }
@@ -161,6 +162,42 @@ select { font: inherit; color: var(--text); background: var(--bg); border: 1px s
 #ed-name { font-weight: 700; min-width: 90px; }
 input[type=range] { width: 120px; accent-color: var(--accent); }
 .chk input { accent-color: var(--accent); width: 18px; height: 18px; }
+
+/* ---------- key bindings ---------- */
+#keys { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 16px; margin-bottom: 12px; }
+.keyrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.keyrow span { color: var(--muted); font-size: 0.9375rem; }
+.keybind { min-width: 72px; padding: 5px 10px; font-size: 0.875rem; font-weight: 600; text-align: center; }
+.keybind.waiting { border-color: var(--accent); color: var(--accent); }
+.keybind.unset { color: var(--muted); font-weight: 400; }
+label.chk { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+
+/* ---------- debug panel ---------- */
+body.debug-on { --side: min(340px, 42vw); }
+#debug { position: fixed; z-index: 20; top: 0; right: 0; bottom: 0; width: var(--side); display: flex;
+  flex-direction: column; background: #0f0d0c; border-left: 1px solid var(--line);
+  font: 11.5px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: #d8d0c6;
+  -webkit-user-select: text; user-select: text; }
+.debug-bar { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-bottom: 1px solid var(--line);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+.debug-bar strong { flex: 1; font-size: 13px; color: var(--accent); }
+.debug-bar button { padding: 2px 8px; font-size: 12px; }
+#debug-stats { margin: 0; padding: 8px; border-bottom: 1px solid var(--line); white-space: pre-wrap; color: #f1e9df; }
+#debug-log { flex: 1; overflow-y: auto; padding: 6px 8px; }
+#debug-log div { white-space: pre-wrap; word-break: break-word; }
+#debug-log .t { color: #7d7368; }
+#debug-log .k-out { color: #d8d0c6; }
+#debug-log .k-err, #debug-log .k-error { color: #ff8f84; }
+#debug-log .k-page { color: #8fb5ff; }
+#debug-log .k-game { color: #86e0c0; }
+#debug-log .k-warn { color: #ffcf7a; }
+/* Narrow screens: no room at the side, so the panel floats over the picture. */
+@media (max-width: 700px) {
+  body.debug-on { --side: 0px; }
+  #debug { left: 0; right: 0; bottom: auto; width: auto; max-height: 34vh; background: rgba(0, 0, 0, .6);
+    border-left: 0; pointer-events: none; font-size: 10px; }
+  #debug .debug-bar { display: none; }
+}
 
 #report { position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; max-height: 60vh; display: flex;
   flex-direction: column; background: rgba(24, 10, 8, .97); border-top: 2px solid #b3382c; }

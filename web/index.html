@@ -31,15 +31,29 @@
   </section>
 
   <section>
-    <h2>Controls</h2>
-    <table>
-      <tr><th>D-Pad</th><td>Arrow keys</td><th>Start / Select</th><td>Enter / Space</td></tr>
-      <tr><th>✕ / □</th><td>Z / X</td><th>○ / △</th><td>C / S</td></tr>
-      <tr><th>L1 / R1</th><td>A / D</td><th>L2 / R2</th><td>Q / E</td></tr>
-    </table>
-    <p class="note">Gamepads work too. On phones and tablets an on-screen controller appears;
+    <h2>Keyboard</h2>
+    <div id="keys"></div>
+    <div class="actions">
+      <button id="keys-reset" class="quiet">Reset keys</button>
+    </div>
+    <p class="note" id="keys-hint">Click a key to change it, then press the new one (Esc cancels).
+    Gamepads work too. On phones and tablets an on-screen controller appears;
     you can move, resize or hide its buttons from the ☰ menu.</p>
   </section>
+
+  <section>
+    <h2>Debug</h2>
+    <label class="chk"><input type="checkbox" id="opt-debug-start"> Show the debug panel next to the game</label>
+    <p class="note">Live engine state and a log of what the game and the page do.
+    Toggle it while playing with F2 or from the ☰ menu.</p>
+    <div class="actions" id="export-row" hidden>
+      <select id="export-file" aria-label="Stored game file"></select>
+      <button id="export-save">Save this file</button>
+    </div>
+    <p class="note" id="export-note" hidden>Saves one of the stored level files to your computer,
+    for example to reproduce a problem in a single level.</p>
+  </section>
+
   <p class="note" id="build-info"></p>
 </main>
 
@@ -59,7 +73,8 @@
   </label>
   <button id="opt-edit">Edit touch layout</button>
   <button id="opt-fullscreen">Fullscreen</button>
-  <button id="opt-log">Show log</button>
+  <button id="opt-debug">Debug panel</button>
+  <button id="opt-log">Show report</button>
   <button id="opt-close" class="primary">Back to game</button>
 </div>
 
@@ -85,6 +100,18 @@
     <button id="ed-done" class="primary">Done</button>
   </div>
 </div>
+
+<!-- Debug panel: live engine state and log, beside the game -->
+<aside id="debug" hidden>
+  <div class="debug-bar">
+    <strong>Debug</strong>
+    <button id="debug-copy">Copy</button>
+    <button id="debug-clear">Clear</button>
+    <button id="debug-close" aria-label="Close">✕</button>
+  </div>
+  <pre id="debug-stats"></pre>
+  <div id="debug-log"></div>
+</aside>
 
 <!-- Error report / log (c1web.js) -->
 <div id="report" hidden>

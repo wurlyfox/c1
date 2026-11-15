@@ -37,10 +37,49 @@
   function note(text) {
     events.push('[' + stamp() + '] ' + text);
     if (events.length > 40) { events.shift(); }
+    debugLine('page', text);
   }
   function record(kind, text) {
     output.push('[' + stamp() + '] ' + kind + ' ' + text);
     if (output.length > 80) { output.shift(); }
+    debugLine(kind, text);
+  }
+
+  /* ---- debug panel: log ------------------------------------------------ */
+  /* kinds: out/err = printed by the engine, page = what the page did,
+     game = engine state changes noticed by the page, warn, error */
+
+  var DEBUG_MAX = 400;
+  var debugLines = [];
+
+  function debugLine(kind, text) {
+    var line = { t: stamp(), kind: kind, text: String(text) };
+    debugLines.push(line);
+    if (debugLines.length > DEBUG_MAX) { debugLines.shift(); }
+    var box = $('debug-log');
+    if (!box || $('debug').hidden) { return; }
+    appendDebugLine(box, line);
+    while (box.childNodes.length > DEBUG_MAX) { box.removeChild(box.firstChild); }
+  }
+
+  function appendDebugLine(box, line) {
+    /* keep following the end unless the reader scrolled up */
+    var follow = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
+    var row = document.createElement('div');
+    row.className = 'k-' + line.kind;
+    var t = document.createElement('span');
+    t.className = 't';
+    t.textContent = line.t + ' ';
+    row.appendChild(t);
+    row.appendChild(document.createTextNode(line.text));
+    box.appendChild(row);
+    if (follow) { box.scrollTop = box.scrollHeight; }
+  }
+
+  function debugText() {
+    return $('debug-stats').textContent + '\n\n' + debugLines.map(function (l) {
+      return '[' + l.t + '] ' + l.kind + ' ' + l.text;
+    }).join('\n');
   }
 
   /* A report must never fail itself: every item is read defensively. (With
@@ -117,7 +156,8 @@
 
   /* The first failure is the one that matters; later ones are its fallout. */
   function reportError(title, detail, stack) {
-    note('ERROR ' + title);
+    events.push('[' + stamp() + '] ERROR ' + title);
+    debugLine('error', title);
     if (reported) { return; }
     reported = true;
     var text;
@@ -208,6 +248,15 @@
     var levels = names.filter(function (n) { return n.slice(-1) === 'f'; }).length;
     $('play').hidden = !hasTitle;
     $('forget').hidden = names.length === 0;
+    $('export-row').hidden = $('export-note').hidden = names.length === 0;
+    var pick = $('export-file');
+    pick.innerHTML = '';
+    names.sort().forEach(function (n) {
+      var opt = document.createElement('option');
+      opt.value = n;
+      opt.textContent = n.toUpperCase() + ' (' + (Module.FS.stat(STREAMS + '/' + n).size / 1048576).toFixed(1) + ' MB)';
+      pick.appendChild(opt);
+    });
     if (message) {
       setStatus(message, true);
     } else if (hasTitle) {
@@ -355,6 +404,18 @@
     if (this.files.length) { runImport(importFiles(this.files)); }
     this.value = '';
   });
+  $('export-save').addEventListener('click', function () {
+    var name = $('export-file').value;
+    if (!name) { return; }
+    var url = URL.createObjectURL(new Blob([Module.FS.readFile(STREAMS + '/' + name)], { type: 'application/octet-stream' }));
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = name.toUpperCase();
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+  });
   $('forget').addEventListener('click', function () {
     if (!confirm('Remove the game files stored in this browser?')) { return; }
     storedAssets().forEach(function (n) { Module.FS.unlink(STREAMS + '/' + n); });
@@ -372,6 +433,124 @@
     var any = Object.keys(held).some(function (k) { return held[k] && k.split(':')[1] === key; });
     Module._WebSetKey(KEYS[key], any ? 1 : 0);
   }
+
+  /* ---- keyboard bindings ---------------------------------------------- */
+  /* The page reads the keyboard itself and presses the engine's pad keys, so
+     any key can be bound to any pad button. Bindings are KeyboardEvent.code
+     values (physical keys, independent of the keyboard language). */
+
+  var BINDS_KEY = 'c1web.keys.v1';
+  var BUTTON_LABELS = [
+    ['up', 'D-pad up'], ['down', 'D-pad down'], ['left', 'D-pad left'], ['right', 'D-pad right'],
+    ['cross', '✕ Jump'], ['square', '□ Spin'], ['circle', '○ Spin'], ['triangle', '△'],
+    ['start', 'Start'], ['select', 'Select'],
+    ['l1', 'L1'], ['r1', 'R1'], ['l2', 'L2'], ['r2', 'R2']
+  ];
+  var DEFAULT_BINDS = {
+    up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight',
+    cross: 'KeyZ', square: 'KeyX', circle: 'KeyC', triangle: 'KeyS',
+    start: 'Enter', select: 'Space',
+    l1: 'KeyA', r1: 'KeyD', l2: 'KeyQ', r2: 'KeyE'
+  };
+  var RESERVED_CODES = ['Escape', 'F2']; /* cancel a binding / toggle the debug panel */
+  var binds = Object.assign({}, DEFAULT_BINDS);
+  try { Object.assign(binds, JSON.parse(localStorage.getItem(BINDS_KEY) || '{}')); } catch (_) { /* defaults */ }
+  var waitingFor = null; /* pad button whose key is being chosen */
+
+  function saveBinds() {
+    try { localStorage.setItem(BINDS_KEY, JSON.stringify(binds)); } catch (_) { /* ignore */ }
+  }
+
+  function keyName(code) {
+    if (!code) { return 'not set'; }
+    var arrows = { ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' };
+    if (arrows[code]) { return arrows[code]; }
+    var m = /^Key([A-Z])$/.exec(code) || /^Digit(\d)$/.exec(code);
+    if (m) { return m[1]; }
+    m = /^Numpad(.+)$/.exec(code);
+    if (m) { return 'Num ' + m[1]; }
+    return code.replace(/(Left|Right)$/, ' $1').replace(/([a-z])([A-Z])/g, '$1 $2');
+  }
+
+  function buttonForCode(code) {
+    for (var btn in binds) { if (binds[btn] === code) { return btn; } }
+    return null;
+  }
+
+  function renderBinds() {
+    var box = $('keys');
+    box.innerHTML = '';
+    BUTTON_LABELS.forEach(function (pair) {
+      var row = document.createElement('div');
+      row.className = 'keyrow';
+      var name = document.createElement('span');
+      name.textContent = pair[1];
+      var key = document.createElement('button');
+      key.className = 'keybind' + (waitingFor === pair[0] ? ' waiting' : '') + (binds[pair[0]] ? '' : ' unset');
+      key.textContent = waitingFor === pair[0] ? 'Press a key…' : keyName(binds[pair[0]]);
+      key.setAttribute('aria-label', pair[1] + ': ' + keyName(binds[pair[0]]) + '. Change');
+      key.addEventListener('click', function () {
+        waitingFor = waitingFor === pair[0] ? null : pair[0];
+        renderBinds();
+        this.blur();
+      });
+      row.appendChild(name);
+      row.appendChild(key);
+      box.appendChild(row);
+    });
+  }
+
+  function assignBind(btn, code) {
+    /* a key drives one button: taking it from another leaves that one unset */
+    for (var other in binds) { if (other !== btn && binds[other] === code) { binds[other] = ''; } }
+    binds[btn] = code;
+    saveBinds();
+  }
+
+  function releaseKeyboard() {
+    for (var key in KEYS) { setKey('kbd', key, false); }
+  }
+
+  function isTypingTarget(el) {
+    return el && (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA');
+  }
+
+  /* Capture phase and registered before the engine starts, so these run before
+     SDL's own keyboard handlers, which must not see the keys (the engine's
+     built-in key layout would act on top of the chosen one). */
+  function onKey(e) {
+    var down = e.type === 'keydown';
+    if (waitingFor) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (!down) { return; }
+      if (e.code !== 'Escape' && RESERVED_CODES.indexOf(e.code) < 0 && e.code) { assignBind(waitingFor, e.code); }
+      waitingFor = null;
+      renderBinds();
+      return;
+    }
+    if (!playing) { return; }
+    e.stopImmediatePropagation();
+    if (down && e.code === 'F2') { e.preventDefault(); toggleDebug(); return; }
+    if (isTypingTarget(e.target) || e.metaKey || e.ctrlKey || e.altKey) { return; }
+    var btn = buttonForCode(e.code);
+    if (!btn) { return; }
+    e.preventDefault();
+    if (down && !e.repeat) { physicalInput(); resumeAudio(); }
+    setKey('kbd', btn, down);
+  }
+  window.addEventListener('keydown', onKey, true);
+  window.addEventListener('keyup', onKey, true);
+  /* keys held while the window loses focus never get their keyup */
+  window.addEventListener('blur', function () { if (playing) { releaseKeyboard(); } });
+
+  $('keys-reset').addEventListener('click', function () {
+    binds = Object.assign({}, DEFAULT_BINDS);
+    waitingFor = null;
+    saveBinds();
+    renderBinds();
+  });
+  renderBinds();
 
   /* standard gamepad layout */
   var PAD_BUTTONS = {
@@ -405,7 +584,7 @@
   /* ---- preferences ---------------------------------------------------- */
 
   var PREFS_KEY = 'c1web.prefs.v1';
-  var prefs = { touch: 'auto' };
+  var prefs = { touch: 'auto', debug: false };
   try { Object.assign(prefs, JSON.parse(localStorage.getItem(PREFS_KEY) || '{}')); } catch (_) { /* defaults */ }
   function savePrefs() {
     try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch (_) { /* ignore */ }
@@ -483,6 +662,96 @@
     }
   }
 
+  /* ---- debug panel: live state ------------------------------------------ */
+
+  var debugTimer = 0;
+  var last = { frames: 0, at: 0, lid: -1, paused: -1, crash: -1, audio: '', canvas: '', slowAt: 0 };
+  var workMax = 0;
+
+  function hex(n) { return '0x' + (n >>> 0).toString(16).toUpperCase(); }
+
+  function heldNames() {
+    var names = {};
+    Object.keys(held).forEach(function (k) { if (held[k]) { names[k.split(':')[1]] = true; } });
+    return Object.keys(names).join(' ') || '-';
+  }
+
+  /* Runs while playing, panel open or not, so the log also records what
+     happened before the panel was opened. */
+  function pollDebug() {
+    var d;
+    try {
+      var ptr = Module._WebDebugInfo();
+      d = Module.HEAP32.subarray(ptr >> 2, (ptr >> 2) + 16);
+    } catch (e) { return; }
+    var now = performance.now();
+    var fps = last.at ? (d[0] - last.frames) * 1000 / (now - last.at) : 0;
+    last.frames = d[0];
+    last.at = now;
+    var work = d[2] / 1000;
+    if (work > workMax) { workMax = work; }
+
+    if (d[3] !== last.lid) { debugLine('game', 'level ' + hex(d[3]) + (last.lid >= 0 ? ' (was ' + hex(last.lid) + ')' : '')); last.lid = d[3]; }
+    if (d[5] !== last.paused) { if (last.paused >= 0) { debugLine('game', d[5] ? 'paused' : 'resumed'); } last.paused = d[5]; }
+    if (d[10] !== last.crash) { if (last.crash >= 0) { debugLine('game', d[10] ? 'player object created' : 'player object removed'); } last.crash = d[10]; }
+    /* a frame has 33 ms: report work that does not fit, at most every 2 s */
+    if (work > 33 && now - last.slowAt > 2000) { debugLine('warn', 'slow frame: ' + work.toFixed(1) + ' ms of work'); last.slowAt = now; }
+    var ctx = Module.SDL2 && Module.SDL2.audioContext;
+    var audio = ctx ? ctx.state + ' ' + ctx.sampleRate + ' Hz' : 'not started';
+    if (audio !== last.audio) { debugLine('page', 'audio ' + audio); last.audio = audio; }
+    var c = $('canvas');
+    var canvas = c.width + 'x' + c.height;
+    if (canvas !== last.canvas) { debugLine('page', 'canvas ' + canvas + ' @' + window.devicePixelRatio); last.canvas = canvas; }
+
+    if ($('debug').hidden) { return; }
+    $('debug-stats').textContent = [
+      'FPS ' + fps.toFixed(1) + '   work ' + work.toFixed(1) + ' ms (max ' + workMax.toFixed(1) + ')',
+      'Level ' + hex(d[3]) + '   frame ' + d[0] + '   draw ' + d[4] + (d[5] ? '   PAUSED' : ''),
+      'Tris ' + d[1] + '   ticks/frame ' + d[6],
+      'Lives ' + d[7] + '   Fruit ' + d[8] + '   Boxes ' + d[9],
+      'Crash ' + (d[10] ? d[11] + ', ' + d[12] + ', ' + d[13] : '(no player object)'),
+      'Pad ' + heldNames(),
+      'Canvas ' + canvas + ' @' + window.devicePixelRatio + '   Mem ' + (Module.HEAP8.length / 1048576).toFixed(0) + ' MB',
+      'Audio ' + audio,
+      'Build ' + BUILD.id + ' ' + BUILD.commit
+    ].join('\n');
+  }
+
+  function applyDebug() {
+    var on = !!prefs.debug && playing;
+    document.body.classList.toggle('debug-on', on);
+    $('debug').hidden = !on;
+    if (on) {
+      var box = $('debug-log');
+      box.innerHTML = '';
+      debugLines.forEach(function (l) { appendDebugLine(box, l); });
+      box.scrollTop = box.scrollHeight;
+      workMax = 0;
+    }
+    settle();
+  }
+
+  function toggleDebug() {
+    prefs.debug = !prefs.debug;
+    savePrefs();
+    $('opt-debug-start').checked = prefs.debug;
+    applyDebug();
+  }
+
+  $('opt-debug-start').checked = !!prefs.debug;
+  $('opt-debug-start').addEventListener('change', function () { prefs.debug = this.checked; savePrefs(); });
+  $('debug-close').addEventListener('click', toggleDebug);
+  $('debug-clear').addEventListener('click', function () { debugLines = []; $('debug-log').innerHTML = ''; workMax = 0; });
+  $('debug-copy').addEventListener('click', function () {
+    var btn = this;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(debugText()).then(function () {
+        btn.textContent = 'Copied';
+        setTimeout(function () { btn.textContent = 'Copy'; }, 1500);
+      }, function () {});
+    }
+  });
+
   /* ---- touch overlay --------------------------------------------------- */
 
   var touchHiddenByPhysical = false;
@@ -550,6 +819,7 @@
     $('opt-close').addEventListener('click', closeMenu);
     $('opt-fullscreen').addEventListener('click', function () { toggleFullscreen(); closeMenu(); });
     $('opt-edit').addEventListener('click', openTouchEditor);
+    $('opt-debug').addEventListener('click', function () { closeMenu(); toggleDebug(); });
     $('opt-log').addEventListener('click', function () {
       closeMenu();
       openReport('Log', buildReport('(none: report opened from the menu)', '', '(not an error)'));
@@ -577,10 +847,6 @@
     });
     $('ed-done').addEventListener('click', closeTouchEditor);
 
-    window.addEventListener('keydown', function (e) {
-      if (e.isTrusted && !e.repeat) { physicalInput(); }
-      resumeAudio();
-    }, true);
     window.addEventListener('pointerdown', function (e) {
       if (e.pointerType === 'touch' && touchHiddenByPhysical) {
         touchHiddenByPhysical = false;
@@ -589,8 +855,13 @@
       resumeAudio();
     }, true);
     document.addEventListener('visibilitychange', function () {
-      if (document.visibilityState === 'visible') { resumeAudio(); }
+      note('tab ' + document.visibilityState);
+      if (document.visibilityState === 'visible') { resumeAudio(); } else { releaseKeyboard(); }
     });
+    window.addEventListener('gamepadconnected', function (e) { note('gamepad connected: ' + e.gamepad.id); });
+    window.addEventListener('gamepaddisconnected', function (e) { note('gamepad disconnected: ' + e.gamepad.id); });
+    $('canvas').addEventListener('webglcontextlost', function () { debugLine('error', 'WebGL context lost'); });
+    $('canvas').addEventListener('webglcontextrestored', function () { debugLine('warn', 'WebGL context restored'); });
 
     if (typeof ResizeObserver !== 'undefined') { new ResizeObserver(resizeCanvas).observe($('canvas')); }
     window.addEventListener('resize', settle);
@@ -612,7 +883,10 @@
     $('canvas').hidden = false;
     $('menu-btn').hidden = false;
     document.body.classList.add('playing');
+    waitingFor = null;
     wireGameUi();
+    applyDebug();
+    debugTimer = setInterval(pollDebug, 250);
     updateTouchVisibility();
     requestAnimationFrame(pollGamepads);
     /* Android: go fullscreen with the tap that starts the game (iOS has no

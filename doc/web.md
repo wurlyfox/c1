@@ -56,12 +56,32 @@ so they only have to be chosen once. Nothing is uploaded.
   the main thread between frames), and the page resumes the audio context on
   input and when the tab becomes visible again.
 - **In-game GUI.** Not built (`CFLAGS_GUI` and `CFLAGS_GOOL_DEBUG` are off).
-- **Input.** Keyboard as on desktop. The page also maps gamepads and the
-  on-screen touch controller to the same keys through `WebSetKey`.
+- **Input.** The page reads the keyboard, gamepads and the on-screen touch
+  controller and presses the engine's pad keys through `WebSetKey`. Keyboard
+  keys can be reassigned on the start page (saved in `localStorage`); SDL's
+  own keyboard handling is bypassed so the built-in layout does not interfere.
 - **Optimization.** The desktop build is `-O0` because optimized builds are
   known to behave differently. The web build defaults to `-O2` with
   `-fno-strict-aliasing -fwrapv -fno-delete-null-pointer-checks
   -ftrivial-auto-var-init=zero`.
+
+## Debug panel
+
+Tick "Show the debug panel" on the start page, press F2 while playing, or use
+the ☰ menu. The panel sits beside the game (over the picture on narrow
+screens) and shows:
+
+- live state, read four times a second through `WebDebugInfo` in
+  `src/pc/gfx/gl.c`: frame rate, work time per frame, level id, triangles
+  drawn, lives / fruit / boxes, the player's position, held pad buttons,
+  canvas size, memory and audio state;
+- a log of what the engine prints, what the page does (resizes, audio,
+  gamepads, tab visibility) and state changes it notices (level changes,
+  pause, slow frames, WebGL context loss). "Copy" puts state and log on the
+  clipboard.
+
+The log is recorded from the moment Play is pressed, whether or not the panel
+is open. When the game stops, a full error report opens by itself.
 
 ## Touch controller
 

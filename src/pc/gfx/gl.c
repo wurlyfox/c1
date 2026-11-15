@@ -18,6 +18,10 @@ EM_ASYNC_JS(void, WebWaitFrame, (), {
     requestAnimationFrame(function() { resolve(); });
   });
 });
+
+/* Values shown by the page's debug panel (see WebDebugInfo below). */
+static int32_t web_debug[16];
+static double web_resume_time = 0;
 #elif defined(_WIN32)
 #include <windows.h>
 #include <SDL_opengl.h>
@@ -626,6 +630,9 @@ static void GLDraw(void *ot) {
   int count;
 
   GLConvertToTris(ot, &tris, &count);
+#ifdef __EMSCRIPTEN__
+  web_debug[1] = count;
+#endif
   GLDrawPrims(tris, count);
 }
 
@@ -708,12 +715,21 @@ void GLUpdate() {
     ticks_cur_frame = ticks_elapsed - context.draw_stamp; /* time elapsed between current sync and previous draw  */
   else
     ticks_cur_frame = 17; /* default to 17 */
+#ifdef __EMSCRIPTEN__
+  /* time spent working (game logic + drawing) since the last wait ended */
+  if (web_resume_time != 0)
+    web_debug[2] = (int32_t)((emscripten_get_now() - web_resume_time) * 1000.0);
+  web_debug[0]++;
+#endif
   while (ticks_elapsed - context.draw_stamp < 34) {
 #ifdef __EMSCRIPTEN__
     WebWaitFrame(); /* a busy wait would freeze the browser tab */
 #endif
     ticks_elapsed = GetTicksElapsed();
   }
+#ifdef __EMSCRIPTEN__
+  web_resume_time = emscripten_get_now();
+#endif
   if (pbak_state == 2)
     SetTicksElapsed(cur_pbak_frame->ticks_elapsed);
   ticks_elapsed = GetTicksElapsed();
@@ -753,3 +769,31 @@ void GLUpdate() {
   if (callbacks.post_update)
     (*callbacks.post_update)();
 }
+
+#ifdef __EMSCRIPTEN__
+extern lid_t cur_lid;
+extern gool_object *crash;
+
+/* Snapshot of engine state for the page's debug panel: 16 int32 values.
+   [0] frames presented  [1] triangles in the last frame
+   [2] work time of the last frame, in microseconds
+   [3] level id  [4] draw count  [5] paused  [6] ticks per frame
+   [7] lives  [8] wumpa fruit  [9] boxes
+   [10] 1 if the player object exists, then [11..13] its position */
+EMSCRIPTEN_KEEPALIVE int32_t *WebDebugInfo() {
+  web_debug[3] = (int32_t)cur_lid;
+  web_debug[4] = draw_count;
+  web_debug[5] = paused;
+  web_debug[6] = context.ticks_per_frame;
+  web_debug[7] = life_count >> 8;
+  web_debug[8] = fruit_count >> 8;
+  web_debug[9] = box_count >> 8;
+  web_debug[10] = crash != 0;
+  if (crash) {
+    web_debug[11] = crash->trans.x;
+    web_debug[12] = crash->trans.y;
+    web_debug[13] = crash->trans.z;
+  }
+  return web_debug;
+}
+#endif
