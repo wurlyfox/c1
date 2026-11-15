@@ -172,7 +172,7 @@
   }
 
   function setBusy(busy) {
-    ['pick-disc', 'pick-files'].forEach(function (id) { $(id).classList.toggle('disabled', busy); });
+    ['pick-disc', 'pick-zip', 'pick-files'].forEach(function (id) { $(id).classList.toggle('disabled', busy); });
     $('play').disabled = busy;
     $('forget').disabled = busy;
   }
@@ -293,7 +293,7 @@
     } else if (names.length) {
       setStatus('The title level (' + TITLE_LEVEL.toUpperCase() + '.NSF/.NSD) is missing. Add the rest of the files.', true);
     } else {
-      setStatus('Choose your disc image or the .NSF/.NSD files to begin.');
+      setStatus('Choose your disc image, a game ZIP or the .NSF/.NSD files to begin.');
     }
     setBusy(false);
   }
@@ -417,6 +417,22 @@
     await persist();
   }
 
+  /* ---- import: game ZIP (tools/pack/make_c1_pack.py) ------------------- */
+
+  async function importZip(file) {
+    setStatus('Reading game ZIP…');
+    var result = await C1ZipPack.importPack(file, store, function (p) {
+      if (p.current) {
+        setStatus('Unpacking game files… ' + Math.floor(p.done * 100 / Math.max(p.total, 1)) + '%  (' + p.current.toUpperCase() + ')');
+      }
+    });
+    if (result.serial && result.serial !== 'SCUS-94900') {
+      console.warn('pack made from ' + result.serial + '; c1 expects SCUS-94900');
+    }
+    setStatus('Storing game files…');
+    await persist();
+  }
+
   function runImport(promise) {
     setBusy(true);
     promise.then(function () { refresh(); }, function (err) {
@@ -427,6 +443,10 @@
 
   $('disc').addEventListener('change', function () {
     if (this.files.length) { runImport(importDisc(this.files[0])); }
+    this.value = '';
+  });
+  $('zip').addEventListener('change', function () {
+    if (this.files.length) { runImport(importZip(this.files[0])); }
     this.value = '';
   });
   $('files').addEventListener('change', function () {

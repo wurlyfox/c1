@@ -122,5 +122,13 @@ cp "$ROOT/web/c1web.js" "$ROOT/web/c1web.css" "$DIST/"
 sed "s/__C1_BUILD__/$BUILD_ID/g" "$ROOT/web/index.html" > "$DIST/index.html"
 mkdir -p "$DIST/js"
 cp "$ROOT/web/js/"*.js "$DIST/js/"
+
+# The disc image -> game ZIP converter, as a download for people who use the
+# page without the repository.
+if command -v python3 >/dev/null 2>&1; then
+  python3 "$ROOT/tools/pack/build_tool_zip.py" "$DIST/c1-pack-tool.zip"
+else
+  echo "python3 not found: skipping c1-pack-tool.zip (the converter download)"
+fi
 echo "build $BUILD_ID ($COMMIT)"
 echo "done: $DIST (serve it over http, e.g. python3 -m http.server -d \"$DIST\")"

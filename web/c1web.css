@@ -32,6 +32,7 @@ button.primary { background: var(--accent); color: var(--accent-text); border-co
   font-weight: 700; padding: 10px 32px; }
 button.quiet { color: var(--muted); border-color: transparent; }
 button:disabled, .button.disabled { opacity: 0.5; pointer-events: none; }
+.note a { color: var(--accent); }
 .note { color: var(--muted); font-size: 0.875rem; margin: 12px 0 0; }
 table { border-collapse: collapse; width: 100%; font-size: 0.9375rem; }
 th { text-align: left; color: var(--muted); font-weight: 500; padding: 4px 12px 4px 0; white-space: nowrap; }

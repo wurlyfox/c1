@@ -32,10 +32,36 @@ No game data is included. The page asks for either
 
 - a disc image of the NTSC-U release (`.bin` with 2352-byte sectors, or a plain
   `.iso`); the `.NSF`/`.NSD` files are extracted from it in the browser, or
-- the `.NSF`/`.NSD` files themselves.
+- the `.NSF`/`.NSD` files themselves, or
+- a **game ZIP** made with the converter described below.
 
 The files are kept in the browser's IndexedDB storage (mounted at `/streams`),
 so they only have to be chosen once. Nothing is uploaded.
+
+### Game ZIP
+
+`tools/pack/make_c1_pack.py` reads the disc image and writes `c1-pack.zip`
+with only what the game needs: the level files and a small `manifest.json`.
+It is roughly a third of the size of the image, which matters when the game
+is loaded on a phone.
+
+```bash
+python3 tools/pack/make_c1_pack.py "Crash Bandicoot (USA).bin"
+```
+
+Without arguments it looks for the image next to the script and in Downloads,
+Desktop and Documents. `-o` chooses the output file, `--store` skips
+compression, `--force` accepts a disc that is not SCUS-94900. Only the Python
+standard library is used. `make_c1_pack.command` (macOS) and
+`make_c1_pack.bat` (Windows) run it with a double click.
+
+The web build publishes the converter as `c1-pack-tool.zip`, linked from the
+start page, for people who use the page without the repository. The page loads
+a pack with "Choose game ZIP" (`web/js/zippack.js`); a hand-made ZIP of the
+level files works too.
+
+The pack contains game data. It is for personal use and must not be shared or
+committed.
 
 ## What differs from the desktop build
 

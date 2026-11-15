@@ -23,11 +23,17 @@
       <button id="play" class="primary" hidden>Play</button>
       <label class="button" id="pick-disc">Choose disc image (.bin / .iso)
         <input type="file" id="disc" accept=".bin,.iso,.img" hidden></label>
+      <label class="button" id="pick-zip">Choose game ZIP
+        <input type="file" id="zip" accept=".zip,application/zip" hidden></label>
       <label class="button" id="pick-files">Choose .NSF / .NSD files
         <input type="file" id="files" accept=".nsf,.nsd,.NSF,.NSD" multiple hidden></label>
       <button id="forget" class="quiet" hidden>Remove stored game files</button>
     </div>
     <p class="note">Files are read locally and kept in this browser's storage. Nothing is uploaded.</p>
+    <p class="note">A <strong>game ZIP</strong> holds only the level files of your disc, so it is about
+    a third of the size of the image and quicker to load, for example on a phone.
+    Make it once on a computer with the <a href="c1-pack-tool.zip" download>converter</a>
+    (needs Python 3): double-click it and it finds your .bin.</p>
   </section>
 
   <section>
@@ -129,6 +135,7 @@
 <script src="version.js?v=__C1_BUILD__"></script>
 <script src="js/dpad-gemuboy.js?v=__C1_BUILD__"></script>
 <script src="js/touch.js?v=__C1_BUILD__"></script>
+<script src="js/zippack.js?v=__C1_BUILD__"></script>
 <script src="c1web.js?v=__C1_BUILD__"></script>
 <script async src="c1.js?v=__C1_BUILD__"></script>
 </body>
