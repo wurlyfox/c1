@@ -220,8 +220,8 @@ static void GLSetProjection(float sx, float sy, float ox, float oy) {
  * Render quality, set by the page (WebSetRender):
  *
  * web_res   internal resolution as a multiple of the original console's
- *           240 rows (2 = 480 rows, 4 = 960, ... 10 = 2400), or 0 to draw
- *           at the size of the canvas
+ *           240 rows (1 = 240 rows, as on the console, up to 4 = 960), or
+ *           0 to draw at the size of the canvas
  * web_aa    1 = antialiasing by supersampling: the frame is drawn at twice
  *           the internal resolution in each direction and averaged down
  *           when it is copied to the canvas, which smooths polygon edges

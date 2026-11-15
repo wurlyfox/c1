@@ -89,8 +89,9 @@ committed.
   *Original 4:3* keeps the picture as it was. All three follow the window
   size as it changes.
 - **Resolution and antialiasing** (☰ menu). The frame is drawn into the
-  offscreen target at an internal resolution: the window's (Auto, the
-  default) or 2, 4, 6, 8 or 10 times the 240 rows of the original console.
+  offscreen target at an internal resolution: 1x (the 240 rows of the
+  original console), 2x, 3x or 4x, or the window's size (Auto, the default).
+  1x with antialiasing off gives the console's hard pixels.
   Antialiasing (on by default) draws at twice the internal resolution in
   each direction and averages it down when the frame is copied to the
   canvas, which smooths polygon edges. The target is capped at 8192 pixels

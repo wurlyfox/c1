@@ -970,7 +970,7 @@
   /* internal resolution (a multiple of the original 240 rows, 0 = the size
      of the window) and antialiasing (supersampling) */
   function applyRender() {
-    var res = [0, 2, 4, 6, 8, 10].indexOf(+prefs.res) >= 0 ? +prefs.res : 0;
+    var res = [0, 1, 2, 3, 4].indexOf(+prefs.res) >= 0 ? +prefs.res : 0;
     var aa = prefs.aa === 0 || prefs.aa === '0' ? 0 : 1;
     $('opt-res').value = String(res);
     $('opt-aa').value = String(aa);
