@@ -1,6 +1,26 @@
 /*
  * fluidsynth pc midi backend
  */
+#ifdef C1_NO_MIDI
+/* build without fluidsynth: sequenced music is silent */
+#include "midi.h"
+
+void SwMidiInit() {}
+void SwMidiKill() {}
+int16_t SwSepOpen(uint8_t *sep, int vab_id, int count) { return 0; }
+void SwSepClose(int san) {}
+void SwSepSetVol(int san, int seq_num, uint32_t voll, uint32_t volr) {}
+void SwSepPlay(int san, int seq_num, int mode, int loops) {}
+void SwSepStop(int san, int seq_num) {}
+void SwSepPause(int san, int seq_num) {}
+void SwSepReplay(int san, int seq_num) {}
+void SwSepSetCrescendo(int san, int seq_num, uint32_t vol, int ticks) {}
+void SwSepSetDecrescendo(int san, int seq_num, uint32_t vol, int ticks) {}
+
+void SwMidiProcess(int ch, float amp[2], float freq, int len, int16_t *data) {
+  memset(data, 0, len*2*sizeof(int16_t));
+}
+#else
 #include <fluidsynth.h>
 
 #include "midi.h"
@@ -359,3 +379,4 @@ void SwSepSetDecrescendo(int san, int seq_num, uint32_t vol, int ticks) {
   context->fade_rate = -((double)vol/0x7F)/(double)ticks;
   context->fading = 1;
 }
+#endif /* C1_NO_MIDI */

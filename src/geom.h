@@ -590,14 +590,14 @@ typedef struct { /* texture region information; also clut_y */
 typedef struct {
   union {
     colinfo;
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__EMSCRIPTEN__)
     colinfo colinfo;
 #endif
   };
   uint32_t tpage;
   union {
     rgninfo;
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__EMSCRIPTEN__)
     rgninfo rgninfo;
 #endif
   };
@@ -606,13 +606,13 @@ typedef struct {
 typedef struct {
   union {
     colinfo;
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__EMSCRIPTEN__)
     colinfo colinfo;
 #endif
   };
   union {
     rgninfo;
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__EMSCRIPTEN__)
     rgninfo rgninfo;
 #endif
     rgninfo rgninfos[0];

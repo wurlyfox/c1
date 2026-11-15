@@ -17,6 +17,12 @@ static inline int32_t GetTicks() {
   ticks = ((1000000*(count*34)) / 0x8000) / freq;
   return ticks;
 }
+#elif defined(__EMSCRIPTEN__)
+#include <emscripten.h>
+static inline int32_t GetTicks() {
+  /* same unit as the other platforms: 1 tick = 963765 ns */
+  return (int32_t)(emscripten_get_now() * (1000000.0 / 963765.0));
+}
 #elif __linux__
 #include <time.h>
 static inline int32_t GetTicks() {

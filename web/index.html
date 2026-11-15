@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>c1 web</title>
+<link rel="stylesheet" href="c1web.css">
+</head>
+<body>
+<main id="setup">
+  <h1>c1 <span>web</span></h1>
+  <p class="lead">Unofficial browser build of the c1 engine. No game data is included:
+  you need the level files from your own <em>Crash Bandicoot</em> (NTSC-U, SCUS-94900) disc.</p>
+
+  <section id="assets">
+    <p id="status" role="status">Loading…</p>
+    <div class="actions">
+      <button id="play" class="primary" hidden>Play</button>
+      <label class="button" id="pick-disc">Choose disc image (.bin / .iso)
+        <input type="file" id="disc" accept=".bin,.iso,.img" hidden></label>
+      <label class="button" id="pick-files">Choose .NSF / .NSD files
+        <input type="file" id="files" accept=".nsf,.nsd,.NSF,.NSD" multiple hidden></label>
+      <button id="forget" class="quiet" hidden>Remove stored game files</button>
+    </div>
+    <p class="note">Files are read locally and kept in this browser's storage. Nothing is uploaded.</p>
+  </section>
+
+  <section>
+    <h2>Controls</h2>
+    <table>
+      <tr><th>D-Pad</th><td>Arrow keys</td><th>Start / Select</th><td>Enter / Space</td></tr>
+      <tr><th>✕ / □</th><td>Z / X</td><th>○ / △</th><td>C / S</td></tr>
+      <tr><th>L1 / R1</th><td>A / D</td><th>L2 / R2</th><td>Q / E</td></tr>
+    </table>
+    <p class="note">Gamepads and touch screens are supported too.</p>
+  </section>
+</main>
+
+<div id="game" hidden>
+  <canvas id="canvas" width="1024" height="768" tabindex="-1"></canvas>
+  <button id="fullscreen" title="Fullscreen" aria-label="Fullscreen">⛶</button>
+  <div id="touch" hidden>
+    <div class="pad left">
+      <button data-key="up" class="up">▲</button>
+      <button data-key="left" class="left">◀</button>
+      <button data-key="right" class="right">▶</button>
+      <button data-key="down" class="down">▼</button>
+    </div>
+    <div class="pad mid">
+      <button data-key="select">SELECT</button>
+      <button data-key="start">START</button>
+    </div>
+    <div class="pad right">
+      <button data-key="triangle" class="up">△</button>
+      <button data-key="square" class="left">□</button>
+      <button data-key="circle" class="right">○</button>
+      <button data-key="cross" class="down">✕</button>
+    </div>
+  </div>
+</div>
+
+<pre id="log" hidden></pre>
+
+<script src="c1web.js"></script>
+<script async src="c1.js"></script>
+</body>
+</html>

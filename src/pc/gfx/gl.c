@@ -1,7 +1,13 @@
 /*
  * opengl pc gfx backend
  */
-#ifdef _WIN32
+#ifdef __EMSCRIPTEN__
+/* web build: WebGL has no fixed-function pipeline, so the primitives are
+   batched into a vertex array and drawn with a single GLSL ES 1.00 program */
+#define C1_GLES2
+#include <emscripten.h>
+#include <GLES2/gl2.h>
+#elif defined(_WIN32)
 #include <windows.h>
 #include <SDL_opengl.h>
 #else
@@ -59,6 +65,136 @@ void GLUpdateTexture(int texid, rect2 rect, uint8_t *buf) {
   glBindTexture(GL_TEXTURE_2D, 0);
 }
 
+#ifdef C1_GLES2
+typedef struct {
+  float x, y;
+  float r, g, b, a;
+  float u, v;
+} gl_vertex;
+
+#define GL_BATCH_MAX 3072 /* vertices per draw call */
+
+static const char *vs_src =
+  "attribute vec2 a_pos;\n"
+  "attribute vec4 a_color;\n"
+  "attribute vec2 a_uv;\n"
+  "uniform vec2 u_scale;\n"
+  "uniform vec2 u_offset;\n"
+  "varying vec4 v_color;\n"
+  "varying vec2 v_uv;\n"
+  "void main() {\n"
+  "  v_color = a_color;\n"
+  "  v_uv = a_uv;\n"
+  "  gl_Position = vec4((a_pos - u_offset) * u_scale, 0.0, 1.0);\n"
+  "}\n";
+
+/* u_texscale: 0 = untextured, otherwise the texture is modulated by the
+   vertex color and its rgb is scaled by this factor (GL_RGB_SCALE equivalent) */
+static const char *fs_src =
+  "precision mediump float;\n"
+  "uniform sampler2D u_tex;\n"
+  "uniform float u_texscale;\n"
+  "varying vec4 v_color;\n"
+  "varying vec2 v_uv;\n"
+  "void main() {\n"
+  "  vec4 c = v_color;\n"
+  "  if (u_texscale > 0.0) {\n"
+  "    vec4 t = texture2D(u_tex, v_uv);\n"
+  "    c = vec4(min(t.rgb * c.rgb * u_texscale, 1.0), t.a * c.a);\n"
+  "  }\n"
+  "  gl_FragColor = c;\n"
+  "}\n";
+
+static GLuint gl_prog = 0, gl_vbo = 0;
+static GLint gl_u_scale, gl_u_offset, gl_u_tex, gl_u_texscale;
+static gl_vertex gl_batch[GL_BATCH_MAX];
+static int gl_batch_count = 0;
+
+static GLuint GLCompileShader(GLenum type, const char *src) {
+  GLuint shader;
+  GLint ok;
+  char log[512];
+
+  shader = glCreateShader(type);
+  glShaderSource(shader, 1, &src, 0);
+  glCompileShader(shader);
+  glGetShaderiv(shader, GL_COMPILE_STATUS, &ok);
+  if (!ok) {
+    glGetShaderInfoLog(shader, sizeof(log), 0, log);
+    printf("Error compiling shader: %s\n", log);
+  }
+  return shader;
+}
+
+static void GLInitProgram() {
+  GLuint vs, fs;
+  GLint ok;
+  char log[512];
+
+  vs = GLCompileShader(GL_VERTEX_SHADER, vs_src);
+  fs = GLCompileShader(GL_FRAGMENT_SHADER, fs_src);
+  gl_prog = glCreateProgram();
+  glAttachShader(gl_prog, vs);
+  glAttachShader(gl_prog, fs);
+  glBindAttribLocation(gl_prog, 0, "a_pos");
+  glBindAttribLocation(gl_prog, 1, "a_color");
+  glBindAttribLocation(gl_prog, 2, "a_uv");
+  glLinkProgram(gl_prog);
+  glGetProgramiv(gl_prog, GL_LINK_STATUS, &ok);
+  if (!ok) {
+    glGetProgramInfoLog(gl_prog, sizeof(log), 0, log);
+    printf("Error linking program: %s\n", log);
+  }
+  glUseProgram(gl_prog);
+  gl_u_scale = glGetUniformLocation(gl_prog, "u_scale");
+  gl_u_offset = glGetUniformLocation(gl_prog, "u_offset");
+  gl_u_tex = glGetUniformLocation(gl_prog, "u_tex");
+  gl_u_texscale = glGetUniformLocation(gl_prog, "u_texscale");
+  glUniform1i(gl_u_tex, 0);
+  glUniform1f(gl_u_texscale, 0.0f);
+  glGenBuffers(1, &gl_vbo);
+  glBindBuffer(GL_ARRAY_BUFFER, gl_vbo);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(gl_batch), 0, GL_DYNAMIC_DRAW);
+  glEnableVertexAttribArray(0);
+  glEnableVertexAttribArray(1);
+  glEnableVertexAttribArray(2);
+  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(gl_vertex), (void*)offsetof(gl_vertex, x));
+  glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(gl_vertex), (void*)offsetof(gl_vertex, r));
+  glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(gl_vertex), (void*)offsetof(gl_vertex, u));
+}
+
+static void GLBatchFlush(GLenum mode) {
+  if (gl_batch_count == 0) { return; }
+  glBufferSubData(GL_ARRAY_BUFFER, 0, gl_batch_count*sizeof(gl_vertex), gl_batch);
+  glDrawArrays(mode, 0, gl_batch_count);
+  gl_batch_count = 0;
+}
+
+static inline void GLBatchVertex(float x, float y,
+  float r, float g, float b, float a, float u, float v) {
+  gl_vertex *vert;
+
+  vert = &gl_batch[gl_batch_count++];
+  vert->x = x; vert->y = y;
+  vert->r = r; vert->g = g; vert->b = b; vert->a = a;
+  vert->u = u; vert->v = v;
+}
+
+/* draw a quad with vertices in fan order; uvs are those used by GLDrawImage */
+static void GLDrawQuad(quad *q, int r, int g, int b, int a) {
+  static const int idxs[6] = { 0, 1, 2, 0, 2, 3 };
+  int i, idx;
+
+  for (i=0;i<6;i++) {
+    idx = idxs[i];
+    GLBatchVertex(q->p[idx].x, -q->p[idx].y,
+      r/255.0f, g/255.0f, b/255.0f, a/255.0f,
+      (idx%3)?1.0f:0.0f, (idx/2)?1.0f:0.0f);
+  }
+  GLBatchFlush(GL_TRIANGLES);
+}
+#endif /* C1_GLES2 */
+
 gl_context context = { 0 };
 gl_callbacks callbacks = { 0 };
 rect2 screen = { .x = -256, .y = -120, .w = 512, .h = 240 };
@@ -93,6 +229,9 @@ int GLInit(gl_callbacks *_callbacks) {
   callbacks = *_callbacks;
 #ifdef CFLAGS_GUI
   GLInitGui();
+#endif
+#ifdef C1_GLES2
+  GLInitProgram();
 #endif
   TexturesInit(GLCreateTexture, GLDeleteTexture, GLUpdateTexture);
   textures_inited=1;
@@ -148,12 +287,16 @@ void GLDrawRect(int x, int y, int w, int h, int r, int g, int b) {
     q.p[i].x += screen.x;
     q.p[i].y += screen.y;
   }
+#ifdef C1_GLES2
+  GLDrawQuad(&q, r, g, b, 255);
+#else
   glColor4ub(r, g, b, 255);
   glBegin(GL_QUADS);
   for (i=0;i<4;i++)
     glVertex3i(q.p[i].x, -q.p[i].y, -1);
   glEnd();
   glColor4ub(255, 255, 255, 255);
+#endif
 }
 
 void GLDrawOverlay(int brightness) {
@@ -171,6 +314,11 @@ void GLDrawOverlay(int brightness) {
     q.p[3].x = -256; q.p[2].y =  120;
     q.p[2].x =  256; q.p[3].y =  120;
     glEnable(GL_BLEND);
+#ifdef C1_GLES2
+    (void)i;
+    GLDrawQuad(&q, 0, 0, 0, brightness);
+    glDisable(GL_BLEND);
+#else
     glColor4ub(0, 0, 0, brightness);
     glBegin(GL_QUADS);
     for (i=0;i<4;i++)
@@ -178,6 +326,7 @@ void GLDrawOverlay(int brightness) {
     glEnd();
     glDisable(GL_BLEND);
     glColor4ub(255, 255, 255, 255);
+#endif
   }
 }
 
@@ -207,6 +356,11 @@ void GLDrawImage(dim2 *dim, uint8_t *buf, pnt2 *loc) {
   }
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, image_texid);
+#ifdef C1_GLES2
+  glUniform1f(gl_u_texscale, 1.0f);
+  GLDrawQuad(&q, 255, 255, 255, 255);
+  glUniform1f(gl_u_texscale, 0.0f);
+#else
   glEnable(GL_TEXTURE_2D);
   glBegin(GL_QUADS);
   glColor4ub(255, 255, 255, 255);
@@ -216,9 +370,75 @@ void GLDrawImage(dim2 *dim, uint8_t *buf, pnt2 *loc) {
   }
   glEnd();
   glDisable(GL_TEXTURE_2D);
+#endif
   glBindTexture(GL_TEXTURE_2D, 0);
 }
 
+#ifdef C1_GLES2
+void GLDrawPrims(void *data, int count) {
+  static const int line_idxs[6] = { 0, 1, 1, 2, 2, 0 };
+  poly3i *poly;
+  GLenum mode, poly_mode;
+  int i, ii, idx, texid, flags, vert_count;
+
+  texid = -1;
+  flags = 3;
+  mode = GL_TRIANGLES;
+  poly = (poly3i*)data;
+  glActiveTexture(GL_TEXTURE0);
+  glUniform1f(gl_u_texscale, 0.0f);
+  glEnable(GL_BLEND);
+  for (i=0;i<count;i++,poly++) {
+    poly_mode = poly->type == 3 ? GL_LINES : GL_TRIANGLES; /* type 3 = wireframe */
+    vert_count = poly->type == 3 ? 6 : 3;
+    if (poly->flags != flags || poly->texid != texid || poly_mode != mode
+     || gl_batch_count + vert_count > GL_BATCH_MAX)
+      GLBatchFlush(mode);
+    mode = poly_mode;
+    if (poly->flags != flags) {
+      if (poly->flags == 2) { glBlendEquation(GL_FUNC_REVERSE_SUBTRACT); }
+      else if (flags == 2)  { glBlendEquation(GL_FUNC_ADD); }
+      switch (poly->flags) {
+      case 0:
+      case 3:
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        break;
+      case 1:
+        glBlendFunc(GL_ONE, GL_ONE);
+        break;
+      case 2:
+        glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_COLOR);
+        break;
+      }
+      flags = poly->flags;
+    }
+    if (poly->texid != texid) {
+      if (poly->texid == -1) { glUniform1f(gl_u_texscale, 0.0f); }
+      else {
+        if (texid == -1) { glUniform1f(gl_u_texscale, 2.0f); }
+        glBindTexture(GL_TEXTURE_2D, poly->texid);
+      }
+      texid = poly->texid;
+    }
+    for (ii=0;ii<vert_count;ii++) {
+      idx = poly->type == 3 ? line_idxs[ii] : ii;
+      /* colors are full-range 32 bit values (as passed to glColor3ui) */
+      GLBatchVertex(poly->verts[idx].x, poly->verts[idx].y,
+        poly->colors[idx].r / 4294967295.0f,
+        poly->colors[idx].g / 4294967295.0f,
+        poly->colors[idx].b / 4294967295.0f,
+        1.0f,
+        poly->uvs[idx].x, poly->uvs[idx].y);
+    }
+  }
+  GLBatchFlush(mode);
+  glDisable(GL_BLEND);
+  glUniform1f(gl_u_texscale, 0.0f);
+  glBindTexture(GL_TEXTURE_2D, 0);
+  glBlendEquation(GL_FUNC_ADD);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+}
+#else
 void GLDrawPrims(void *data, int count) {
   poly3i *poly;
   int i, ii, texid, flags;
@@ -278,6 +498,7 @@ void GLDrawPrims(void *data, int count) {
   glBlendEquation(GL_FUNC_ADD);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
+#endif /* C1_GLES2 */
 
 void **GLGetPrimsTail() {
   return &context.prims_tail;
@@ -414,6 +635,12 @@ void GLClear() {
   rgb8 fill;
   int fh;
 
+#ifdef C1_GLES2
+  glClear(GL_COLOR_BUFFER_BIT);
+  /* equivalent of the glFrustum call below for vertices at z=-1 */
+  glUniform2f(gl_u_scale, 2.0f/screen.w, 2.0f/screen.h);
+  glUniform2f(gl_u_offset, screen.x+(screen.w/2.0f), screen.y+(screen.h/2.0f));
+#else
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glLoadIdentity();
   // glViewport(0, 0, screen.w, screen.h);
@@ -423,6 +650,7 @@ void GLClear() {
             1.0, 100000.0);
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity();
+#endif
   if (!(cur_display_flags & 0x80000)) {
     /* fill bg color(s) */
     header = (zone_header*)cur_zone->items[0];
@@ -463,6 +691,9 @@ void GLUpdate() {
   else
     ticks_cur_frame = 17; /* default to 17 */
   while (ticks_elapsed - context.draw_stamp < 34) {
+#ifdef __EMSCRIPTEN__
+    emscripten_sleep(1); /* a busy wait would freeze the browser tab */
+#endif
     ticks_elapsed = GetTicksElapsed();
   }
   if (pbak_state == 2)

@@ -132,7 +132,11 @@ void SwAudioInit() {
   spec.freq = 44100;
   spec.callback = (SDL_AudioCallback)AudioCallback;
   spec.format = AUDIO_S16;
+#ifdef __EMSCRIPTEN__
+  spec.samples = 512; /* web audio needs a larger power-of-two buffer */
+#else
   spec.samples = 64;
+#endif
   spec.channels = 2;
   if (SDL_OpenAudio(&spec, 0) < 0) {
     printf("Error initializing audio: %s\n", SDL_GetError());

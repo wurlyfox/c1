@@ -5,6 +5,7 @@ c1
 *.exe
 *.pdb
 build/
+build-web/
 
 # user files
 streams/*

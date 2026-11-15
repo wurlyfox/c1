@@ -78,6 +78,17 @@ The build system provides the following configuration toggles via CMake:
 | `BUILD_DEPS` | `OFF` | When `OFF`, searches locally or automatically downloads/installs pre-compiled libraries (APT multiarch on Linux, pre-compiled packages on Windows). When `ON`, fetches and compiles SDL2 and FluidSynth from source via FetchContent. |
 | `BUILD_SHARED_LIBS` | `OFF` | When building dependencies from source (`BUILD_DEPS=ON`), controls whether dependencies are built as shared DLLs/SOs or static libraries. |
 
+### Web (browser) ###
+
+An Emscripten build that runs in the browser lives in `web/`:
+
+```bash
+web/build.sh
+python3 -m http.server -d build-web/dist
+```
+
+See [doc/web.md](doc/web.md) for requirements, options and current status.
+
 ## Running ##
 
 To run C1, ensure the asset files are present, then execute the binary from the root project directory:

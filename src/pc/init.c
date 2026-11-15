@@ -1,4 +1,7 @@
 #include <SDL2/SDL.h>
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
 #ifdef CFLAGS_GUI
 #define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
 #define CIMGUI_USE_SDL2
@@ -31,6 +34,15 @@ void SDLInit() {
   SDL_SetMainReady();
 #endif
   SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
+#ifdef __EMSCRIPTEN__
+  /* WebGL context: GLES2 profile and an opaque canvas (otherwise the
+     blended primitives would let the page show through) */
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+  SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 0);
+  SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);
+#endif
   window = SDL_CreateWindow("c1",
     SDL_WINDOWPOS_UNDEFINED,
     SDL_WINDOWPOS_UNDEFINED,
@@ -90,6 +102,15 @@ void SDLUpdate() {
   ImGui_ImplSDL2_NewFrame();
 #endif
 }
+
+#ifdef __EMSCRIPTEN__
+/* lets the page (touch controls, gamepad polling) press and release keys;
+   idx is an index into keys[] as computed in SDLUpdate */
+EMSCRIPTEN_KEEPALIVE void WebSetKey(int idx, int down) {
+  if (idx >= 0 && idx < 512)
+    keys[idx] = down ? 1 : 0;
+}
+#endif
 
 void SDLSwap() {
   SDL_GL_SwapWindow(window);
