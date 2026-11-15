@@ -2814,13 +2814,15 @@ void GoolOpMisc(gool_object *obj, uint32_t instruction) {
       int i, ii;
       if (!cur_zone) { break; }
       header = (zone_header*)cur_zone->items[0];
+      /* GoolZoneObjectsTerminate walks all the object handles itself (see
+         GoolZoneNeighborObjectsTerminate). It used to be passed here as the
+         per-object callback of another walk, with the wrong signature
+         (one argument, no result): undefined behavior that goes unnoticed
+         on x86 and traps in WebAssembly. */
+      (void)ii;
       for (i=0;i<(int)header->neighbor_count;i++) {
         neighbor = NSLookup(&header->neighbors[i]);
-        for (ii=0;ii<8;ii++)
-          GoolObjectHandleTraverseTreePostorder(
-            (gool_object*)&handles[ii],
-            (gool_ifnptr_t)(void*)GoolZoneObjectsTerminate,
-            (int)neighbor);
+        GoolZoneObjectsTerminate(neighbor);
       }
       break;
     }
