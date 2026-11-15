@@ -170,6 +170,7 @@ input[type=range] { width: 120px; accent-color: var(--accent); }
 .keybind { min-width: 72px; padding: 5px 10px; font-size: 0.875rem; font-weight: 600; text-align: center; }
 .keybind.waiting { border-color: var(--accent); color: var(--accent); }
 .keybind.unset { color: var(--muted); font-weight: 400; }
+label.row { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
 label.chk { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 
 /* ---------- debug panel ---------- */

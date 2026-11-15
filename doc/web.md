@@ -85,6 +85,10 @@ screens) and shows:
   pause, slow frames, WebGL context loss). "Copy" puts state and log on the
   clipboard.
 
+The Debug section of the start page can also boot straight into any stored
+level instead of the title sequence ("Start at", or `?level=<hex id>` in the
+address), and save a stored level file to disk.
+
 The log is recorded from the moment Play is pressed, whether or not the panel
 is open. When the game stops, a full error report opens by itself.
 

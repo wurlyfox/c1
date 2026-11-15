@@ -91,14 +91,23 @@ extern gl_context context;
 void CoreLoop(lid_t lid);
 
 //----- (80011D88) --------------------------------------------------------
+#ifdef __EMSCRIPTEN__
+/* web build: the page may pass the level to boot (hex id) as an argument */
+int main(int argc, char **argv) {
+  lid_t boot_lid = LID_BOOTLEVEL;
+  if (argc > 1)
+    boot_lid = (lid_t)strtoul(argv[1], 0, 16);
+#else
 int main() {
+  lid_t boot_lid = LID_BOOTLEVEL;
+#endif
 #ifdef PSX
   use_cd = 1;
 #else
   use_cd = 0;
 #endif
   init();
-  CoreLoop(LID_BOOTLEVEL);
+  CoreLoop(boot_lid);
   _kill();
   return 0;
 }

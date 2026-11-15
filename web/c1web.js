@@ -242,9 +242,38 @@
     return Module.FS.readdir(STREAMS).filter(function (n) { return ASSET_NAME.test(n); });
   }
 
+  /* Level to boot: the title sequence unless another one is chosen in the
+     Debug section or with ?level=<hex id> in the address. */
+  var bootLevel = '';
+  try { bootLevel = (new URLSearchParams(location.search).get('level') || '').toLowerCase().replace(/^0x/, ''); } catch (_) { /* none */ }
+
+  function levelFiles(hexId) {
+    var base = 's' + ('0000000' + hexId).slice(-7);
+    return [base + '.nsd', base + '.nsf'];
+  }
+
+  /* hex ids of the levels that have both of their files stored */
+  function storedLevels(names) {
+    return names.filter(function (n) { return n.slice(-1) === 'd' && names.indexOf(n.slice(0, -1) + 'f') >= 0; })
+      .map(function (n) { return n.slice(1, 8).replace(/^0+(?=.)/, ''); }).sort();
+  }
+
   function refresh(message) {
     var names = storedAssets();
-    var hasTitle = names.indexOf(TITLE_LEVEL + '.nsf') >= 0 && names.indexOf(TITLE_LEVEL + '.nsd') >= 0;
+    var levelsStored = storedLevels(names);
+    var titleId = TITLE_LEVEL.slice(1).replace(/^0+/, '');
+    if (levelsStored.indexOf(bootLevel) < 0) { bootLevel = levelsStored.indexOf(titleId) >= 0 || !levelsStored.length ? '' : levelsStored[0]; }
+    var bootPick = $('boot-level');
+    bootPick.innerHTML = '';
+    levelsStored.forEach(function (id) {
+      var opt = document.createElement('option');
+      opt.value = id === titleId ? '' : id;
+      opt.textContent = id === titleId ? 'Title screen (normal start)' : 'Level 0x' + id.toUpperCase();
+      bootPick.appendChild(opt);
+    });
+    bootPick.value = bootLevel;
+    $('boot-row').hidden = levelsStored.length < 2 && !bootLevel;
+    var hasTitle = bootLevel ? true : levelsStored.indexOf(titleId) >= 0;
     var levels = names.filter(function (n) { return n.slice(-1) === 'f'; }).length;
     $('play').hidden = !hasTitle;
     $('forget').hidden = names.length === 0;
@@ -260,7 +289,7 @@
     if (message) {
       setStatus(message, true);
     } else if (hasTitle) {
-      setStatus('Game files ready (' + levels + ' level files stored).');
+      setStatus('Game files ready (' + levels + ' level files stored)' + (bootLevel ? ', starting at level 0x' + bootLevel.toUpperCase() + '.' : '.'));
     } else if (names.length) {
       setStatus('The title level (' + TITLE_LEVEL.toUpperCase() + '.NSF/.NSD) is missing. Add the rest of the files.', true);
     } else {
@@ -404,6 +433,7 @@
     if (this.files.length) { runImport(importFiles(this.files)); }
     this.value = '';
   });
+  $('boot-level').addEventListener('change', function () { bootLevel = this.value; refresh(); });
   $('export-save').addEventListener('click', function () {
     var name = $('export-file').value;
     if (!name) { return; }
@@ -895,7 +925,8 @@
       document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(function () {});
     }
     try {
-      Module.callMain([]);
+      if (bootLevel) { note('booting level 0x' + bootLevel); }
+      Module.callMain(bootLevel ? [bootLevel] : []);
       note('engine started (main is running)');
     } catch (e) {
       reportError((e && e.name ? e.name + ': ' : '') + (e && e.message || String(e)), 'thrown while starting', e && e.stack);
