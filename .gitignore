@@ -10,6 +10,7 @@ build-web/
 # user files
 streams/*
 imgui.ini
+c1card.dat
 !README.MD
 
 # visual studio user settings

@@ -96,6 +96,23 @@ committed.
   `-fno-strict-aliasing -fwrapv -fno-delete-null-pointer-checks
   -ftrivial-auto-var-init=zero`.
 
+## Saved games
+
+The PC port had no memory card: `CardControl` was a stub, so the Load Game and
+save screens could not work. `src/pc/card.c` now provides a virtual card that
+is always inserted and formatted. It reproduces the states, flags and part
+information that the game's own save screens (the `CardC` GOOL code) expect
+from `src/psx/card.c`, and keeps up to 15 saves, each holding the same block
+of globals the original writes, in one small file.
+
+On the web that file is `/save/card.dat`, stored in IndexedDB. The start page
+shows how many saves there are and can download a backup, restore one or
+delete them. The desktop build writes `c1card.dat` in the working directory.
+
+Slot names and icons are not shown: the helpers that draw them are
+PlayStation-only in this port. Slots still show whether they are used and
+their progress.
+
 ## Debug panel
 
 Tick "Show the debug panel" on the start page, press F2 while playing, or use

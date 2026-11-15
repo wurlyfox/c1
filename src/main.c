@@ -22,6 +22,7 @@
 #include "pc/time.h"
 #include "pc/gfx/gl.h"
 #include "pc/gfx/soft.h" // for ext only
+#include "pc/card.h"
 #endif
 
 /* .data */
@@ -294,6 +295,9 @@ void CoreLoop(lid_t lid) {
 #endif
     if (ns.ldat->lid == LID_TITLE)
       TitleUpdate(ot);
+#ifndef PSX
+    CardUpdate(); /* virtual memory card */
+#endif
 #ifdef PSX
     GpuUpdate();
 #else

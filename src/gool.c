@@ -14,7 +14,7 @@
 #include "psx/card.h"
 #else
 #include "pc/gfx/soft.h"
-int CardControl(int op, int part_idx) { return 1; }
+#include "pc/card.h"
 #endif
 
 /* forward declarations for unexported funcs */

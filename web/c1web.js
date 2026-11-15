@@ -4,6 +4,7 @@
 (function () {
   var $ = function (id) { return document.getElementById(id); };
   var STREAMS = '/streams';
+  var SAVES = '/save';
   var TITLE_LEVEL = 's0000019'; /* level 0x19: title sequence, the boot level */
   var ASSET_NAME = /^s[0-9a-f]{7}\.ns[fd]$/;
 
@@ -209,11 +210,20 @@
       try { throw new Error('abort'); } catch (e) { stack = e.stack; }
       reportError('abort: ' + (what || '(no message: the C/C++ code called abort())'), '', stack);
     },
+    /* called by the engine after it wrote the memory card file */
+    c1SaveChanged: function () {
+      note('saved games written');
+      Module.FS.syncfs(false, function (err) {
+        if (err) { debugLine('error', 'could not store the saved games: ' + err); }
+      });
+    },
     onRuntimeInitialized: function () {
       var FS = Module.FS;
       FS.mkdir(STREAMS);
+      FS.mkdir(SAVES); /* saved games: the engine's virtual memory card */
       try {
         FS.mount(Module.IDBFS, {}, STREAMS);
+        FS.mount(Module.IDBFS, {}, SAVES);
       } catch (e) {
         console.warn('persistent storage unavailable', e);
       }
@@ -258,7 +268,63 @@
       .map(function (n) { return n.slice(1, 8).replace(/^0+(?=.)/, ''); }).sort();
   }
 
+  /* ---- saved games (the engine's virtual memory card, src/pc/card.c) ---- */
+
+  var CARD_FILE = SAVES + '/card.dat';
+  var CARD_SIZE = 8 + 15 * 132;
+  var CARD_MAGIC = 0x31433143;
+
+  /* number of saves in a card file, or -1 if it is not one */
+  function cardSaveCount(data) {
+    if (!data || data.length !== CARD_SIZE) { return -1; }
+    var dv = new DataView(data.buffer, data.byteOffset, data.length);
+    var count = dv.getUint32(4, true);
+    return dv.getUint32(0, true) === CARD_MAGIC && count <= 15 ? count : -1;
+  }
+
+  function readCard() {
+    try { return Module.FS.readFile(CARD_FILE); } catch (_) { return null; }
+  }
+
+  function refreshSaves(message) {
+    var count = cardSaveCount(readCard());
+    $('saves-status').textContent = message ||
+      (count > 0 ? count + (count === 1 ? ' saved game' : ' saved games') + ' on the memory card.' : 'No saved games yet.');
+    $('saves-export').hidden = $('saves-delete').hidden = !(count > 0);
+  }
+
+  $('saves-export').addEventListener('click', function () {
+    var data = readCard();
+    if (!data) { return; }
+    var url = URL.createObjectURL(new Blob([data], { type: 'application/octet-stream' }));
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'c1-saves.dat';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+  });
+  $('saves-import').addEventListener('change', function () {
+    var picked = this.files[0];
+    this.value = '';
+    if (!picked) { return; }
+    picked.arrayBuffer().then(function (buf) {
+      var data = new Uint8Array(buf);
+      if (cardSaveCount(data) < 0) { refreshSaves('That file is not a c1 saved games backup.'); return; }
+      if (cardSaveCount(readCard()) > 0 && !confirm('Replace the saved games in this browser with the backup?')) { return; }
+      Module.FS.writeFile(CARD_FILE, data);
+      persist().then(function () { refreshSaves(); });
+    });
+  });
+  $('saves-delete').addEventListener('click', function () {
+    if (!confirm('Delete all saved games? This cannot be undone.')) { return; }
+    try { Module.FS.unlink(CARD_FILE); } catch (_) { /* nothing to delete */ }
+    persist().then(function () { refreshSaves(); });
+  });
+
   function refresh(message) {
+    refreshSaves();
     var names = storedAssets();
     var levelsStored = storedLevels(names);
     var titleId = TITLE_LEVEL.slice(1).replace(/^0+/, '');

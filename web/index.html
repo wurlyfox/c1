@@ -37,6 +37,19 @@
   </section>
 
   <section>
+    <h2>Saved games</h2>
+    <p id="saves-status" class="plain">No saved games yet.</p>
+    <div class="actions">
+      <button id="saves-export" hidden>Download backup</button>
+      <label class="button" id="saves-import-label">Restore backup
+        <input type="file" id="saves-import" accept=".dat,application/octet-stream" hidden></label>
+      <button id="saves-delete" class="quiet" hidden>Delete saved games</button>
+    </div>
+    <p class="note">The game saves to a virtual memory card kept in this browser (15 slots).
+    Use Load Game on the title screen to continue.</p>
+  </section>
+
+  <section>
     <h2>Keyboard</h2>
     <div id="keys"></div>
     <div class="actions">
