@@ -49,18 +49,45 @@ const C1ZipPack = (() => {
     return entries;
   }
 
-  async function entryBytes(file, e) {
-    const lh = await bytes(file, e.localOffset, e.localOffset + 30);
+  // Reads the pack through a 4 MB window: the 30 byte header of every entry
+  // and the whole of the small entries then cost a handful of reads instead
+  // of two each. Every read of a big Blob is slow on iPhone, where it lives
+  // on disk (in IndexedDB).
+  const WINDOW = 4 * 1024 * 1024;
+  function windowReader(file) {
+    let wStart = 0, wData = null;
+    return async (start, end) => {
+      if (!wData || start < wStart || end > wStart + wData.length) {
+        wStart = start;
+        wData = await bytes(file, start, Math.min(file.size, Math.max(end, start + WINDOW)));
+      }
+      return wData.subarray(start - wStart, end - wStart);
+    };
+  }
+
+  // Entries up to this size are taken from the window.
+  const SMALL = 256 * 1024;
+
+  // Always returns its own copy of the bytes, never a slice of the pack:
+  // Safari on iOS stores a slice of a disk-backed Blob (the downloaded pack
+  // is one, joined from the parts kept in IndexedDB) with the right size but
+  // the wrong data.
+  async function entryBytes(file, e, read) {
+    const lh = read ? await read(e.localOffset, e.localOffset + 30) : await bytes(file, e.localOffset, e.localOffset + 30);
     if (u32(lh, 0) !== 0x04034b50) throw new PackError('The ZIP is damaged.');
     const start = e.localOffset + 30 + u16(lh, 26) + u16(lh, 28);
-    const raw = file.slice(start, start + e.compSize);
     let data;
     if (e.method === 0) {
-      data = new Uint8Array(await raw.arrayBuffer());
+      data = (read && e.compSize <= SMALL)
+        ? (await read(start, start + e.compSize)).slice()
+        : new Uint8Array(await file.slice(start, start + e.compSize).arrayBuffer());
     } else if (e.method === 8) {
       if (typeof DecompressionStream === 'undefined') {
         throw new PackError('This browser cannot open compressed packs. Update it, or make the pack again with --store.');
       }
+      const raw = (read && e.compSize <= SMALL)
+        ? new Blob([(await read(start, start + e.compSize)).slice()])
+        : file.slice(start, start + e.compSize);
       const stream = raw.stream().pipeThrough(new DecompressionStream('deflate-raw'));
       data = new Uint8Array(await new Response(stream).arrayBuffer());
     } else {
@@ -96,13 +123,14 @@ const C1ZipPack = (() => {
     wanted.sort((a, b) => a.entry.localOffset - b.entry.localOffset); // sequential reads
     const total = wanted.reduce((sum, w) => sum + w.entry.size, 0);
     let done = 0;
+    const read = windowReader(file);
     for (const w of wanted) {
       if (onProgress) onProgress({ done, total, current: w.name });
-      store(w.name, await entryBytes(file, w.entry));
+      store(w.name, await entryBytes(file, w.entry, read));
       done += w.entry.size;
     }
     if (onProgress) onProgress({ done: total, total, current: '' });
-    return { files: wanted.length, bytes: total, serial: manifest ? manifest.serial : null };
+    return { files: wanted.length, bytes: total, serial: manifest ? manifest.serial : null, names: wanted.map((w) => w.name) };
   }
 
   return { importPack, PackError };

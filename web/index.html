@@ -7,15 +7,17 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="c1 web">
-<title>c1 web</title>
+<meta name="apple-mobile-web-app-title" content="Crash web port">
+<title>Crash Bandicoot web port by Bardock</title>
 <link rel="stylesheet" href="c1web.css?v=__C1_BUILD__">
 </head>
 <body>
 <main id="setup">
   <header class="hero">
-    <h1>c1 <span>web</span></h1>
-    <p class="lead">Crash Bandicoot in your browser. An unofficial fan port: bring your own copy of the game.</p>
+    <img id="hero-art" src="img/hero.jpg?v=__C1_BUILD__" alt="Crash Bandicoot, rendered by the game" width="1200" height="480">
+    <h1>Crash Bandicoot <span>web port</span></h1>
+    <p class="byline">by Bardock</p>
+    <p class="lead">The classic in your browser. An unofficial fan port: bring your own copy of the game.</p>
   </header>
 
   <!-- Shown when the game is installed in this browser -->
@@ -27,20 +29,31 @@
   <p id="status" role="status">Loading…</p>
   <div id="progress" hidden><div id="progress-bar"></div></div>
 
+  <!-- Shown when installing the game failed -->
+  <section id="install-error" class="card error" hidden>
+    <h2>The game could not be installed</h2>
+    <p id="install-error-text"></p>
+    <div class="actions">
+      <button id="install-retry" class="primary">Retry</button>
+      <button id="install-reset">Delete everything and download again</button>
+      <button id="install-dismiss" class="quiet">Close</button>
+    </div>
+  </section>
+
+  <section class="card source" id="card-net" hidden>
+    <span class="step" id="step-net">1</span>
+    <div class="body">
+      <h2 id="net-title">Download the game</h2>
+      <p>The quickest way: the game is downloaded in small parts and kept in this browser.
+      If the connection drops, it carries on where it stopped. <span id="net-size"></span></p>
+      <button id="net-play" class="primary">Download and play</button>
+    </div>
+  </section>
+
   <p class="center"><button id="sources-toggle" class="quiet" hidden>Load the game again or from another source</button></p>
 
   <!-- Ways to install the game -->
   <div id="sources">
-    <section class="card source" id="card-net" hidden>
-      <span class="step">1</span>
-      <div class="body">
-        <h2>Download the game</h2>
-        <p>The quickest way: the game is downloaded in small parts and kept in this browser.
-        If the connection drops, it carries on where it stopped. <span id="net-size"></span></p>
-        <button id="net-play" class="primary">Download and play</button>
-      </div>
-    </section>
-
     <section class="card source">
       <span class="step" id="step-disc">1</span>
       <div class="body">
@@ -99,6 +112,7 @@
       <label class="button" id="pick-files">Add .NSF / .NSD files
         <input type="file" id="files" accept=".nsf,.nsd,.NSF,.NSD" multiple hidden></label>
       <button id="forget" class="quiet" hidden>Remove the game from this browser</button>
+      <button id="opt-reset" class="quiet" hidden>Delete everything and download again</button>
     </div>
     <div class="actions" id="export-row" hidden>
       <select id="export-file" aria-label="Stored game file"></select>
@@ -106,9 +120,26 @@
     </div>
     <p class="note" id="export-note" hidden>Saves one of the stored level files to your computer,
     for example to reproduce a problem in a single level.</p>
-    <p class="note" id="build-info"></p>
   </details>
+
+  <p class="note center" id="build-info"></p>
 </main>
+
+<!-- Game credit, over the bottom right corner of the picture on the title menu -->
+<div id="credit" hidden></div>
+
+<!-- Hidden diagnostics: 5 taps on the build line, or ?diag in the address -->
+<div id="diag" hidden>
+  <div class="report-bar">
+    <strong>Diagnostics</strong>
+    <button id="diag-parts">Verify stored parts</button>
+    <button id="diag-tone">Test sound (Web Audio)</button>
+    <button id="diag-audio">Test sound (&lt;audio&gt;)</button>
+    <button id="diag-copy">Copy</button>
+    <button id="diag-close">Close</button>
+  </div>
+  <pre id="diag-text"></pre>
+</div>
 
 <canvas id="canvas" width="1024" height="768" tabindex="-1" hidden></canvas>
 
@@ -209,6 +240,7 @@
 <script src="version.js?v=__C1_BUILD__"></script>
 <script src="js/dpad-gemuboy.js?v=__C1_BUILD__"></script>
 <script src="js/touch.js?v=__C1_BUILD__"></script>
+<script src="js/sha256.js?v=__C1_BUILD__"></script>
 <script src="js/zippack.js?v=__C1_BUILD__"></script>
 <script src="js/netpack.js?v=__C1_BUILD__"></script>
 <script src="c1web.js?v=__C1_BUILD__"></script>

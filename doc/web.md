@@ -92,6 +92,67 @@ has; once the game is installed the parts are deleted.
 `web/data/` is ignored by git. The parts are the game: do not commit or
 publish them.
 
+### Robust installs
+
+Installing a large game in a browser fails in ways that are easy to make
+permanent. The page guards against them:
+
+- **Parts kept from an interrupted download are read back and hashed again**
+  before they are reused; a part written as the tab closed can be truncated.
+  A part that does not match is downloaded again. Each part is tried three
+  times, with a growing wait, and its size and SHA-256 are checked before it
+  is stored.
+- **SHA-256 works without `crypto.subtle`** (`web/js/sha256.js`). Browsers
+  only offer it on https and localhost, so a phone opening the page by the
+  computer's address on the local network would otherwise be unable to verify
+  anything.
+- **Errors say what happened**: the real error name and text, with the part
+  or phase ("c1-pack.part003: TypeError – Failed to fetch", "IndexedDB (saving
+  the game): QuotaExceededError"). Only running out of space is reworded.
+- **Free space is checked before downloading** (parts plus the unpacked game,
+  about 2.6 times the pack) and the browser is asked to keep the data
+  (`navigator.storage.persist`).
+- **An install manifest** (`/streams/install.json`) is written last and only
+  on success: the number of files really stored, `complete`, an
+  `importVersion`, the source and the pack's SHA-256. A full install removes
+  the previous manifest before its first write, and a failed one deletes what
+  it wrote, so nothing half installed is ever taken for a game.
+- **The stored game is validated when the page starts**: manifest present and
+  complete, at least as many files as it lists, the title level there, and
+  the start of the title `.NSF` and of the first and last `.NSF` checked for
+  the page magic (`34 12` or `35 12`). Otherwise it is deleted and the page
+  says why. Installs older than the manifest are accepted when every file has
+  its partner and every `.NSF` starts correctly.
+- **The error panel has Retry** (an interrupted download carries on from the
+  parts it has) **and "Delete everything and download again"**, which is also
+  in Advanced. The latter empties the game store, deletes the game and
+  download databases even if they are broken, clears every cache, and reloads
+  with a mark that starts the download by itself. Saved games (another
+  database) and options (`localStorage`) are kept.
+- **The download stays on offer with a game installed**, as an update, unless
+  the installed game came from that very pack.
+- **The ZIP is read through a 4 MB window** in file order, so headers and
+  small entries do not cost a read each, and every entry is copied into its
+  own bytes: nothing stored is a slice of the pack. Game files are stored as
+  bytes by Emscripten's IDBFS, not as Blobs, so WebKit's one-file-per-Blob
+  cost and its bug with slices of disk-backed Blobs do not come into play.
+
+There is no service worker, so nothing about caching versions or data parts
+applies here.
+
+### Hidden diagnostics
+
+Five taps on the build line at the bottom of the start page, or `?diag` in
+the address, open a report meant for phones, where there is no console: what
+the browser supports (secure context, SHA-256 method, `DecompressionStream`,
+storage used and whether it is persisted), the pack next to the page and the
+parts kept in the browser (with a button that re-hashes them), the install
+manifest, file counts, unpaired or wrongly starting files, the first 16 bytes
+of key files, saved games, sound (audio support, an offline render with its
+peak amplitude to detect silence, and two buttons that play a beep through
+Web Audio and through `<audio>`), graphics, the last install error and the
+page's recent events. "Copy" puts it on the clipboard.
+
 ## What differs from the desktop build
 
 - **Renderer.** WebGL has no fixed-function pipeline, so `src/pc/gfx/gl.c` has a
@@ -126,8 +187,11 @@ publish them.
   canvas, which smooths polygon edges. The target is capped at 8192 pixels
   a side (or the GPU's limit). Both cost GPU time and memory; the debug
   panel shows the target size as "Render".
+- **Title menu credit.** While the title menu is on screen the page draws a
+  credit line over the bottom right corner of the picture (`CREDIT` in
+  `web/c1web.js`). The engine reports the title state through `WebDebugInfo`.
 - **Title menu link.** The game's title menu gets a fifth entry below
-  OPTIONS that opens a web page in a new tab. Its text and address are
+  OPTIONS ("MORE GAMES") that opens a web page in a new tab. Its text and address are
   `MENU_LINK` at the top of `web/c1web.js`; an empty address removes it.
   `web/menulink.c` enables the hidden fifth entry the menu already has
   ("TEST SAVE SYSTEM"), replaces its text in memory and takes over its

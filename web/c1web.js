@@ -7,7 +7,10 @@
      opens this address in a new tab. `label` is drawn with the game's font:
      up to 16 characters, capital letters, digits and spaces. An empty url
      removes the entry. */
-  var MENU_LINK = { label: 'WEBSITE', url: 'https://github.com/gabom88/crash1' };
+  var MENU_LINK = { label: 'MORE GAMES', url: 'https://x.com/bardock_dev' };
+
+  /* shown at the bottom right of the game's title menu */
+  var CREDIT = 'Crash Bandicoot web port by Bardock';
 
   var STREAMS = '/streams';
   var SAVES = '/save';
@@ -212,6 +215,191 @@
   });
   $('build-info').textContent = 'Build ' + BUILD.id + ' (' + BUILD.commit + ')';
 
+  /* ---- hidden diagnostics ------------------------------------------------
+     Five taps on the build line, or ?diag in the address. Everything a phone
+     cannot show in a console: what the browser supports, what is stored and
+     whether it is intact, and whether sound comes out at all. */
+
+  function hexBytes(bytes) {
+    return Array.prototype.map.call(bytes, function (b) { return ('0' + b.toString(16)).slice(-2); }).join(' ');
+  }
+
+  function fmtMb(n) { return (n / 1048576).toFixed(1) + ' MB'; }
+
+  async function gatherDiagnostics(verifyParts) {
+    var out = [];
+    var line = function (t) { out.push(t); };
+    line('=== c1 web diagnostics ===');
+    line('Build: ' + BUILD.id + ' (' + BUILD.commit + ') ' + BUILD.flags);
+    line('Page: ' + location.origin + location.pathname);
+    line('Browser: ' + navigator.userAgent);
+    line('');
+    line('--- Browser support ---');
+    line('Secure context: ' + (window.isSecureContext ? 'yes' : 'NO (plain http from another machine)'));
+    line('SHA-256: ' + (C1Sha256.native ? 'crypto.subtle' : 'JavaScript fallback (no crypto.subtle here)'));
+    line('DecompressionStream (compressed packs): ' + (typeof DecompressionStream !== 'undefined' ? 'yes' : 'NO'));
+    line('IndexedDB: ' + (window.indexedDB ? 'yes' : 'NO'));
+    line('Service worker caches: ' + (window.caches ? 'available (none used by this page)' : 'not available'));
+    if (navigator.storage && navigator.storage.estimate) {
+      try {
+        var est = await navigator.storage.estimate();
+        line('Storage: ' + fmtMb(est.usage || 0) + ' used of ' + fmtMb(est.quota || 0));
+      } catch (e) { line('Storage: estimate failed (' + e.name + ')'); }
+      try { line('Storage persisted: ' + (await navigator.storage.persisted() ? 'yes' : 'no (the browser may evict it)')); } catch (_) { /* n/a */ }
+    } else {
+      line('Storage: estimate not available here');
+    }
+    line('');
+    line('--- Download (data/pack.json) ---');
+    if (netPack) {
+      line('Pack: ' + netPack.file + ', ' + fmtMb(netPack.size) + ', ' + netPack.parts.length + ' parts, sha ' + netPack.sha256.slice(0, 16) + '…');
+    } else {
+      line('No pack next to the page (the download option is off).');
+    }
+    var kept = await C1NetPack.stored(verifyParts);
+    if (kept.error) { line('Parts kept: ' + kept.error); }
+    else if (!kept.parts.length) { line('Parts kept in this browser: none'); }
+    else {
+      line('Parts kept in this browser: ' + kept.parts.length);
+      kept.parts.forEach(function (p) {
+        line('  ' + p.name + '  ' + fmtMb(p.size) + (verifyParts ? (p.ok ? '  checksum ok' : '  CHECKSUM WRONG' + (p.error ? ' (' + p.error + ')' : '')) : ''));
+      });
+      if (!verifyParts) { line('  (press "Verify stored parts" to check their contents)'); }
+    }
+    line('');
+    line('--- Installed game ---');
+    var m = readManifest();
+    line('Manifest: ' + (m ? JSON.stringify(m) : 'none'));
+    var names = storedAssets().sort();
+    var nsf = names.filter(function (n) { return n.slice(-1) === 'f'; });
+    var nsd = names.filter(function (n) { return n.slice(-1) === 'd'; });
+    var total = 0;
+    names.forEach(function (n) { try { total += Module.FS.stat(STREAMS + '/' + n).size; } catch (_) { /* gone */ } });
+    line('Files: ' + nsf.length + ' .NSF, ' + nsd.length + ' .NSD, ' + fmtMb(total));
+    var unpaired = names.filter(function (n) { return names.indexOf(n.slice(0, -1) + (n.slice(-1) === 'f' ? 'd' : 'f')) < 0; });
+    line('Without partner: ' + (unpaired.length ? unpaired.join(' ') : 'none'));
+    var badNsf = nsf.filter(function (n) { return !nsfLooksValid(n); });
+    line('.NSF files with a wrong start: ' + (badNsf.length ? badNsf.join(' ') : 'none'));
+    [TITLE_LEVEL + '.nsf', TITLE_LEVEL + '.nsd', nsf[0], nsf[nsf.length - 1]].filter(function (n, i, all) {
+      return n && all.indexOf(n) === i;
+    }).forEach(function (n) {
+      var b = firstBytes(n, 16);
+      var isNsf = n.slice(-1) === 'f';
+      line('  ' + n + ': ' + (b.length ? hexBytes(b) : 'MISSING') +
+        (isNsf && b.length ? (nsfLooksValid(n) ? '  (page magic ok)' : '  (NOT a page magic)') : ''));
+    });
+    line('Saved games: ' + Math.max(0, cardSaveCount(readCard())));
+    line('');
+    line('--- Sound ---');
+    var AC = window.AudioContext || window.webkitAudioContext;
+    var OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    line('AudioContext: ' + (AC ? 'yes' : 'NO') + '   OfflineAudioContext: ' + (OAC ? 'yes' : 'NO'));
+    var sdl = Module.SDL2 && Module.SDL2.audioContext;
+    line('Game audio: ' + (sdl ? sdl.state + ' at ' + sdl.sampleRate + ' Hz' : 'not started (it starts with the game)'));
+    var probe = document.createElement('audio');
+    line('<audio> can play: wav ' + (probe.canPlayType('audio/wav') || 'no') + ', m4a ' + (probe.canPlayType('audio/mp4') || 'no') + ', ogg ' + (probe.canPlayType('audio/ogg') || 'no'));
+    if (OAC) {
+      /* renders a tone without playing it: a peak of 0 means the audio
+         pipeline itself produces silence */
+      for (var r = 0; r < 2; r++) {
+        var rate = [44100, 22050][r];
+        try {
+          var off = new OAC(1, rate / 10, rate);
+          var osc = off.createOscillator();
+          osc.frequency.value = 440;
+          osc.connect(off.destination);
+          osc.start(0);
+          var t0 = performance.now();
+          var buf = await new Promise(function (resolve, reject) {
+            off.oncomplete = function (e) { resolve(e.renderedBuffer); };
+            var p = off.startRendering();
+            if (p && p.then) { p.then(resolve, reject); }
+          });
+          var data = buf.getChannelData(0), peak = 0;
+          for (var i = 0; i < data.length; i++) { var a = Math.abs(data[i]); if (a > peak) { peak = a; } }
+          line('Offline render at ' + rate + ' Hz: peak ' + peak.toFixed(3) + (peak === 0 ? '  (SILENT!)' : '') + ', ' + Math.round(performance.now() - t0) + ' ms');
+        } catch (e) { line('Offline render at ' + rate + ' Hz: failed (' + (e.name || e) + ')'); }
+      }
+    }
+    line('');
+    line('--- Graphics ---');
+    line('WebGL: ' + safe(glInfo));
+    line('Screen: ' + window.innerWidth + 'x' + window.innerHeight + ' @' + window.devicePixelRatio);
+    line('');
+    line('--- Last install error ---');
+    line(lastInstallError || '(none)');
+    line('');
+    line('--- Page events ---');
+    line(events.length ? events.join('\n') : '(none)');
+    line('');
+    line('--- Engine output ---');
+    line(output.length ? output.join('\n') : '(none)');
+    return out.join('\n');
+  }
+
+  function openDiagnostics(verifyParts) {
+    $('diag').hidden = false;
+    $('diag-text').textContent = 'Collecting…';
+    gatherDiagnostics(verifyParts).then(function (text) { $('diag-text').textContent = text; },
+      function (e) { $('diag-text').textContent = 'Diagnostics failed: ' + (e && e.stack || e); });
+  }
+
+  /* a short beep, to tell "no sound at all" from "the game is silent" */
+  function testToneWebAudio() {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) { return; }
+    var ctx = new AC();
+    var osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.frequency.value = 660;
+    gain.gain.value = 0.2;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.4);
+    osc.onended = function () { ctx.close(); };
+    $('diag-text').textContent += '\n[' + new Date().toLocaleTimeString() + '] Web Audio beep requested, context ' + ctx.state + ' at ' + ctx.sampleRate + ' Hz';
+  }
+  function testToneElement() {
+    var rate = 22050, n = rate * 0.4, wav = new Uint8Array(44 + n * 2), dv = new DataView(wav.buffer);
+    var put = function (o, t) { for (var i = 0; i < t.length; i++) { wav[o + i] = t.charCodeAt(i); } };
+    put(0, 'RIFF'); dv.setUint32(4, 36 + n * 2, true); put(8, 'WAVEfmt '); dv.setUint32(16, 16, true);
+    dv.setUint16(20, 1, true); dv.setUint16(22, 1, true); dv.setUint32(24, rate, true); dv.setUint32(28, rate * 2, true);
+    dv.setUint16(32, 2, true); dv.setUint16(34, 16, true); put(36, 'data'); dv.setUint32(40, n * 2, true);
+    for (var i = 0; i < n; i++) { dv.setInt16(44 + i * 2, Math.sin(i * 2 * Math.PI * 660 / rate) * 6000, true); }
+    var url = URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }));
+    var el = new Audio(url);
+    var say = function (t) { $('diag-text').textContent += '\n[' + new Date().toLocaleTimeString() + '] <audio> beep: ' + t; };
+    el.onended = function () { say('played to the end'); URL.revokeObjectURL(url); };
+    el.onerror = function () { say('ERROR ' + (el.error && el.error.code)); };
+    var p = el.play();
+    if (p && p.catch) { p.catch(function (e) { say('refused (' + e.name + ')'); }); }
+  }
+
+  var buildTaps = [];
+  $('build-info').addEventListener('click', function () {
+    var now = Date.now();
+    buildTaps = buildTaps.filter(function (t) { return now - t < 3000; });
+    buildTaps.push(now);
+    if (buildTaps.length >= 5) { buildTaps = []; openDiagnostics(false); }
+  });
+  $('diag-close').addEventListener('click', function () { $('diag').hidden = true; });
+  $('diag-parts').addEventListener('click', function () { openDiagnostics(true); });
+  $('diag-tone').addEventListener('click', testToneWebAudio);
+  $('diag-audio').addEventListener('click', testToneElement);
+  $('diag-copy').addEventListener('click', function () {
+    var btn = this, text = $('diag-text').textContent;
+    var done = function () { btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy'; }, 1500); };
+    if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(text).then(done, function () {}); }
+    else {
+      var range = document.createRange();
+      range.selectNodeContents($('diag-text'));
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      try { document.execCommand('copy'); done(); } catch (_) { /* selected: copy by hand */ }
+    }
+  });
+
   /* ---- emscripten module ------------------------------------------- */
 
   window.Module = {
@@ -259,7 +447,16 @@
       }
       FS.syncfs(true, function (err) {
         if (err) { console.warn('could not load stored files', err); }
-        refresh();
+        var problem = validateInstall();
+        refresh(problem);
+        checkNetPack().then(function (pack) {
+          refresh(problem);
+          /* set by "Delete everything and download again" before reloading */
+          var auto = false;
+          try { auto = sessionStorage.getItem(AUTO_DOWNLOAD) === '1'; sessionStorage.removeItem(AUTO_DOWNLOAD); } catch (_) { /* private mode */ }
+          if (auto && pack) { runInstall('net', true, importNet); }
+          if (/[?&]diag\b/.test(location.search)) { openDiagnostics(false); }
+        });
       });
     }
   };
@@ -383,6 +580,18 @@
     if (!hasTitle) { sourcesOpen = false; }
     $('sources-toggle').hidden = !hasTitle || sourcesOpen;
     $('sources').hidden = hasTitle && !sourcesOpen;
+    /* The download stays on offer with a game installed, as an update, unless
+       that very pack is what is installed. */
+    var manifest = readManifest();
+    var samePack = !!(netPack && manifest && manifest.packSha === netPack.sha256);
+    $('card-net').hidden = !netPack || (hasTitle && samePack);
+    var isUpdate = hasTitle && !!(manifest && manifest.packSha);
+    $('net-title').textContent = isUpdate ? 'Update the game' : 'Download the game';
+    $('net-play').textContent = isUpdate ? 'Download the update' : 'Download and play';
+    $('step-net').hidden = hasTitle;
+    $('step-disc').textContent = netPack ? '2' : '1';
+    $('step-zip').textContent = netPack ? '3' : '2';
+    $('opt-reset').hidden = !netPack;
     $('forget').hidden = names.length === 0;
     $('export-row').hidden = $('export-note').hidden = names.length === 0;
     var pick = $('export-file');
@@ -414,9 +623,207 @@
     });
   }
 
-  function store(name, data) {
-    Module.FS.writeFile(STREAMS + '/' + name, data);
+  /* like persist, but a failure (no space left, broken database) is an error */
+  function persistStrict(what) {
+    return new Promise(function (resolve, reject) {
+      Module.FS.syncfs(false, function (err) {
+        if (!err) { resolve(); return; }
+        var e = err.target && err.target.error ? err.target.error : err;
+        var name = (e && e.name) || 'Error';
+        var msg = (e && e.message) || String(e);
+        var full = name === 'QuotaExceededError' || /quota|no space/i.test(msg);
+        var out = new Error((full ? 'There is not enough free storage in this browser. ' : '') +
+          'IndexedDB (' + what + '): ' + name + (msg && msg !== name ? ' – ' + msg : ''));
+        out.kind = full ? 'storage' : 'other';
+        reject(out);
+      });
+    });
   }
+
+  /* ---- installation: manifest, validation, cleaning -------------------- */
+
+  /* Written last, and only when an install went through. A game without it
+     was interrupted half way. */
+  var MANIFEST = STREAMS + '/install.json';
+  var IMPORT_VERSION = 1; /* raise when the way files are stored changes */
+  var install = null;     /* the install in progress: { source, full, names } */
+
+  function readManifest() {
+    try { return JSON.parse(Module.FS.readFile(MANIFEST, { encoding: 'utf8' })); } catch (_) { return null; }
+  }
+  function removeManifest() {
+    try { Module.FS.unlink(MANIFEST); } catch (_) { /* none */ }
+  }
+  function wipeAssets() {
+    storedAssets().forEach(function (n) { try { Module.FS.unlink(STREAMS + '/' + n); } catch (_) { /* gone */ } });
+    removeManifest();
+  }
+
+  function firstBytes(name, count) {
+    var buf = new Uint8Array(count);
+    try {
+      var st = Module.FS.open(STREAMS + '/' + name, 'r');
+      var got = Module.FS.read(st, buf, 0, count, 0);
+      Module.FS.close(st);
+      return buf.subarray(0, got);
+    } catch (_) { return new Uint8Array(0); }
+  }
+  /* an .NSF starts with a page: magic 0x1234 (plain) or 0x1235 (compressed) */
+  function nsfLooksValid(name) {
+    var b = firstBytes(name, 2);
+    return b.length === 2 && b[1] === 0x12 && (b[0] === 0x34 || b[0] === 0x35);
+  }
+
+  function store(name, data) {
+    /* a full install replaces the previous one: its manifest goes first, so
+       that a game left half written is recognised as such */
+    if (install && install.full && !install.started) { install.started = true; removeManifest(); }
+    Module.FS.writeFile(STREAMS + '/' + name, data);
+    if (install) { install.names[name] = true; }
+  }
+
+  function writeManifest(source, extra) {
+    var names = storedAssets();
+    var m = {
+      format: 'c1-web-install',
+      complete: true,
+      importVersion: IMPORT_VERSION,
+      source: source,
+      /* the files really stored, not the entries the source claimed to have */
+      files: install && install.full ? Object.keys(install.names).length : names.length,
+      packSha: (extra && extra.packSha) || null,
+      installed: new Date().toISOString()
+    };
+    Module.FS.writeFile(MANIFEST, JSON.stringify(m));
+    return m;
+  }
+
+  /* Checks the stored game when the page starts. Returns '' when it is fine
+     (or absent), otherwise the reason, after deleting what was there. */
+  function validateInstall() {
+    var names = storedAssets();
+    var m = readManifest();
+    if (!names.length) { if (m) { removeManifest(); } return ''; }
+    var titleId = TITLE_LEVEL.slice(1).replace(/^0+/, '');
+    var levels = storedLevels(names);
+    var nsfs = names.filter(function (n) { return n.slice(-1) === 'f'; }).sort();
+    var problem = '';
+    if (!m) {
+      /* Installs made before the manifest existed: accepted when they look
+         whole (every file has its partner and every .NSF starts as one). */
+      if (levels.length && names.length === levels.length * 2 && nsfs.every(nsfLooksValid)) {
+        install = null;
+        var legacy = writeManifest('legacy');
+        note('older install accepted: ' + legacy.files + ' files');
+        persist();
+        return '';
+      }
+      problem = 'it was not completed';
+    } else if (!m.complete) {
+      problem = 'it was not completed';
+    } else if (names.length < m.files) {
+      problem = names.length + ' of ' + m.files + ' files are there';
+    } else if (m.source !== 'files' && levels.indexOf(titleId) < 0) {
+      problem = 'the title screen is missing';
+    } else {
+      var probe = [TITLE_LEVEL + '.nsf', nsfs[0], nsfs[nsfs.length - 1]].filter(function (n, i, all) {
+        return n && names.indexOf(n) >= 0 && all.indexOf(n) === i;
+      });
+      var bad = probe.filter(function (n) { return !nsfLooksValid(n); });
+      if (bad.length) { problem = bad[0].toUpperCase() + ' is damaged'; }
+    }
+    if (!problem) { return ''; }
+    note('stored game removed: ' + problem);
+    wipeAssets();
+    persist();
+    return 'The game stored in this browser was incomplete or damaged (' + problem + '). Install it again.';
+  }
+
+  /* Runs one way of installing the game. `full` installs replace the game;
+     the loose files option only adds to it. */
+  function runInstall(source, full, work) {
+    setBusy(true);
+    hideInstallError();
+    install = { source: source, full: full, names: {}, started: false };
+    lastInstall = { source: source, work: work, full: full };
+    return Promise.resolve().then(work).then(function (extra) {
+      writeManifest(source, extra);
+      return persistStrict('saving the game');
+    }).then(function () {
+      install = null;
+      note('installed from ' + source);
+      refresh();
+    }, function (err) {
+      console.error(err);
+      /* nothing usable is left of a full install that had started writing */
+      var wrote = install && install.full && install.started;
+      install = null;
+      if (wrote) { wipeAssets(); }
+      note('install from ' + source + ' failed: ' + (err && err.message || err));
+      return persist().then(function () { refresh(); showInstallError(err, source); });
+    });
+  }
+
+  /* ---- install error panel --------------------------------------------- */
+
+  var lastInstall = null;
+  var lastInstallError = '';
+
+  function hideInstallError() { $('install-error').hidden = true; }
+
+  function showInstallError(err, source) {
+    var kind = (err && err.kind) || 'other';
+    lastInstallError = (err && err.message) || String(err);
+    $('install-error-text').textContent = lastInstallError;
+    /* An interrupted download carries on from the parts it has: retry first.
+       Anything else is safer started clean, when there is a download. */
+    var canRetry = !!lastInstall && source === 'net';
+    $('install-retry').hidden = !canRetry;
+    $('install-reset').hidden = !netPack;
+    $('install-retry').classList.toggle('primary', kind === 'network' || !netPack);
+    $('install-reset').classList.toggle('primary', kind !== 'network' && !!netPack);
+    $('install-error').hidden = false;
+    setStatus('');
+  }
+
+  $('install-dismiss').addEventListener('click', hideInstallError);
+  $('install-retry').addEventListener('click', function () {
+    if (lastInstall) { runInstall(lastInstall.source, lastInstall.full, lastInstall.work); }
+  });
+
+  function deleteDatabase(name) {
+    return new Promise(function (resolve) {
+      var r;
+      try { r = indexedDB.deleteDatabase(name); } catch (_) { resolve(); return; }
+      /* a broken or still open database must not hold this up */
+      r.onsuccess = r.onerror = r.onblocked = function () { resolve(); };
+      setTimeout(resolve, 3000);
+    });
+  }
+
+  /* Removes the game, the downloaded parts and every cache, keeps the saved
+     games and the options, then reloads and starts the download by itself. */
+  var AUTO_DOWNLOAD = 'c1web.autoDownload';
+  function resetAndDownload() {
+    setBusy(true);
+    setStatus('Deleting the stored game…');
+    try { wipeAssets(); } catch (_) { /* the file system may be the broken part */ }
+    persist().then(function () {
+      return Promise.all([deleteDatabase(STREAMS), deleteDatabase(C1NetPack.DB_NAME)]);
+    }).then(function () {
+      if (!window.caches || !caches.keys) { return null; }
+      return caches.keys().then(function (keys) {
+        return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+      }).catch(function () {});
+    }).then(function () {
+      try { sessionStorage.setItem(AUTO_DOWNLOAD, '1'); } catch (_) { /* private mode */ }
+      location.reload();
+    });
+  }
+  $('install-reset').addEventListener('click', resetAndDownload);
+  $('opt-reset').addEventListener('click', function () {
+    if (confirm('Delete the game stored in this browser and download it again? Saved games are kept.')) { resetAndDownload(); }
+  });
 
   /* ---- import: loose files ----------------------------------------- */
 
@@ -430,7 +837,6 @@
       count++;
     }
     if (!count) { throw new Error('None of the selected files look like S00000xx.NSF / .NSD game files.'); }
-    await persist();
   }
 
   /* ---- import: disc image (ISO 9660, raw 2352 or cooked 2048) ------- */
@@ -522,7 +928,7 @@
       setProgress((i + 1) / found.length);
       store(found[i].name, await disc.readExtent(found[i].lba, found[i].size));
     }
-    await persist();
+    setStatus('Storing the game…');
   }
 
   /* ---- import: download in parts (tools/pack/split_pack.py) ------------- */
@@ -531,19 +937,18 @@
 
   /* The option only exists when the build was given a split pack (data/). */
   function checkNetPack() {
-    C1NetPack.info().then(function (pack) {
+    return C1NetPack.info().then(function (pack) {
       netPack = pack;
-      $('card-net').hidden = !pack;
-      $('step-disc').textContent = pack ? '2' : '1';
-      $('step-zip').textContent = pack ? '3' : '2';
       if (pack) { $('net-size').textContent = '(' + Math.round(pack.size / 1048576) + ' MB)'; }
+      return pack;
     });
   }
 
   async function importNet() {
     setStatus('Starting the download…');
     setProgress(0);
-    await C1NetPack.downloadAndImport(netPack, store, function (p) {
+    var pack = netPack;
+    await C1NetPack.downloadAndImport(pack, store, function (p) {
       var fraction = p.done / Math.max(p.total, 1);
       if (p.phase === 'download') {
         setStatus('Downloading the game… part ' + p.part + ' of ' + p.parts);
@@ -554,13 +959,12 @@
       }
     });
     setStatus('Storing the game…');
-    await persist();
+    return { packSha: pack.sha256 };
   }
 
   $('net-play').addEventListener('click', function () {
-    if (netPack) { runImport(importNet()); }
+    if (netPack) { runInstall('net', true, importNet); }
   });
-  checkNetPack();
 
   /* ---- import: game ZIP (tools/pack/make_c1_pack.py) ------------------- */
 
@@ -574,28 +978,22 @@
       console.warn('pack made from ' + result.serial + '; c1 expects SCUS-94900');
     }
     setStatus('Storing the game…');
-    await persist();
-  }
-
-  function runImport(promise) {
-    setBusy(true);
-    promise.then(function () { refresh(); }, function (err) {
-      console.error(err);
-      refresh(err.message || String(err));
-    });
   }
 
   $('disc').addEventListener('change', function () {
-    if (this.files.length) { runImport(importDisc(this.files[0])); }
+    var picked = this.files[0];
+    if (picked) { runInstall('disc', true, function () { return importDisc(picked); }); }
     this.value = '';
   });
   $('zip').addEventListener('change', function () {
-    if (this.files.length) { runImport(importZip(this.files[0])); }
+    var picked = this.files[0];
+    if (picked) { runInstall('zip', true, function () { return importZip(picked); }); }
     this.value = '';
   });
   $('files').addEventListener('change', function () {
     /* copy the list: clearing the input below empties the live FileList */
-    if (this.files.length) { runImport(importFiles(Array.prototype.slice.call(this.files))); }
+    var list = Array.prototype.slice.call(this.files);
+    if (list.length) { runInstall('files', false, function () { return importFiles(list); }); }
     this.value = '';
   });
   $('boot-level').addEventListener('change', function () { bootLevel = this.value; refresh(); });
@@ -613,9 +1011,11 @@
   });
   $('forget').addEventListener('click', function () {
     if (!confirm('Remove the game from this browser? Saved games are kept.')) { return; }
-    storedAssets().forEach(function (n) { Module.FS.unlink(STREAMS + '/' + n); });
+    wipeAssets();
     C1NetPack.reset();
-    runImport(persist());
+    hideInstallError();
+    setBusy(true);
+    persist().then(function () { refresh(); });
   });
 
   /* ---- input: keyboard, gamepads and the touch overlay ---------------- */
@@ -878,7 +1278,7 @@
     var d;
     try {
       var ptr = Module._WebDebugInfo();
-      d = Module.HEAP32.subarray(ptr >> 2, (ptr >> 2) + 16);
+      d = Module.HEAP32.subarray(ptr >> 2, (ptr >> 2) + 24);
     } catch (e) { return; }
     var now = performance.now();
     var fps = last.at ? (d[0] - last.frames) * 1000 / (now - last.at) : 0;
@@ -899,6 +1299,7 @@
     var canvas = c.width + 'x' + c.height;
     if (canvas !== last.canvas) { debugLine('page', 'canvas ' + canvas + ' @' + window.devicePixelRatio); last.canvas = canvas; }
 
+    updateCredit(d[16] === 5);
     if ($('debug').hidden) { return; }
     $('debug-stats').textContent = [
       'FPS ' + fps.toFixed(1) + '   work ' + work.toFixed(1) + ' ms (max ' + workMax.toFixed(1) + ')',
@@ -912,6 +1313,20 @@
       'Audio ' + audio,
       'Build ' + BUILD.id + ' ' + BUILD.commit
     ].join('\n');
+  }
+
+  /* The credit sits over the bottom right corner of the picture while the
+     game's title menu is on screen. */
+  function updateCredit(onMenu) {
+    var el = $('credit');
+    if (!onMenu || !CREDIT) { el.hidden = true; return; }
+    var r = $('canvas').getBoundingClientRect();
+    /* the picture ends 12 of its 240 rows above the bottom of the canvas */
+    el.textContent = CREDIT;
+    el.style.fontSize = Math.max(9, Math.round(r.height * 0.026)) + 'px';
+    el.style.right = Math.round(window.innerWidth - r.right + r.width * 0.02) + 'px';
+    el.style.bottom = Math.round(window.innerHeight - r.bottom + r.height * 0.075) + 'px';
+    el.hidden = false;
   }
 
   function applyDebug() {

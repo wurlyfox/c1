@@ -20,7 +20,7 @@ EM_ASYNC_JS(void, WebWaitFrame, (), {
 });
 
 /* Values shown by the page's debug panel (see WebDebugInfo below). */
-static int32_t web_debug[16];
+static int32_t web_debug[24];
 static double web_resume_time = 0;
 #elif defined(_WIN32)
 #include <windows.h>
@@ -1037,6 +1037,7 @@ void GLUpdate() {
 #ifdef __EMSCRIPTEN__
 extern lid_t cur_lid;
 extern gool_object *crash;
+extern int WebTitleState();
 
 /* Snapshot of engine state for the page's debug panel: 16 int32 values.
    [0] frames presented  [1] triangles in the last frame
@@ -1044,7 +1045,8 @@ extern gool_object *crash;
    [3] level id  [4] draw count  [5] paused  [6] ticks per frame
    [7] lives  [8] wumpa fruit  [9] boxes
    [10] 1 if the player object exists, then [11..13] its position
-   [14] [15] size of the offscreen render target */
+   [14] [15] size of the offscreen render target
+   [16] state of the title sequence (5 = main menu), or -1 outside it */
 EMSCRIPTEN_KEEPALIVE int32_t *WebDebugInfo() {
   web_debug[3] = (int32_t)cur_lid;
   web_debug[4] = draw_count;
@@ -1053,6 +1055,7 @@ EMSCRIPTEN_KEEPALIVE int32_t *WebDebugInfo() {
   web_debug[7] = life_count >> 8;
   web_debug[8] = fruit_count >> 8;
   web_debug[9] = box_count >> 8;
+  web_debug[16] = WebTitleState();
   web_debug[10] = crash != 0;
   if (crash) {
     web_debug[11] = crash->trans.x;

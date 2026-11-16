@@ -124,6 +124,8 @@ cp "$ROOT/web/c1web.js" "$ROOT/web/c1web.css" "$DIST/"
 sed "s/__C1_BUILD__/$BUILD_ID/g" "$ROOT/web/index.html" > "$DIST/index.html"
 mkdir -p "$DIST/js"
 cp "$ROOT/web/js/"*.js "$DIST/js/"
+mkdir -p "$DIST/img"
+cp "$ROOT/web/img/"* "$DIST/img/" 2>/dev/null || true
 
 # Game data split with tools/pack/split_pack.py, for the "Download the game"
 # option. Local use only: web/data is not in the repository.

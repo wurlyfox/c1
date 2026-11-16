@@ -17,7 +17,21 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
   font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
 main { max-width: 600px; margin: 0 auto; padding: 40px 16px 56px; }
 .hero { text-align: center; margin-bottom: 28px; }
-h1 { font-size: 3rem; margin: 0 0 6px; letter-spacing: -0.03em; line-height: 1; }
+#hero-art { display: block; width: 100%; height: auto; aspect-ratio: 5 / 2; object-fit: cover;
+  border-radius: 16px; border: 1px solid var(--line); margin-bottom: 20px; background: #000; }
+.byline { margin: 0 0 10px; color: var(--accent); font-weight: 700; letter-spacing: 0.02em; }
+.card.error { border-color: #b3382c; }
+.card.error p { margin: 0 0 14px; color: #ffd7d2; word-break: break-word; }
+#credit { position: fixed; z-index: 12; pointer-events: none; white-space: nowrap;
+  font: 800 13px/1 system-ui, -apple-system, "Segoe UI", sans-serif; letter-spacing: 0.04em;
+  text-transform: uppercase; color: #ffb347;
+  text-shadow: -1px -1px 0 #3a1200, 1px -1px 0 #3a1200, -1px 1px 0 #3a1200, 1px 1px 0 #3a1200, 0 2px 3px rgba(0,0,0,.7); }
+#diag { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; background: rgba(12, 10, 9, .98); }
+#diag .report-bar { flex-wrap: wrap; border-bottom: 1px solid var(--line); }
+#diag .report-bar strong { color: var(--accent); }
+#diag-text { flex: 1; margin: 0; padding: 12px; overflow: auto; font-size: 0.75rem; line-height: 1.45;
+  white-space: pre-wrap; word-break: break-word; -webkit-user-select: text; user-select: text; }
+h1 { font-size: 2.25rem; margin: 0 0 4px; letter-spacing: -0.03em; line-height: 1.05; text-wrap: balance; }
 h1 span { color: var(--accent); }
 h2 { font-size: 1.0625rem; margin: 0 0 4px; }
 h3 { font-size: 0.8125rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 20px 0 8px; }

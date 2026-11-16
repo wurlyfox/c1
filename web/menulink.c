@@ -72,6 +72,12 @@ static void ReplaceText(entry *exec) {
   }
 }
 
+/* state of the title sequence (TITLE_STATE_MENU = main menu), -1 outside it */
+int WebTitleState() {
+  if (!ns.ldat || ns.ldat->lid != LID_TITLE || !title) { return -1; }
+  return title->state;
+}
+
 /* called once per frame from the main loop, before the game objects run:
    makes the menu start with its fifth entry and gives it its text */
 void WebMenuLinkUpdate() {

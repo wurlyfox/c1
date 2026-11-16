@@ -13,25 +13,25 @@ const C1NetPack = (() => {
   const DB_NAME = 'c1-download';
   const STORE = 'parts';
 
-  class NetError extends Error {}
+  // kind: 'network' (resumable: retry), 'storage' (no space), 'corrupt'
+  // (bad data: start clean), 'other'. The message always carries the real
+  // error name and text and where it happened; nothing is reported as a
+  // connection problem unless it is one.
+  class NetError extends Error {
+    constructor(message, kind) { super(message); this.kind = kind || 'other'; }
+  }
 
-  const MESSAGES = {
-    storageFull: 'There is not enough free storage in this browser for the game.',
-    interrupted: 'The download was interrupted. Press the button again to carry on where it stopped.',
-    badPart: 'A downloaded part is damaged. Try again.',
-    noCrypto: 'This browser cannot verify the download (the page must be opened from localhost or https).',
-  };
-
-  // Human-readable cause: the real error name/message, never a generic
-  // "network" (storage full, memory, a broken browser database... are not
-  // connection problems).
   function describe(e, where) {
-    if (e instanceof NetError) return e.message;
+    if (e instanceof NetError) return e;
     const name = (e && e.name) || 'Error';
     const msg = (e && e.message) || String(e);
-    if (name === 'QuotaExceededError' || /quota|space/i.test(msg)) return MESSAGES.storageFull;
-    if (name === 'TypeError' || /fetch|network|http \d/i.test(msg)) return MESSAGES.interrupted;
-    return (where ? where + ': ' : '') + name + (msg && msg !== name ? ' – ' + msg : '');
+    const detail = (where ? where + ': ' : '') + name + (msg && msg !== name ? ' – ' + msg : '');
+    if (name === 'QuotaExceededError' || /quota|no space|disk full/i.test(msg)) {
+      return new NetError('There is not enough free storage in this browser (' + detail + ').', 'storage');
+    }
+    if (e && e.isHttp) return new NetError('The download stopped (' + detail + ').', 'network');
+    if (name === 'TypeError' && /fetch|network|load/i.test(msg)) return new NetError('The download stopped (' + detail + ').', 'network');
+    return new NetError(detail, 'other');
   }
 
   async function info() {
@@ -67,15 +67,13 @@ const C1NetPack = (() => {
   }
   const req = (r) => new Promise((resolve, reject) => { r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); });
 
-  async function sha256Hex(buf) {
-    const d = new Uint8Array(await crypto.subtle.digest('SHA-256', buf));
-    return Array.from(d, (b) => b.toString(16).padStart(2, '0')).join('');
-  }
+  // crypto.subtle, or plain JavaScript where the page is not a secure context
+  const sha256Hex = (buf) => C1Sha256.hex(buf);
 
   // Downloads one part with byte progress; returns its ArrayBuffer.
   async function fetchPart(part, onBytes) {
     const res = await fetch(BASE + part.name, { cache: 'no-store' });
-    if (!res.ok) throw new Error('http ' + res.status);
+    if (!res.ok) { const err = new Error('HTTP ' + res.status); err.isHttp = true; throw err; }
     if (!res.body || !res.body.getReader) {
       const buf = await res.arrayBuffer();
       onBytes(buf.byteLength);
@@ -100,16 +98,21 @@ const C1NetPack = (() => {
   // onProgress({ phase: 'download'|'import', done, total, part, parts })
   // store(name, bytes) receives each level file, as in C1ZipPack.importPack.
   async function downloadAndImport(pack, store, onProgress) {
-    if (!crypto || !crypto.subtle) throw new NetError(MESSAGES.noCrypto);
-    // The parts plus the unpacked game need a bit over twice the pack size.
+    // Ask the browser not to evict this site's data, and check the space:
+    // the parts plus the unpacked game need a bit over twice the pack size.
+    if (navigator.storage && navigator.storage.persist) {
+      try { await navigator.storage.persist(); } catch (_) { /* optional */ }
+    }
     if (navigator.storage && navigator.storage.estimate) {
-      try {
-        const est = await navigator.storage.estimate();
-        if (est.quota && est.quota - est.usage < pack.size * 2.6) throw new NetError(MESSAGES.storageFull);
-      } catch (e) { if (e instanceof NetError) throw e; }
+      let est = null;
+      try { est = await navigator.storage.estimate(); } catch (_) { /* unknown */ }
+      if (est && est.quota && est.quota - (est.usage || 0) < pack.size * 2.6) {
+        throw new NetError('There is not enough free storage in this browser: the game needs about ' +
+          Math.round(pack.size * 2.6 / 1048576) + ' MB and ' + Math.round((est.quota - (est.usage || 0)) / 1048576) + ' MB are free.', 'storage');
+      }
     }
     let db;
-    try { db = await openDb(); } catch (e) { throw new NetError(describe(e, 'IndexedDB')); }
+    try { db = await openDb(); } catch (e) { throw describe(e, 'IndexedDB (download)'); }
     try {
       // Parts kept from an earlier, interrupted download (same SHA-256 only).
       const kept = await tx(db, 'readonly', (s) => req(s.getAll()).then((rows) => rows));
@@ -141,11 +144,12 @@ const C1NetPack = (() => {
               done += n;
               onProgress && onProgress({ phase: 'download', done, total, part: i + 1, parts: pack.parts.length });
             });
-            if (b.byteLength !== part.size || await sha256Hex(b) !== part.sha256) throw new NetError(MESSAGES.badPart);
+            if (b.byteLength !== part.size) throw new NetError(part.name + ': size ' + b.byteLength + ', expected ' + part.size, 'network');
+            if (await sha256Hex(b) !== part.sha256) throw new NetError(part.name + ': the data does not match its checksum', 'corrupt');
             buf = b;
           } catch (e) {
             done = before;
-            if (attempt === 3) throw new NetError(describe(e, part.name));
+            if (attempt === 3) throw describe(e, part.name);
             await new Promise((r) => setTimeout(r, 1500 * attempt));
           }
         }
@@ -153,14 +157,14 @@ const C1NetPack = (() => {
         try {
           await tx(db, 'readwrite', (s) => s.put({ name: part.name, sha256: part.sha256, blob }, part.name));
         } catch (e) {
-          throw new NetError(describe(e, 'IndexedDB'));
+          throw describe(e, 'IndexedDB (saving ' + part.name + ')');
         }
         blobs.push(blob);
       }
 
       // Joined pack (disk-backed blobs) -> the ZIP importer.
       const file = new Blob(blobs, { type: 'application/zip' });
-      if (file.size !== pack.size) throw new NetError(MESSAGES.badPart);
+      if (file.size !== pack.size) throw new NetError('joined pack: size ' + file.size + ', expected ' + pack.size, 'corrupt');
       let result;
       try {
         result = await C1ZipPack.importPack(file, store, (p) => {
@@ -178,6 +182,25 @@ const C1NetPack = (() => {
     } finally {
       db.close();
     }
+  }
+
+  // Parts currently kept, for the diagnostics: [{name, size, ok}] where ok
+  // tells whether the stored bytes still match their checksum.
+  async function stored(verify) {
+    let db;
+    try { db = await openDb(); } catch (e) { return { error: describe(e, 'IndexedDB (download)').message }; }
+    try {
+      const rows = await tx(db, 'readonly', (s) => req(s.getAll()).then((r) => r));
+      const out = [];
+      for (const r of rows || []) {
+        const item = { name: r.name, size: r.blob ? r.blob.size : 0 };
+        if (verify) {
+          try { item.ok = (await sha256Hex(await r.blob.arrayBuffer())) === r.sha256; } catch (e) { item.ok = false; item.error = String(e && e.name || e); }
+        }
+        out.push(item);
+      }
+      return { parts: out };
+    } finally { db.close(); }
   }
 
   // Forget any downloaded parts (used when an install is found incomplete).
@@ -198,5 +221,5 @@ const C1NetPack = (() => {
     });
   }
 
-  return { info, downloadAndImport, reset, deleteAll, NetError };
+  return { info, downloadAndImport, reset, deleteAll, stored, NetError, DB_NAME };
 })();
