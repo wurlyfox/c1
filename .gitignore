@@ -15,3 +15,8 @@ c1card.dat
 
 # visual studio user settings
 .vs/*
+
+# game data for the web page's download option (tools/pack/split_pack.py)
+web/data/pack.json
+web/data/*.part*
+*.zip

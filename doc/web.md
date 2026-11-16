@@ -28,15 +28,21 @@ SDL2 comes from the Emscripten ports; FluidSynth is cloned and built into
 
 ## Game files
 
-No game data is included. The page asks for either
+No game data is included. The start page offers up to three ways to load
+the game:
 
-- a disc image of the NTSC-U release (`.bin` with 2352-byte sectors, or a plain
-  `.iso`); the `.NSF`/`.NSD` files are extracted from it in the browser, or
-- the `.NSF`/`.NSD` files themselves, or
-- a **game ZIP** made with the converter described below.
+1. **Download the game**, when the build was given a split pack (see
+   below). The parts are fetched one by one, checked and kept in the browser.
+2. **Use your disc image**: the `.bin` (2352-byte sectors) or `.iso` of the
+   NTSC-U release; the level files are extracted from it in the browser.
+3. **Use a game ZIP** made with the converter described below.
+
+Loose `.NSF`/`.NSD` files can still be added from the Advanced section, which
+also holds the other technical options (debug panel, start level, saving a
+stored level file).
 
 The files are kept in the browser's IndexedDB storage (mounted at `/streams`),
-so they only have to be chosen once. Nothing is uploaded.
+so the game only has to be loaded once. Nothing is uploaded.
 
 ### Game ZIP
 
@@ -62,6 +68,29 @@ level files works too.
 
 The pack contains game data. It is for personal use and must not be shared or
 committed.
+
+### Download in parts
+
+For local use, the page can install the game by itself from parts placed
+next to it, so that a phone on the same network does not need the disc image
+or the ZIP:
+
+```bash
+python3 tools/pack/make_c1_pack.py "Crash Bandicoot (USA).bin"
+python3 tools/pack/split_pack.py c1-pack.zip
+web/build.sh
+```
+
+`split_pack.py` (adapted from ReChan Web) cuts the pack into 19 MB parts and
+writes them with a `pack.json` (sizes and SHA-256 of each part) into
+`web/data/`; the build copies that folder into `dist/data/`. With it present
+the start page shows "Download the game". `web/js/netpack.js` downloads the
+parts, verifies each one, and keeps them in their own IndexedDB database
+(`c1-download`) so an interrupted download resumes with the parts it already
+has; once the game is installed the parts are deleted.
+
+`web/data/` is ignored by git. The parts are the game: do not commit or
+publish them.
 
 ## What differs from the desktop build
 

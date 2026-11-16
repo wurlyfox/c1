@@ -15,25 +15,47 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
   font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
-main { max-width: 640px; margin: 0 auto; padding: 32px 16px 48px; }
-h1 { font-size: 2.5rem; margin: 0 0 8px; letter-spacing: -0.02em; }
+main { max-width: 600px; margin: 0 auto; padding: 40px 16px 56px; }
+.hero { text-align: center; margin-bottom: 28px; }
+h1 { font-size: 3rem; margin: 0 0 6px; letter-spacing: -0.03em; line-height: 1; }
 h1 span { color: var(--accent); }
-h2 { font-size: 1rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 8px; }
-.lead { color: var(--muted); margin: 0 0 24px; }
-section { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
-  padding: 20px; margin-bottom: 16px; }
-#status { margin: 0 0 16px; font-weight: 600; }
+h2 { font-size: 1.0625rem; margin: 0 0 4px; }
+h3 { font-size: 0.8125rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 20px 0 8px; }
+.lead { color: var(--muted); margin: 0 auto; max-width: 34em; text-wrap: balance; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  padding: 18px 20px; margin-bottom: 12px; }
+.card.ready { text-align: center; padding: 28px 20px 22px; border-color: var(--accent); }
+.card.source { display: flex; gap: 16px; align-items: flex-start; }
+.card.source p { color: var(--muted); margin: 0 0 12px; font-size: 0.9375rem; }
+.card.source .body { flex: 1; min-width: 0; }
+.step { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--bg); border: 1px solid var(--line); color: var(--accent); font-weight: 700;
+  font-variant-numeric: tabular-nums; }
+p.center { text-align: center; margin: 0 0 12px; }
+#status { margin: 0 0 12px; font-weight: 600; text-align: center; min-height: 1.5em; }
 #status.error { color: #ff6b5e; }
+#progress { height: 8px; border-radius: 4px; background: var(--panel); border: 1px solid var(--line);
+  overflow: hidden; margin: 0 0 16px; }
+#progress-bar { height: 100%; width: 0; background: var(--accent); transition: width .2s linear; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; }
 button, .button { font: inherit; color: var(--text); background: transparent;
-  border: 1px solid var(--line); border-radius: 8px; padding: 10px 16px; cursor: pointer; }
+  border: 1px solid var(--line); border-radius: 8px; padding: 9px 16px; cursor: pointer; display: inline-block; }
 button:hover, .button:hover { border-color: var(--accent); }
 button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent);
-  font-weight: 700; padding: 10px 32px; }
+  font-weight: 700; }
+button.primary.big { font-size: 1.375rem; padding: 14px 56px; border-radius: 12px; }
 button.quiet { color: var(--muted); border-color: transparent; }
 button:disabled, .button.disabled { opacity: 0.5; pointer-events: none; }
-.note a { color: var(--accent); }
 .note { color: var(--muted); font-size: 0.875rem; margin: 12px 0 0; }
+.note.center { text-align: center; margin: 4px 0 24px; }
+.note a, .card a { color: var(--accent); }
+p.plain { margin: 14px 0 0; color: var(--muted); font-size: 0.9375rem; }
+details.fold > summary { cursor: pointer; font-weight: 600; list-style: none; display: flex;
+  align-items: center; justify-content: space-between; }
+details.fold > summary::-webkit-details-marker { display: none; }
+details.fold > summary::after { content: "+"; color: var(--muted); font-size: 1.25rem; line-height: 1; }
+details.fold[open] > summary::after { content: "−"; }
+details.fold[open] > summary { margin-bottom: 14px; }
 table { border-collapse: collapse; width: 100%; font-size: 0.9375rem; }
 th { text-align: left; color: var(--muted); font-weight: 500; padding: 4px 12px 4px 0; white-space: nowrap; }
 td { padding: 4px 16px 4px 0; }
@@ -184,7 +206,6 @@ input[type=range] { width: 120px; accent-color: var(--accent); }
 .keybind { min-width: 72px; padding: 5px 10px; font-size: 0.875rem; font-weight: 600; text-align: center; }
 .keybind.waiting { border-color: var(--accent); color: var(--accent); }
 .keybind.unset { color: var(--muted); font-weight: 400; }
-p.plain { margin: 0 0 12px; }
 label.row { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
 label.chk { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 

@@ -13,70 +13,101 @@
 </head>
 <body>
 <main id="setup">
-  <h1>c1 <span>web</span></h1>
-  <p class="lead">Unofficial browser build of the c1 engine. No game data is included:
-  you need the level files from your own <em>Crash Bandicoot</em> (NTSC-U, SCUS-94900) disc.</p>
+  <header class="hero">
+    <h1>c1 <span>web</span></h1>
+    <p class="lead">Crash Bandicoot in your browser. An unofficial fan port: bring your own copy of the game.</p>
+  </header>
 
-  <section id="assets">
-    <p id="status" role="status">Loading…</p>
-    <div class="actions">
-      <button id="play" class="primary" hidden>Play</button>
-      <label class="button" id="pick-disc">Choose disc image (.bin / .iso)
-        <input type="file" id="disc" accept=".bin,.iso,.img" hidden></label>
-      <label class="button" id="pick-zip">Choose game ZIP
-        <input type="file" id="zip" accept=".zip,application/zip" hidden></label>
-      <label class="button" id="pick-files">Choose .NSF / .NSD files
-        <input type="file" id="files" accept=".nsf,.nsd,.NSF,.NSD" multiple hidden></label>
-      <button id="forget" class="quiet" hidden>Remove stored game files</button>
-    </div>
-    <p class="note">Files are read locally and kept in this browser's storage. Nothing is uploaded.</p>
-    <p class="note">A <strong>game ZIP</strong> holds only the level files of your disc, so it is about
-    a third of the size of the image and quicker to load, for example on a phone.
-    Make it once on a computer with the <a href="c1-pack-tool.zip" download>converter</a>
-    (needs Python 3): double-click it and it finds your .bin.</p>
+  <!-- Shown when the game is installed in this browser -->
+  <section id="ready" class="card ready" hidden>
+    <button id="play" class="primary big">Play ▶</button>
+    <p id="saves-status" class="plain">No saved games yet.</p>
   </section>
 
-  <section>
-    <h2>Saved games</h2>
-    <p id="saves-status" class="plain">No saved games yet.</p>
+  <p id="status" role="status">Loading…</p>
+  <div id="progress" hidden><div id="progress-bar"></div></div>
+
+  <p class="center"><button id="sources-toggle" class="quiet" hidden>Load the game again or from another source</button></p>
+
+  <!-- Ways to install the game -->
+  <div id="sources">
+    <section class="card source" id="card-net" hidden>
+      <span class="step">1</span>
+      <div class="body">
+        <h2>Download the game</h2>
+        <p>The quickest way: the game is downloaded in small parts and kept in this browser.
+        If the connection drops, it carries on where it stopped. <span id="net-size"></span></p>
+        <button id="net-play" class="primary">Download and play</button>
+      </div>
+    </section>
+
+    <section class="card source">
+      <span class="step" id="step-disc">1</span>
+      <div class="body">
+        <h2>Use your disc image</h2>
+        <p>Choose the <strong>.bin</strong> (or .iso) of your <em>Crash Bandicoot</em> disc,
+        NTSC-U version (SCUS-94900). Only what the game needs is copied.</p>
+        <label class="button" id="pick-disc">Choose disc image
+          <input type="file" id="disc" accept=".bin,.iso,.img" hidden></label>
+      </div>
+    </section>
+
+    <section class="card source">
+      <span class="step" id="step-zip">2</span>
+      <div class="body">
+        <h2>Use a game ZIP</h2>
+        <p>A smaller file with just the levels, handy for phones. Make it once on a computer
+        with the <a href="c1-pack-tool.zip" download>converter</a>.</p>
+        <label class="button" id="pick-zip">Choose game ZIP
+          <input type="file" id="zip" accept=".zip,application/zip" hidden></label>
+      </div>
+    </section>
+  </div>
+  <p class="note center">Everything stays on this device. Nothing is uploaded.</p>
+
+  <details class="card fold">
+    <summary>Saved games</summary>
     <div class="actions">
       <button id="saves-export" hidden>Download backup</button>
       <label class="button" id="saves-import-label">Restore backup
         <input type="file" id="saves-import" accept=".dat,application/octet-stream" hidden></label>
       <button id="saves-delete" class="quiet" hidden>Delete saved games</button>
     </div>
-    <p class="note">The game saves to a virtual memory card kept in this browser (15 slots).
-    Use Load Game on the title screen to continue.</p>
-  </section>
+    <p class="note">The game saves to a memory card kept in this browser (15 slots).
+    Choose Load Game on the title screen to continue.</p>
+  </details>
 
-  <section>
-    <h2>Keyboard</h2>
+  <details class="card fold">
+    <summary>Controls</summary>
     <div id="keys"></div>
     <div class="actions">
       <button id="keys-reset" class="quiet">Reset keys</button>
     </div>
     <p class="note" id="keys-hint">Click a key to change it, then press the new one (Esc cancels).
     Gamepads work too. On phones and tablets an on-screen controller appears;
-    you can move, resize or hide its buttons from the ☰ menu.</p>
-  </section>
+    you can move, resize or hide its buttons from the ☰ menu while playing.</p>
+  </details>
 
-  <section>
-    <h2>Debug</h2>
-    <label class="chk"><input type="checkbox" id="opt-debug-start"> Show the debug panel next to the game</label>
-    <p class="note">Live engine state and a log of what the game and the page do.
-    Toggle it while playing with F2 or from the ☰ menu.</p>
+  <details class="card fold">
+    <summary>Advanced</summary>
+    <label class="chk"><input type="checkbox" id="opt-debug-start"> Show the debug panel next to the game (F2)</label>
     <label class="row" id="boot-row" hidden>Start at
       <select id="boot-level"></select>
     </label>
+    <h3>Game files</h3>
+    <div class="actions">
+      <label class="button" id="pick-files">Add .NSF / .NSD files
+        <input type="file" id="files" accept=".nsf,.nsd,.NSF,.NSD" multiple hidden></label>
+      <button id="forget" class="quiet" hidden>Remove the game from this browser</button>
+    </div>
     <div class="actions" id="export-row" hidden>
       <select id="export-file" aria-label="Stored game file"></select>
       <button id="export-save">Save this file</button>
     </div>
     <p class="note" id="export-note" hidden>Saves one of the stored level files to your computer,
     for example to reproduce a problem in a single level.</p>
-  </section>
-
-  <p class="note" id="build-info"></p>
+    <p class="note" id="build-info"></p>
+  </details>
 </main>
 
 <canvas id="canvas" width="1024" height="768" tabindex="-1" hidden></canvas>
@@ -179,6 +210,7 @@
 <script src="js/dpad-gemuboy.js?v=__C1_BUILD__"></script>
 <script src="js/touch.js?v=__C1_BUILD__"></script>
 <script src="js/zippack.js?v=__C1_BUILD__"></script>
+<script src="js/netpack.js?v=__C1_BUILD__"></script>
 <script src="c1web.js?v=__C1_BUILD__"></script>
 <script async src="c1.js?v=__C1_BUILD__"></script>
 </body>

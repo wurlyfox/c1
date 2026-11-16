@@ -173,6 +173,12 @@
     openReport('The game stopped unexpectedly', text);
   }
 
+  /* progress bar under the status line: 0..1, or a negative value to hide it */
+  function setProgress(fraction) {
+    $('progress').hidden = fraction < 0;
+    $('progress-bar').style.width = Math.round(Math.max(0, Math.min(1, fraction)) * 100) + '%';
+  }
+
   function showLog(text) {
     note(text);
     openReport('Log', text);
@@ -181,6 +187,8 @@
   function setBusy(busy) {
     ['pick-disc', 'pick-zip', 'pick-files'].forEach(function (id) { $(id).classList.toggle('disabled', busy); });
     $('play').disabled = busy;
+    $('net-play').disabled = busy;
+    if (!busy) { setProgress(-1); }
     $('forget').disabled = busy;
   }
 
@@ -347,6 +355,9 @@
     persist().then(function () { refreshSaves(); });
   });
 
+  var sourcesOpen = false;
+  $('sources-toggle').addEventListener('click', function () { sourcesOpen = true; refresh(); });
+
   function refresh(message) {
     refreshSaves();
     var names = storedAssets();
@@ -367,7 +378,11 @@
     $('boot-row').hidden = levelsStored.length < 2 && !bootLevel;
     var hasTitle = bootLevel ? true : levelsStored.indexOf(titleId) >= 0;
     var levels = names.filter(function (n) { return n.slice(-1) === 'f'; }).length;
-    $('play').hidden = !hasTitle;
+    $('ready').hidden = !hasTitle;
+    /* with the game installed the ways to load it step back behind a button */
+    if (!hasTitle) { sourcesOpen = false; }
+    $('sources-toggle').hidden = !hasTitle || sourcesOpen;
+    $('sources').hidden = hasTitle && !sourcesOpen;
     $('forget').hidden = names.length === 0;
     $('export-row').hidden = $('export-note').hidden = names.length === 0;
     var pick = $('export-file');
@@ -381,11 +396,11 @@
     if (message) {
       setStatus(message, true);
     } else if (hasTitle) {
-      setStatus('Game files ready (' + levels + ' level files stored)' + (bootLevel ? ', starting at level 0x' + bootLevel.toUpperCase() + '.' : '.'));
+      setStatus(bootLevel ? 'The game is ready, starting at level 0x' + bootLevel.toUpperCase() + '.' : 'The game is ready to play.');
     } else if (names.length) {
-      setStatus('The title level (' + TITLE_LEVEL.toUpperCase() + '.NSF/.NSD) is missing. Add the rest of the files.', true);
+      setStatus('Some game files are missing (the title screen). Load the game again from one of the options.', true);
     } else {
-      setStatus('Choose your disc image, a game ZIP or the .NSF/.NSD files to begin.');
+      setStatus('Choose how to load the game.');
     }
     setBusy(false);
   }
@@ -503,25 +518,62 @@
     var found = await disc.list(le32(pvd, 156 + 2), le32(pvd, 156 + 10), 0, []);
     if (!found.length) { throw new Error('No S00000xx.NSF / .NSD files were found on this disc.'); }
     for (var i = 0; i < found.length; i++) {
-      setStatus('Copying game files… ' + (i + 1) + ' / ' + found.length);
+      setStatus('Copying the game from the disc… ' + Math.floor((i + 1) * 100 / found.length) + '%');
+      setProgress((i + 1) / found.length);
       store(found[i].name, await disc.readExtent(found[i].lba, found[i].size));
     }
     await persist();
   }
+
+  /* ---- import: download in parts (tools/pack/split_pack.py) ------------- */
+
+  var netPack = null;
+
+  /* The option only exists when the build was given a split pack (data/). */
+  function checkNetPack() {
+    C1NetPack.info().then(function (pack) {
+      netPack = pack;
+      $('card-net').hidden = !pack;
+      $('step-disc').textContent = pack ? '2' : '1';
+      $('step-zip').textContent = pack ? '3' : '2';
+      if (pack) { $('net-size').textContent = '(' + Math.round(pack.size / 1048576) + ' MB)'; }
+    });
+  }
+
+  async function importNet() {
+    setStatus('Starting the download…');
+    setProgress(0);
+    await C1NetPack.downloadAndImport(netPack, store, function (p) {
+      var fraction = p.done / Math.max(p.total, 1);
+      if (p.phase === 'download') {
+        setStatus('Downloading the game… part ' + p.part + ' of ' + p.parts);
+        setProgress(fraction * 0.8);
+      } else {
+        setStatus('Installing the game… ' + Math.floor(fraction * 100) + '%');
+        setProgress(0.8 + fraction * 0.2);
+      }
+    });
+    setStatus('Storing the game…');
+    await persist();
+  }
+
+  $('net-play').addEventListener('click', function () {
+    if (netPack) { runImport(importNet()); }
+  });
+  checkNetPack();
 
   /* ---- import: game ZIP (tools/pack/make_c1_pack.py) ------------------- */
 
   async function importZip(file) {
     setStatus('Reading game ZIP…');
     var result = await C1ZipPack.importPack(file, store, function (p) {
-      if (p.current) {
-        setStatus('Unpacking game files… ' + Math.floor(p.done * 100 / Math.max(p.total, 1)) + '%  (' + p.current.toUpperCase() + ')');
-      }
+      setStatus('Installing the game… ' + Math.floor(p.done * 100 / Math.max(p.total, 1)) + '%');
+      setProgress(p.done / Math.max(p.total, 1));
     });
     if (result.serial && result.serial !== 'SCUS-94900') {
       console.warn('pack made from ' + result.serial + '; c1 expects SCUS-94900');
     }
-    setStatus('Storing game files…');
+    setStatus('Storing the game…');
     await persist();
   }
 
@@ -560,8 +612,9 @@
     setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
   });
   $('forget').addEventListener('click', function () {
-    if (!confirm('Remove the game files stored in this browser?')) { return; }
+    if (!confirm('Remove the game from this browser? Saved games are kept.')) { return; }
     storedAssets().forEach(function (n) { Module.FS.unlink(STREAMS + '/' + n); });
+    C1NetPack.reset();
     runImport(persist());
   });
 

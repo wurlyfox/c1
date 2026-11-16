@@ -125,6 +125,15 @@ sed "s/__C1_BUILD__/$BUILD_ID/g" "$ROOT/web/index.html" > "$DIST/index.html"
 mkdir -p "$DIST/js"
 cp "$ROOT/web/js/"*.js "$DIST/js/"
 
+# Game data split with tools/pack/split_pack.py, for the "Download the game"
+# option. Local use only: web/data is not in the repository.
+rm -rf "$DIST/data"
+if [ -f "$ROOT/web/data/pack.json" ]; then
+  mkdir -p "$DIST/data"
+  cp "$ROOT/web/data/pack.json" "$ROOT/web/data/"c1-pack.part* "$DIST/data/"
+  echo "game data: $(ls "$DIST/data" | grep -c part) parts copied (download option enabled)"
+fi
+
 # The disc image -> game ZIP converter, as a download for people who use the
 # page without the repository.
 if command -v python3 >/dev/null 2>&1; then
