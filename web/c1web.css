@@ -22,10 +22,6 @@ main { max-width: 600px; margin: 0 auto; padding: 40px 16px 56px; }
 .byline { margin: 0 0 10px; color: var(--accent); font-weight: 700; letter-spacing: 0.02em; }
 .card.error { border-color: #b3382c; }
 .card.error p { margin: 0 0 14px; color: #ffd7d2; word-break: break-word; }
-#credit { position: fixed; z-index: 12; pointer-events: none; white-space: nowrap;
-  font: 800 13px/1 system-ui, -apple-system, "Segoe UI", sans-serif; letter-spacing: 0.04em;
-  text-transform: uppercase; color: #ffb347;
-  text-shadow: -1px -1px 0 #3a1200, 1px -1px 0 #3a1200, -1px 1px 0 #3a1200, 1px 1px 0 #3a1200, 0 2px 3px rgba(0,0,0,.7); }
 .card.install p { color: var(--muted); margin: 0 0 14px; font-size: 0.9375rem; }
 .install-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 4px 24px; }
 .install-cols h3 { margin-top: 8px; }

@@ -9,7 +9,7 @@
      removes the entry. */
   var MENU_LINK = { label: 'MORE GAMES', url: 'https://x.com/bardock_dev' };
 
-  /* shown at the bottom right of the game's title menu */
+  /* drawn inside the picture, at the bottom right of the game's title menu */
   var CREDIT = 'Crash Bandicoot web port by Bardock';
 
   var STREAMS = '/streams';
@@ -688,6 +688,7 @@
 
   function refresh(message) {
     refreshSaves();
+    updateTabIcon();
     var names = storedAssets();
     var levelsStored = storedLevels(names);
     var titleId = TITLE_LEVEL.slice(1).replace(/^0+/, '');
@@ -1311,7 +1312,7 @@
   /* ---- preferences ---------------------------------------------------- */
 
   var PREFS_KEY = 'c1web.prefs.v1';
-  var prefs = { touch: 'auto', debug: false, volume: 100, aspect: 'fill', res: 0, aa: 1 };
+  var prefs = { touch: 'auto', debug: false, volume: 100, aspect: 'fill', res: 0, aa: 1, skipIntro: true };
   try { Object.assign(prefs, JSON.parse(localStorage.getItem(PREFS_KEY) || '{}')); } catch (_) { /* defaults */ }
   function savePrefs() {
     try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch (_) { /* ignore */ }
@@ -1389,6 +1390,139 @@
     }
   }
 
+  /* ---- tab icon from the installed game -------------------------------------
+     The game's memory card icon (Crash's face) is read from the title level
+     stored in this browser, as tools/pack/make_icons.py does for the app
+     icons, so the tab shows it without running anything. */
+
+  var ICON_TPAGE = 0x52C2E06F, ICON_X = 368, ICON_Y = 48, ICON_CLUT = (7 * 16) * 2;
+
+  function decompressPage(b, off) {
+    var dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+    var length = dv.getUint32(off + 4, true), skip = dv.getUint32(off + 8, true);
+    if (dv.getUint16(off, true) !== 0x1235 || !length || length > 0x10000) { return null; }
+    var out = new Uint8Array(0x10000), d = 0, src = off + 12;
+    while (d < length) {
+      var prefix = b[src++];
+      if (prefix & 0x80) {
+        var data = (prefix << 8) | b[src++];
+        var span = data & 7, seek = (data >> 3) & 0xFFF;
+        span = span === 7 ? 0x40 : span + 3;
+        if (!seek || seek > d) { return null; }
+        for (var i = 0; i < span; i++, d++) { out[d] = out[d - seek]; }
+      } else {
+        out.set(b.subarray(src, src + prefix), d);
+        d += prefix; src += prefix;
+      }
+    }
+    src += skip;
+    out.set(b.subarray(src, src + 0x10000 - length), d);
+    return out;
+  }
+
+  /* the 16x16 icon as RGBA, or null */
+  function iconFromPage(page) {
+    var dv = new DataView(page.buffer, page.byteOffset, page.byteLength);
+    if (dv.getUint16(0, true) !== 0x1234 || dv.getUint16(2, true) !== 1 || dv.getUint32(4, true) !== ICON_TPAGE) { return null; }
+    var clut = [], distinct = {};
+    for (var i = 0; i < 16; i++) { clut.push(dv.getUint16(ICON_CLUT + i * 2, true)); distinct[clut[i]] = 1; }
+    if ((clut[0] !== 0 && clut[0] !== 0x8000) || Object.keys(distinct).length < 8) { return null; }
+    var rgba = new Uint8ClampedArray(16 * 16 * 4), lit = 0;
+    for (var y = 0; y < 16; y++) {
+      for (var x = 0; x < 16; x++) {
+        var byte = page[(ICON_Y + y) * 512 + ICON_X + (x >> 1)];
+        var c = clut[x & 1 ? (byte >> 4) & 15 : byte & 15], o = (y * 16 + x) * 4;
+        rgba[o] = (c & 31) * 255 / 31; rgba[o + 1] = ((c >> 5) & 31) * 255 / 31;
+        rgba[o + 2] = ((c >> 10) & 31) * 255 / 31; rgba[o + 3] = c === 0 ? 0 : 255;
+        if (c & 0x7FFF) { lit++; }
+      }
+    }
+    return lit >= 60 ? rgba : null;
+  }
+
+  function gameIcon() {
+    var nsf;
+    try { nsf = Module.FS.readFile(STREAMS + '/' + TITLE_LEVEL + '.nsf'); } catch (_) { return null; }
+    for (var off = 0; (off = indexOfMagic(nsf, off)) >= 0; off++) {
+      var page = null;
+      try { page = decompressPage(nsf, off); } catch (_) { page = null; }
+      var icon = page && iconFromPage(page);
+      if (icon) { return icon; }
+    }
+    return null;
+  }
+  function indexOfMagic(b, from) {
+    for (var i = from; i + 4 <= b.length; i++) {
+      if (b[i] === 0x35 && b[i + 1] === 0x12 && b[i + 2] === 0 && b[i + 3] === 0) { return i; }
+    }
+    return -1;
+  }
+
+  var tabIconSet = false;
+  function updateTabIcon() {
+    if (tabIconSet) { return; }
+    var icon = null;
+    try { icon = gameIcon(); } catch (_) { icon = null; }
+    if (!icon) { return; }
+    var small = document.createElement('canvas');
+    small.width = small.height = 16;
+    small.getContext('2d').putImageData(new ImageData(icon, 16, 16), 0, 0);
+    var make = function (size, fill) {
+      var c = document.createElement('canvas');
+      c.width = c.height = size;
+      var g = c.getContext('2d');
+      g.fillStyle = '#000';
+      g.fillRect(0, 0, size, size);
+      g.imageSmoothingEnabled = false;
+      var s = Math.floor(size * fill / 16) * 16, o = (size - s) >> 1;
+      g.drawImage(small, o, o, s, s);
+      return c.toDataURL('image/png');
+    };
+    document.querySelectorAll('link[rel="icon"]').forEach(function (l) { l.href = make(64, 1); l.setAttribute('sizes', '64x64'); });
+    /* read by iPhone and iPad when the page is added to the home screen */
+    document.querySelectorAll('link[rel="apple-touch-icon"]').forEach(function (l) { l.href = make(180, 0.82); });
+    tabIconSet = true;
+  }
+
+  /* ---- credit line, drawn by the engine inside the picture --------------- */
+
+  var PAGE_TITLE = document.title;
+
+  /* Renders CREDIT as an RGBA image in the style of the game's menu text
+     (orange with a dark outline) and hands it to the engine. It is drawn at
+     the bottom right of the 4:3 frame, 7 of the 240 rows high, so it is
+     rendered at a few times that for sharp text at any resolution. */
+  function sendCredit() {
+    if (!CREDIT) { return; }
+    var px = 64; /* text height in pixels */
+    var c = document.createElement('canvas');
+    var g = c.getContext('2d');
+    var font = '900 ' + px + 'px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+    g.font = font;
+    var text = CREDIT.toUpperCase();
+    var pad = Math.ceil(px * 0.18);
+    c.width = Math.ceil(g.measureText(text).width) + pad * 2;
+    c.height = Math.ceil(px * 1.12) + pad * 2;
+    g = c.getContext('2d');
+    g.font = font;
+    g.textBaseline = 'middle';
+    g.lineJoin = 'round';
+    g.lineWidth = px * 0.22;
+    g.strokeStyle = 'rgba(40, 10, 0, 0.95)';
+    g.strokeText(text, pad, c.height / 2);
+    var grad = g.createLinearGradient(0, pad, 0, c.height - pad);
+    grad.addColorStop(0, '#ffd23f');
+    grad.addColorStop(1, '#ff7a1a');
+    g.fillStyle = grad;
+    g.fillText(text, pad, c.height / 2);
+    var data = g.getImageData(0, 0, c.width, c.height).data;
+    var ptr = Module._malloc(data.length);
+    try {
+      Module.HEAPU8.set(data, ptr);
+      Module._WebSetCredit(ptr, c.width, c.height);
+    } catch (_) { /* older engine */ } finally { Module._free(ptr); }
+  }
+
   /* ---- debug panel: live state ------------------------------------------ */
 
   var debugTimer = 0;
@@ -1430,7 +1564,6 @@
     var canvas = c.width + 'x' + c.height;
     if (canvas !== last.canvas) { debugLine('page', 'canvas ' + canvas + ' @' + window.devicePixelRatio); last.canvas = canvas; }
 
-    updateCredit(d[16] === 5);
     if ($('debug').hidden) { return; }
     $('debug-stats').textContent = [
       'FPS ' + fps.toFixed(1) + '   work ' + work.toFixed(1) + ' ms (max ' + workMax.toFixed(1) + ')',
@@ -1444,20 +1577,6 @@
       'Audio ' + audio,
       'Build ' + BUILD.id + ' ' + BUILD.commit
     ].join('\n');
-  }
-
-  /* The credit sits over the bottom right corner of the picture while the
-     game's title menu is on screen. */
-  function updateCredit(onMenu) {
-    var el = $('credit');
-    if (!onMenu || !CREDIT) { el.hidden = true; return; }
-    var r = $('canvas').getBoundingClientRect();
-    /* the picture ends 12 of its 240 rows above the bottom of the canvas */
-    el.textContent = CREDIT;
-    el.style.fontSize = Math.max(9, Math.round(r.height * 0.026)) + 'px';
-    el.style.right = Math.round(window.innerWidth - r.right + r.width * 0.02) + 'px';
-    el.style.bottom = Math.round(window.innerHeight - r.bottom + r.height * 0.075) + 'px';
-    el.hidden = false;
   }
 
   function applyDebug() {
@@ -1482,6 +1601,8 @@
   }
 
   $('opt-debug-start').checked = !!prefs.debug;
+  $('opt-skip-intro').checked = prefs.skipIntro !== false;
+  $('opt-skip-intro').addEventListener('change', function () { prefs.skipIntro = this.checked; savePrefs(); });
   $('opt-debug-start').addEventListener('change', function () { prefs.debug = this.checked; savePrefs(); });
   $('debug-close').addEventListener('click', toggleDebug);
   $('debug-clear').addEventListener('click', function () { debugLines = []; $('debug-log').innerHTML = ''; workMax = 0; });
@@ -1688,7 +1809,10 @@
     }
     try {
       if (bootLevel) { note('booting level 0x' + bootLevel); }
+      try { Module._WebSetSkipIntro(prefs.skipIntro === false ? 0 : 1); } catch (_) { /* older engine */ }
+      sendCredit();
       Module.callMain(bootLevel ? [bootLevel] : []);
+      document.title = PAGE_TITLE;
       note('engine started (main is running)');
     } catch (e) {
       reportError((e && e.name ? e.name + ': ' : '') + (e && e.message || String(e)), 'thrown while starting', e && e.stack);

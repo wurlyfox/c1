@@ -230,9 +230,18 @@ page's recent events. "Copy" puts it on the clipboard.
   canvas, which smooths polygon edges. The target is capped at 8192 pixels
   a side (or the GPU's limit). Both cost GPU time and memory; the debug
   panel shows the target size as "Render".
-- **Title menu credit.** While the title menu is on screen the page draws a
-  credit line over the bottom right corner of the picture (`CREDIT` in
-  `web/c1web.js`). The engine reports the title state through `WebDebugInfo`.
+- **Title menu credit.** While the title menu is on screen the engine draws a
+  credit line at the bottom right of the 4:3 picture, 7 of its 240 rows high,
+  under the fades (`WebDrawCredit` in `gl.c`). The page renders the text
+  (`CREDIT` in `web/c1web.js`) into an image and passes it with
+  `WebSetCredit`.
+- **Logo screens.** By default the title sequence starts at the main menu,
+  skipping the Sony, Universal and Naughty Dog screens (`web_skip_intro` in
+  `title.c`); "Skip the logo screens at the start" in Advanced turns them
+  back on.
+- **Tab icon.** The page reads the game's memory card icon from the title
+  level stored in the browser and uses it as the tab icon and as the iPhone
+  home screen icon, so it appears without running `make_icons.py`.
 - **Title menu link.** The game's title menu gets a fifth entry below
   OPTIONS ("MORE GAMES") that opens a web page in a new tab. Its text and address are
   `MENU_LINK` at the top of `web/c1web.js`; an empty address removes it.

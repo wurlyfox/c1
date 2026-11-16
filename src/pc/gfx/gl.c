@@ -386,6 +386,68 @@ static void GLPresent() {
   glUseProgram(gl_prog);
 }
 
+/*
+ * Credit line drawn inside the picture, at the bottom right of the 4:3 frame,
+ * while the title menu is on screen. The page renders the text into an
+ * RGBA image (WebSetCredit); it is drawn with the frame, under the fades,
+ * and scales with it like everything else the game draws.
+ */
+static uint8_t *web_credit = 0;
+static int web_credit_w = 0, web_credit_h = 0, web_credit_dirty = 0, web_credit_tex = 0;
+extern int WebTitleState();
+
+EMSCRIPTEN_KEEPALIVE void WebSetCredit(uint8_t *rgba, int w, int h) {
+  free(web_credit);
+  web_credit = 0;
+  web_credit_w = web_credit_h = 0;
+  if (rgba && w > 0 && h > 0) {
+    web_credit = malloc(w*h*4);
+    memcpy(web_credit, rgba, w*h*4);
+    web_credit_w = w;
+    web_credit_h = h;
+  }
+  web_credit_dirty = 1;
+}
+
+static void GLDrawQuad(quad *q, int r, int g, int b, int a);
+
+static void WebDrawCredit() {
+  quad q;
+  float h, w;
+
+  if (web_credit_dirty) {
+    if (web_credit_tex) { GLDeleteTexture(web_credit_tex); web_credit_tex = 0; }
+    if (web_credit) {
+      dim2 d;
+      d.w = web_credit_w; d.h = web_credit_h;
+      web_credit_tex = GLCreateTexture(d, web_credit);
+      glBindTexture(GL_TEXTURE_2D, web_credit_tex);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      glBindTexture(GL_TEXTURE_2D, 0);
+    }
+    web_credit_dirty = 0;
+  }
+  if (!web_credit_tex || WebTitleState() != 5) { return; }
+  /* 7 of the 240 rows high; right edge 6 units inside the 4:3 picture,
+     bottom 4 units above the 12 row border */
+  h = 7;
+  w = h * web_credit_w / web_credit_h;
+  q.p[0].x = q.p[3].x = (int)(256 - 6 - w);
+  q.p[1].x = q.p[2].x = 256 - 6;
+  q.p[0].y = q.p[1].y = (int)(108 - 4 - h);
+  q.p[2].y = q.p[3].y = 108 - 4;
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_2D, web_credit_tex);
+  glUniform1f(gl_u_texscale, 1.0f);
+  GLDrawQuad(&q, 255, 255, 255, 255);
+  glUniform1f(gl_u_texscale, 0.0f);
+  glBindTexture(GL_TEXTURE_2D, 0);
+  glDisable(GL_BLEND);
+}
+
 extern rect2 screen;
 static int web_wide = 1;
 
@@ -998,6 +1060,9 @@ void GLUpdate() {
     ns.draw_skip_counter--;
   if (ns.draw_skip_counter == 0)
     GLDraw(context.ot);
+#ifdef C1_GLES2
+  WebDrawCredit();
+#endif
   GLResetPrims(&context);
   if (fade_counter != 0) { /* brightness */
     if (fade_counter < -2) {

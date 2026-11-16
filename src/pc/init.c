@@ -43,7 +43,12 @@ void SDLInit() {
   SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 0);
   SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);
 #endif
+#ifdef __EMSCRIPTEN__
+  /* SDL copies the window title to the page's title */
+  window = SDL_CreateWindow("Crash Bandicoot web port by Bardock",
+#else
   window = SDL_CreateWindow("c1",
+#endif
     SDL_WINDOWPOS_UNDEFINED,
     SDL_WINDOWPOS_UNDEFINED,
     WINDOW_WIDTH, WINDOW_HEIGHT,

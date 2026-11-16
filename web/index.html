@@ -106,6 +106,7 @@
 
   <details class="card fold">
     <summary>Advanced</summary>
+    <label class="chk"><input type="checkbox" id="opt-skip-intro"> Skip the logo screens at the start</label>
     <label class="chk"><input type="checkbox" id="opt-debug-start"> Show the debug panel next to the game (F2)</label>
     <label class="row" id="boot-row" hidden>Start at
       <select id="boot-level"></select>
@@ -166,8 +167,6 @@
   <button id="update-later" class="quiet">Later</button>
 </div>
 
-<!-- Game credit, over the bottom right corner of the picture on the title menu -->
-<div id="credit" hidden></div>
 
 <!-- Hidden diagnostics: 5 taps on the build line, or ?diag in the address -->
 <div id="diag" hidden>

@@ -21,7 +21,14 @@ int title_once = 1;                            /* 80056500; gp[0x41] */
 //char mdat_name[8]                = "%cMapP"; /* 80056554; gp[0x56] */
 //char mdat_1_name[8]              = "0MapP";  /* 8005655C; gp[0x58] */
 /* .sbss */
-int title_not_seen;                            /* 80056678; gp[0x9F] */
+int title_not_seen;
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+/* set by the page before the game starts: skip the logo screens (Sony,
+   Universal, Naughty Dog) the first time the title sequence runs */
+int web_skip_intro = 0;
+EMSCRIPTEN_KEEPALIVE void WebSetSkipIntro(int skip) { web_skip_intro = skip; }
+#endif                            /* 80056678; gp[0x9F] */
 title_struct *title;                           /* 800566E0; gp[0xB9] */
 #ifndef PSX
 uint8_t image[512*256*2];
@@ -85,6 +92,14 @@ int TitleLoadNextState() {
       break;
     }
   }
+#ifdef __EMSCRIPTEN__
+  else if (web_skip_intro) { /* web option: straight to the main menu */
+    title_state = 5;
+    title->next_state = 5;
+    title->state = 5;
+    title->transition_state = 0;
+  }
+#endif
   else { /* set scea screen state */
     title_state = 10;
     title->next_state = 10;
