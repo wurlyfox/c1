@@ -215,6 +215,66 @@
   });
   $('build-info').textContent = 'Build ' + BUILD.id + ' (' + BUILD.commit + ')';
 
+  /* ---- app (PWA): service worker, updates, install --------------------- */
+
+  /* The service worker keeps the page working offline. Browsers only allow it
+     on https and on localhost; elsewhere (a phone opening the computer's
+     local address) the page works as before, online. */
+  var standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+    (window.matchMedia && window.matchMedia('(display-mode: fullscreen)').matches) || navigator.standalone === true;
+  if (standalone) { $('install-help').hidden = true; }
+  if (!window.isSecureContext && !standalone) { $('install-local-note').hidden = false; }
+
+  function offerUpdate(worker) {
+    $('update-bar').hidden = false;
+    $('update-now').onclick = function () {
+      $('update-now').disabled = true;
+      worker.postMessage({ type: 'SKIP_WAITING' });
+    };
+  }
+  $('update-later').addEventListener('click', function () { $('update-bar').hidden = true; });
+
+  if ('serviceWorker' in navigator && window.isSecureContext) {
+    var reloading = false;
+    var hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      /* the first install takes control silently; a later one is an update
+         the player asked for: load the page of the new build */
+      if (!hadController) { hadController = true; return; }
+      if (reloading) { return; }
+      reloading = true;
+      location.reload();
+    });
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js').then(function (reg) {
+        if (reg.waiting && navigator.serviceWorker.controller) { offerUpdate(reg.waiting); }
+        reg.addEventListener('updatefound', function () {
+          var w = reg.installing;
+          if (!w) { return; }
+          w.addEventListener('statechange', function () {
+            if (w.state === 'installed' && navigator.serviceWorker.controller) { offerUpdate(w); }
+          });
+        });
+        /* look for a new build now and then while the page stays open */
+        setInterval(function () { reg.update().catch(function () {}); }, 30 * 60 * 1000);
+      }, function (e) { note('service worker not registered: ' + (e && e.message || e)); });
+    });
+  }
+
+  /* Chrome and Edge offer their own install prompt; the button uses it */
+  var installPrompt = null;
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    installPrompt = e;
+    $('install-app').hidden = false;
+  });
+  $('install-app').addEventListener('click', function () {
+    if (!installPrompt) { return; }
+    installPrompt.prompt();
+    installPrompt.userChoice.then(function () { installPrompt = null; $('install-app').hidden = true; });
+  });
+  window.addEventListener('appinstalled', function () { $('install-app').hidden = true; note('installed as an app'); });
+
   /* ---- hidden diagnostics ------------------------------------------------
      Five taps on the build line, or ?diag in the address. Everything a phone
      cannot show in a console: what the browser supports, what is stored and
@@ -239,7 +299,9 @@
     line('SHA-256: ' + (C1Sha256.native ? 'crypto.subtle' : 'JavaScript fallback (no crypto.subtle here)'));
     line('DecompressionStream (compressed packs): ' + (typeof DecompressionStream !== 'undefined' ? 'yes' : 'NO'));
     line('IndexedDB: ' + (window.indexedDB ? 'yes' : 'NO'));
-    line('Service worker caches: ' + (window.caches ? 'available (none used by this page)' : 'not available'));
+    line('Service worker: ' + (!('serviceWorker' in navigator) ? 'not supported' : !window.isSecureContext ? 'not allowed (not a secure context)' : navigator.serviceWorker.controller ? 'active' : 'not active yet'));
+    if (window.caches) { try { line('Caches: ' + ((await caches.keys()).join(', ') || 'none')); } catch (_) { /* n/a */ } }
+    line('Installed as an app: ' + (standalone ? 'yes' : 'no'));
     if (navigator.storage && navigator.storage.estimate) {
       try {
         var est = await navigator.storage.estimate();

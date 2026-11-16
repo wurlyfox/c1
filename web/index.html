@@ -9,6 +9,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Crash web port">
 <title>Crash Bandicoot web port by Bardock</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="img/icons/icon-192.png">
+<link rel="apple-touch-icon" href="img/icons/apple-touch-icon.png">
 <link rel="stylesheet" href="c1web.css?v=__C1_BUILD__">
 </head>
 <body>
@@ -122,8 +125,46 @@
     for example to reproduce a problem in a single level.</p>
   </details>
 
+  <section class="card install" id="install-help">
+    <h2>Install it as an app</h2>
+    <p>Add the game to your home screen: it opens full screen, without the browser bars,
+    and keeps working without a connection once it is installed.</p>
+    <button id="install-app" class="primary" hidden>Install the app</button>
+    <div class="install-cols">
+      <div>
+        <h3>iPhone and iPad</h3>
+        <ol>
+          <li>Open this page in <strong>Safari</strong>.</li>
+          <li>Tap <strong>Share</strong> (the square with an arrow).</li>
+          <li>Choose <strong>Add to Home Screen</strong>, then <strong>Add</strong>.</li>
+          <li>Open the game from its icon. Safari deletes the data of web pages that are not
+          visited for 7 days, but not that of apps on the home screen.</li>
+        </ol>
+      </div>
+      <div>
+        <h3>Android</h3>
+        <ol>
+          <li>Open this page in <strong>Chrome</strong>.</li>
+          <li>Tap the menu <strong>⋮</strong> at the top right.</li>
+          <li>Choose <strong>Install app</strong> (or <strong>Add to Home screen</strong>), then <strong>Install</strong>.</li>
+          <li>Open the game from its icon.</li>
+        </ol>
+      </div>
+    </div>
+    <p class="note" id="install-local-note" hidden>This page is opened over plain http from another device, so the browser
+    can only add a shortcut: it will need this computer to be running. For the full app,
+    open it on the computer itself (localhost) or serve it over https.</p>
+  </section>
+
   <p class="note center" id="build-info"></p>
 </main>
+
+<!-- A new build is ready (service worker waiting) -->
+<div id="update-bar" hidden>
+  <span>A new version is ready.</span>
+  <button id="update-now" class="primary">Update</button>
+  <button id="update-later" class="quiet">Later</button>
+</div>
 
 <!-- Game credit, over the bottom right corner of the picture on the title menu -->
 <div id="credit" hidden></div>

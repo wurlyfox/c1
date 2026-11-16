@@ -215,6 +215,18 @@ def make_pack(image, out, store=False, force=False, log=print):
                 log("\r  packing %3d%%  %s" % (done * 100 // total, name), end="")
         log("")
         os.replace(tmp, out)
+        # The app icon is the game's memory card icon, from the title level.
+        # It goes to web/img/icons when this script runs from the repository.
+        title = [a for a in assets if a[0] == "s0000019.nsf"]
+        icons_dir = Path(__file__).resolve().parent.parent.parent / "web" / "img"
+        if title and icons_dir.is_dir():
+            try:
+                sys.path.insert(0, str(Path(__file__).resolve().parent))
+                import make_icons
+                make_icons.make_from_nsf(disc.read_extent(title[0][1], title[0][2]), icons_dir / "icons")
+                log("App icon written to %s" % (icons_dir / "icons"))
+            except Exception as e:  # the pack is made; the icon is optional
+                log("Note: the app icon could not be made (%s)" % e)
     finally:
         disc.close()
     log("Created %s (%.1f MB)" % (out, Path(out).stat().st_size / 1048576))

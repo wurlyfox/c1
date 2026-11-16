@@ -137,8 +137,41 @@ permanent. The page guards against them:
   bytes by Emscripten's IDBFS, not as Blobs, so WebKit's one-file-per-Blob
   cost and its bug with slices of disk-backed Blobs do not come into play.
 
-There is no service worker, so nothing about caching versions or data parts
-applies here.
+The service worker (see App below) never caches the data parts.
+
+### App (PWA)
+
+The page can be installed as an app (home screen icon, full screen, works
+offline once opened):
+
+- `web/manifest.webmanifest`: name, colors and icons.
+- `web/sw.js`, the service worker. `web/build.sh` writes the build id and the
+  list of files of the build into it. It stores every file of the build with
+  `cache: 'reload'` (no copy from the HTTP cache can mix builds) in a cache
+  named after the build, serves the page and its files from there, and never
+  caches the game data parts in `data/`, which go to the page's own storage.
+  A new build installs in the background and waits: the page shows "A new
+  version is ready" and switches only when the player presses Update
+  (`SKIP_WAITING`). While developing, a hard reload (Shift + reload) bypasses
+  it.
+- Browsers only run service workers on https and on localhost. A phone that
+  opens the computer's local address (`http://192.168.x.x:8000`) gets the page
+  without one: it still works, online, and the home screen entry is a
+  shortcut; the start page says so.
+- The bottom of the start page explains how to install it on iPhone/iPad
+  (Safari, Share, Add to Home Screen) and Android (Chrome, menu, Install
+  app). Chrome and Edge also get an "Install the app" button from their own
+  install prompt.
+
+**Icon.** The app icon is the game's memory card icon (Crash's face), taken
+from the title level of your disc by `tools/pack/make_icons.py`, which
+`make_c1_pack.py` also runs when it makes a pack. It is written to
+`web/img/icons/`, which git ignores: it is game art and stays on your
+machine. Without it the build uses a plain "C1" placeholder.
+
+```bash
+python3 tools/pack/make_icons.py "Crash Bandicoot (USA).bin"
+```
 
 ### Hidden diagnostics
 

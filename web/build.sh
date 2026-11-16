@@ -124,8 +124,17 @@ cp "$ROOT/web/c1web.js" "$ROOT/web/c1web.css" "$DIST/"
 sed "s/__C1_BUILD__/$BUILD_ID/g" "$ROOT/web/index.html" > "$DIST/index.html"
 mkdir -p "$DIST/js"
 cp "$ROOT/web/js/"*.js "$DIST/js/"
-mkdir -p "$DIST/img"
-cp "$ROOT/web/img/"* "$DIST/img/" 2>/dev/null || true
+mkdir -p "$DIST/img/icons"
+cp "$ROOT/web/img/"*.jpg "$DIST/img/" 2>/dev/null || true
+# App icons: the game's own (tools/pack/make_icons.py, made from your disc and
+# kept out of git), or a plain placeholder.
+if [ -f "$ROOT/web/img/icons/icon-512.png" ]; then
+  cp "$ROOT/web/img/icons/"*.png "$DIST/img/icons/"
+elif command -v python3 >/dev/null 2>&1; then
+  python3 "$ROOT/tools/pack/make_icons.py" -o "$DIST/img/icons" >/dev/null
+  echo "app icon: placeholder (make the game icon with tools/pack/make_icons.py)"
+fi
+cp "$ROOT/web/manifest.webmanifest" "$DIST/"
 
 # Game data split with tools/pack/split_pack.py, for the "Download the game"
 # option. Local use only: web/data is not in the repository.
@@ -143,5 +152,14 @@ if command -v python3 >/dev/null 2>&1; then
 else
   echo "python3 not found: skipping c1-pack-tool.zip (the converter download)"
 fi
+# Service worker: the build id, and the list of files to keep offline (with
+# the same ?v= the page uses to request them).
+FILES_JSON="$(cd "$DIST" && {
+  echo "./"; echo "index.html"; echo "manifest.webmanifest";
+  for f in c1web.js c1web.css version.js js/*.js c1.js c1.wasm img/*.jpg; do [ -f "$f" ] && echo "$f?v=$BUILD_ID"; done;
+  for f in img/icons/*.png; do [ -f "$f" ] && echo "$f"; done;
+} | python3 -c 'import json,sys; print(json.dumps([l.strip() for l in sys.stdin if l.strip()]))')"
+sed -e "s/__C1_BUILD__/$BUILD_ID/g" -e "s#__C1_FILES__#$FILES_JSON#" "$ROOT/web/sw.js" > "$DIST/sw.js"
+
 echo "build $BUILD_ID ($COMMIT)"
 echo "done: $DIST (serve it over http, e.g. python3 -m http.server -d \"$DIST\")"
