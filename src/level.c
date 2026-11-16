@@ -42,7 +42,7 @@ extern gool_object *crash;
 extern uint32_t spawns[GOOL_SPAWN_COUNT];
 extern uint16_t level_spawns[GOOL_LEVEL_SPAWN_COUNT];
 extern gool_handle handles[8];
-extern gool_bound object_bounds[28];
+extern gool_bound object_bounds[GOOL_OBJECT_COUNT];
 extern int object_bound_count;
 extern uint32_t screen_proj;
 
@@ -1387,6 +1387,12 @@ int ZoneQueryOctrees(vec *v, gool_object *obj, zone_query *query) {
     z_rect = (zone_rect*)neighbor->items[1];
     if (TestRectIntersectsBound(&query->nodes_bound, (rect*)z_rect)) {
       count = query->result_count;
+#ifndef PSX
+      /* room left: the zone's 2 slot header, its results and the -1 that
+         ends the list must all fit in the 0x200 slots */
+      zone_query_capacity = 0x200 - count - 3;
+      if (zone_query_capacity <= 0) { break; }
+#endif
       results_tail = (zone_query_results*)&query->results[count];
 #ifdef PSX
       query->result_count = RZoneQueryOctree(z_rect, &query->nodes_bound, results_tail);
@@ -1395,6 +1401,12 @@ int ZoneQueryOctrees(vec *v, gool_object *obj, zone_query *query) {
 #endif
     }
   }
+#ifndef PSX
+  zone_query_capacity = 512;
+#endif
+#ifdef __EMSCRIPTEN__
+  { extern int web_max_results; if (query->result_count > web_max_results) web_max_results = query->result_count; }
+#endif
   count = query->result_count;
   *((int32_t*)(&query->results[count])) = -1;
   return count;

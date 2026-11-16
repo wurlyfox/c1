@@ -134,7 +134,11 @@ gool_handle handles[8];            /* 80060DB8 */
 gool_handle free_objects;          /* 80060DF8 */
 gool_object *cur_obj;              /* 80060E00 */
 uint32_t frames_elapsed;           /* 80060E04 */
-gool_bound object_bounds[28];      /* 80060E08 */
+/* 28 on the console. The pc port has a pool of GOOL_OBJECT_COUNT (96)
+   objects and nothing limited how many of them recorded a bound in a frame,
+   so a busy scene wrote past the end of a 28 entry array into the globals
+   after it. One entry per object always fits. */
+gool_bound object_bounds[GOOL_OBJECT_COUNT]; /* 80060E08 */
 int object_bound_count;            /* 80061888 */
 gool_globals globals;              /* 8006188C */
 
@@ -1652,7 +1656,12 @@ int GoolObjectBound(gool_object *obj) {
   int32_t rot_x;
   int bound_idx, frame_idx;
 
+  if (object_bound_count >= (int)(sizeof(object_bounds)/sizeof(object_bounds[0])))
+    return SUCCESS; /* full (cannot happen with one bound per object per frame) */
   bound_idx = object_bound_count++;
+#ifdef __EMSCRIPTEN__
+  { extern int web_max_bounds; if (object_bound_count > web_max_bounds) web_max_bounds = object_bound_count; }
+#endif
   bound = &object_bounds[bound_idx]; /* allocate a new bound for this object/frame */
   bound->obj = obj;
   anim = obj->anim_seq;

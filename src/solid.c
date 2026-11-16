@@ -95,7 +95,7 @@ zone_query cur_zone_query;       /* 8005CFEC */
 
 extern ns_struct ns;
 extern entry *cur_zone;
-extern gool_bound object_bounds[28];
+extern gool_bound object_bounds[GOOL_OBJECT_COUNT];
 extern int object_bound_count;
 extern int frames_elapsed;
 
@@ -973,7 +973,7 @@ static void ZoneQueryOctreeR(
 
   if (!node) { return; }
   if (node & 1) {
-    if (*result_count >= 512) { return; }
+    if (*result_count >= zone_query_capacity) { return; }
     result = &results[*result_count];
     result->node = node >> 1;
     result->level = level;
@@ -1013,6 +1013,13 @@ static void ZoneQueryOctreeR(
     }
   }
 }
+
+/* Results a single ZoneQueryOctree may write, after its 2 slot header.
+   ZoneQueryOctrees lowers it so that the results of all the neighbor zones
+   together fit in the query's 0x200 slots: each zone used to be allowed 512
+   of its own, and several crowded neighbors wrote past the end of the
+   query into the globals after it. */
+int zone_query_capacity = 512;
 
 int ZoneQueryOctree(zone_rect *zone_rect, bound *bound, zone_query_results *results) {
   rect n_rect, t_rect;

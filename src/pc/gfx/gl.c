@@ -21,6 +21,7 @@ EM_ASYNC_JS(void, WebWaitFrame, (), {
 
 /* Values shown by the page's debug panel (see WebDebugInfo below). */
 static int32_t web_debug[24];
+int web_max_bounds = 0, web_max_results = 0;
 static double web_resume_time = 0;
 #elif defined(_WIN32)
 #include <windows.h>
@@ -1046,7 +1047,9 @@ extern int WebTitleState();
    [7] lives  [8] wumpa fruit  [9] boxes
    [10] 1 if the player object exists, then [11..13] its position
    [14] [15] size of the offscreen render target
-   [16] state of the title sequence (5 = main menu), or -1 outside it */
+   [16] state of the title sequence (5 = main menu), or -1 outside it
+   [17] most objects with a bound in one frame, [18] most zone query results
+        (both since the page started; see object_bounds and ZoneQueryOctrees) */
 EMSCRIPTEN_KEEPALIVE int32_t *WebDebugInfo() {
   web_debug[3] = (int32_t)cur_lid;
   web_debug[4] = draw_count;
@@ -1056,6 +1059,8 @@ EMSCRIPTEN_KEEPALIVE int32_t *WebDebugInfo() {
   web_debug[8] = fruit_count >> 8;
   web_debug[9] = box_count >> 8;
   web_debug[16] = WebTitleState();
+  web_debug[17] = web_max_bounds;
+  web_debug[18] = web_max_results;
   web_debug[10] = crash != 0;
   if (crash) {
     web_debug[11] = crash->trans.x;

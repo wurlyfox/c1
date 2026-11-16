@@ -20,6 +20,7 @@ extern int StopAtWalls(vec *trans, int x, int z, int *adj_x, int *adj_z,
 
 #if (!defined (PSX) || defined (PSX_NOASM))
 extern int ZoneQueryOctree(zone_rect *zone_rect, bound *bound, zone_query_results *results);
+extern int zone_query_capacity;
 extern void PlotQueryWalls(zone_query *query, bound *nodes_bound,
 	int flag, int test_y1_t1, int test_y1, int test_y2, int trans_x, int trans_z);
 extern void FindFloorY(gool_object *obj, zone_query *query, bound *nodes_bound,

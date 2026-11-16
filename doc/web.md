@@ -173,6 +173,16 @@ machine. Without it the build uses a plain "C1" placeholder.
 python3 tools/pack/make_icons.py "Crash Bandicoot (USA).bin"
 ```
 
+### Error reports with source lines
+
+Debug builds (`DEBUG=1`, the default) are compiled with line tables and come
+with a source map, `c1.wasm.map`. When the game stops, the report resolves
+each frame of the call stack to a file and line ("TransSmoothStopAtSolid ->
+src/solid.c:340"), including code the compiler inlined into another
+function. Line tables do not change the generated code. The debug panel also
+shows the most objects with a collision bound in one frame and the most
+zone query results, against their limits.
+
 ### Hidden diagnostics
 
 Five taps on the build line at the bottom of the start page, or `?diag` in

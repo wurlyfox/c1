@@ -75,7 +75,7 @@ extern level_state savestate;
 #ifdef CFLAGS_DRAW_EXTENSIONS
 extern zone_query cur_zone_query;
 extern uint32_t *wall_bitmap;
-extern gool_bound object_bounds[96];
+extern gool_bound object_bounds[GOOL_OBJECT_COUNT];
 extern int object_bound_count;
 int draw_octrees = 0;
 int draw_wallmap = 0;

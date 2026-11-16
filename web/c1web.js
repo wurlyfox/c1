@@ -158,6 +158,70 @@
     return lines.join('\n');
   }
 
+  /* ---- source map: code offsets of an error -> file and line --------------
+     Debug builds come with c1.wasm.map. A stack frame such as
+     "c1.wasm:wasm-function[499]:0x18ca0" carries the offset in the module;
+     the map gives the source line of the code at that offset, including
+     code that the compiler inlined into another function. */
+
+  var sourceMap = null;
+
+  function loadSourceMap() {
+    if (sourceMap) { return sourceMap; }
+    sourceMap = fetch('c1.wasm.map?v=' + encodeURIComponent(BUILD.id)).then(function (res) {
+      if (!res.ok) { throw new Error('HTTP ' + res.status); }
+      return res.json();
+    }).then(function (map) {
+      var B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+      var offsets = [], entries = [];
+      var col = 0, src = 0, line = 0, scol = 0;
+      map.mappings.split(',').forEach(function (seg) {
+        if (!seg) { return; }
+        var vals = [], value = 0, shift = 0;
+        for (var i = 0; i < seg.length; i++) {
+          var digit = B64.indexOf(seg[i]);
+          value += (digit & 31) << shift;
+          if (digit & 32) { shift += 5; continue; }
+          vals.push(value & 1 ? -(value >>> 1) : value >>> 1);
+          value = 0; shift = 0;
+        }
+        col += vals[0];
+        if (vals.length >= 4) {
+          src += vals[1]; line += vals[2]; scol += vals[3];
+          offsets.push(col);
+          entries.push([src, line + 1]);
+        }
+      });
+      return { sources: map.sources, offsets: offsets, entries: entries };
+    });
+    return sourceMap;
+  }
+
+  /* "file:line" for each wasm frame of a stack, as text lines */
+  function resolveStack(stack) {
+    var frames = [];
+    String(stack || '').split('\n').forEach(function (l) {
+      var m = /c1\.wasm[^:]*:wasm-function\[(\d+)\]:0x([0-9a-f]+)/.exec(l);
+      if (m) { frames.push({ name: (/at (?:c1\.wasm\.)?([^ (]+)/.exec(l) || [])[1] || 'function ' + m[1], offset: parseInt(m[2], 16) }); }
+    });
+    if (!frames.length) { return Promise.resolve(''); }
+    return loadSourceMap().then(function (map) {
+      return frames.map(function (f) {
+        var lo = 0, hi = map.offsets.length - 1, best = -1;
+        while (lo <= hi) {
+          var mid = (lo + hi) >> 1;
+          if (map.offsets[mid] <= f.offset) { best = mid; lo = mid + 1; } else { hi = mid - 1; }
+        }
+        if (best < 0) { return f.name + ': (no line)'; }
+        var e = map.entries[best];
+        var file = String(map.sources[e[0]] || '?').replace(/^.*?\/src\//, 'src/').replace(/^(\.\.\/)+/, '');
+        return f.name + '  ->  ' + file + ':' + e[1];
+      }).join('\n');
+    }, function (e) {
+      return '(no source map in this build: ' + (e && e.message || e) + '. Build with DEBUG=1.)';
+    });
+  }
+
   function openReport(title, text) {
     $('report-title').textContent = title;
     $('log').textContent = text;
@@ -174,6 +238,11 @@
     try { text = buildReport(title, detail, stack); }
     catch (e) { text = 'Error: ' + title + '\n' + cleanStack(stack) + '\n(the full report failed: ' + (e && e.message || e) + ')'; }
     openReport('The game stopped unexpectedly', text);
+    /* add the source lines when the map has been read */
+    resolveStack(stack).then(function (lines) {
+      if (!lines) { return; }
+      $('log').textContent = $('log').textContent.replace('\n\n--- Engine output', '\n\n--- Source lines ---\n' + lines + '\n\n--- Engine output');
+    });
   }
 
   /* progress bar under the status line: 0..1, or a negative value to hide it */
@@ -1366,7 +1435,7 @@
     $('debug-stats').textContent = [
       'FPS ' + fps.toFixed(1) + '   work ' + work.toFixed(1) + ' ms (max ' + workMax.toFixed(1) + ')',
       'Level ' + hex(d[3]) + '   frame ' + d[0] + '   draw ' + d[4] + (d[5] ? '   PAUSED' : ''),
-      'Tris ' + d[1] + '   ticks/frame ' + d[6],
+      'Tris ' + d[1] + '   ticks/frame ' + d[6] + '   peak bounds ' + d[17] + '/96 results ' + d[18] + '/512',
       'Lives ' + d[7] + '   Fruit ' + d[8] + '   Boxes ' + d[9],
       'Crash ' + (d[10] ? d[11] + ', ' + d[12] + ', ' + d[13] : '(no player object)'),
       'Pad ' + heldNames(),

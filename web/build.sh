@@ -84,6 +84,8 @@ else
   CFLAGS+=(-DC1_NO_MIDI)
 fi
 
+if [ "$DEBUG" = "1" ]; then CFLAGS+=(-gline-tables-only); fi
+
 echo "compiling ${#SOURCES[@]} files ($OPT)..."
 OBJECTS=()
 pids=()
@@ -99,7 +101,9 @@ for pid in "${pids[@]}"; do wait "$pid"; done
 
 LINK_DEBUG=()
 if [ "$DEBUG" = "1" ]; then
-  LINK_DEBUG=(-sASSERTIONS=1 --profiling-funcs)
+  # A source map (c1.wasm.map) lets the page turn the code offsets of an error
+  # into file and line. Line tables do not change the generated code.
+  LINK_DEBUG=(-sASSERTIONS=1 --profiling-funcs -gsource-map)
 fi
 
 echo "linking..."
