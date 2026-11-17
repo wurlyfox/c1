@@ -1,0 +1,52 @@
+{
+  "format": "c1-pack-parts",
+  "version": 1,
+  "created": "2026-11-17T07:04:09Z",
+  "file": "c1-pack.zip",
+  "size": 152395620,
+  "sha256": "3b9ae3555333b0e96a20e2a8c3892637b8ad651cfe9523d56faecb87ab1da40a",
+  "serial": "SCUS-94900",
+  "packVersion": 1,
+  "parts": [
+    {
+      "name": "c1-pack.part001",
+      "size": 19922944,
+      "sha256": "996eb6e551aa419f1e053aa4936ce4611fdfb4f09f1351a41bddf0b6c8090f27"
+    },
+    {
+      "name": "c1-pack.part002",
+      "size": 19922944,
+      "sha256": "2ddc17888df5cf891bc95aa953fac95d969ad9463c43d0c023014b84ee2c88d6"
+    },
+    {
+      "name": "c1-pack.part003",
+      "size": 19922944,
+      "sha256": "2a72619897bdd1df87fc8b312faf351526007e67691fcce2560008578ce0e7b4"
+    },
+    {
+      "name": "c1-pack.part004",
+      "size": 19922944,
+      "sha256": "685a54e6ee76d8642ebc31b723f693426735936b2a06e318de368957676c154e"
+    },
+    {
+      "name": "c1-pack.part005",
+      "size": 19922944,
+      "sha256": "20619d640622b069cd7e6b4a8de51d17fae726c54d7958dbb78c94c376612c59"
+    },
+    {
+      "name": "c1-pack.part006",
+      "size": 19922944,
+      "sha256": "43fc9992c83f277aa4098d5be3c2759df444d31914414f8a2d5b1dbc2656857a"
+    },
+    {
+      "name": "c1-pack.part007",
+      "size": 19922944,
+      "sha256": "190d8b0c690fd6d28dce51899ad52937b6fa4dcd5f40eb89b0fe1720a0ddfe30"
+    },
+    {
+      "name": "c1-pack.part008",
+      "size": 12935012,
+      "sha256": "2eaf08a703077fbcf1b66c86617147f7890e17d83bc2cbad6a9399c96d06576a"
+    }
+  ]
+}
