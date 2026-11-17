@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#14110f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Crash web port">
+<title>Crash Bandicoot web port by Bardock</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="img/icons/icon-192.png">
+<link rel="apple-touch-icon" href="img/icons/apple-touch-icon.png">
+<link rel="stylesheet" href="c1web.css?v=20261117-070448">
+</head>
+<body>
+<main id="setup">
+  <header class="hero">
+    <img id="hero-art" src="img/hero.jpg?v=20261117-070448" alt="Crash Bandicoot, rendered by the game" width="1200" height="480">
+    <h1>Crash Bandicoot <span>web port</span></h1>
+    <p class="byline">by Bardock</p>
+    <p class="lead">The classic in your browser. An unofficial fan port: bring your own copy of the game.</p>
+  </header>
+
+  <!-- Shown when the game is installed in this browser -->
+  <section id="ready" class="card ready" hidden>
+    <button id="play" class="primary big">Play ▶</button>
+    <p id="saves-status" class="plain">No saved games yet.</p>
+  </section>
+
+  <p id="status" role="status">Loading…</p>
+  <div id="progress" hidden><div id="progress-bar"></div></div>
+
+  <!-- Shown when installing the game failed -->
+  <section id="install-error" class="card error" hidden>
+    <h2>The game could not be installed</h2>
+    <p id="install-error-text"></p>
+    <div class="actions">
+      <button id="install-retry" class="primary">Retry</button>
+      <button id="install-reset">Delete everything and download again</button>
+      <button id="install-dismiss" class="quiet">Close</button>
+    </div>
+  </section>
+
+  <section class="card source" id="card-net" hidden>
+    <span class="step" id="step-net">1</span>
+    <div class="body">
+      <h2 id="net-title">Download the game</h2>
+      <p>The quickest way: the game is downloaded in small parts and kept in this browser.
+      If the connection drops, it carries on where it stopped. <span id="net-size"></span></p>
+      <button id="net-play" class="primary">Download and play</button>
+    </div>
+  </section>
+
+  <p class="center"><button id="sources-toggle" class="quiet" hidden>Load the game again or from another source</button></p>
+
+  <!-- Ways to install the game -->
+  <div id="sources">
+    <section class="card source">
+      <span class="step" id="step-disc">1</span>
+      <div class="body">
+        <h2>Use your disc image</h2>
+        <p>Choose the <strong>.bin</strong> (or .iso) of your <em>Crash Bandicoot</em> disc,
+        NTSC-U version (SCUS-94900). Only what the game needs is copied.</p>
+        <label class="button" id="pick-disc">Choose disc image
+          <input type="file" id="disc" accept=".bin,.iso,.img" hidden></label>
+      </div>
+    </section>
+
+    <section class="card source">
+      <span class="step" id="step-zip">2</span>
+      <div class="body">
+        <h2>Use a game ZIP</h2>
+        <p>A smaller file with just the levels, handy for phones. Make it once on a computer
+        with the <a href="c1-pack-tool.zip" download>converter</a>.</p>
+        <label class="button" id="pick-zip">Choose game ZIP
+          <input type="file" id="zip" accept=".zip,application/zip" hidden></label>
+      </div>
+    </section>
+  </div>
+  <p class="note center">Everything stays on this device. Nothing is uploaded.</p>
+
+  <details class="card fold">
+    <summary>Saved games</summary>
+    <div class="actions">
+      <button id="saves-export" hidden>Download backup</button>
+      <label class="button" id="saves-import-label">Restore backup
+        <input type="file" id="saves-import" accept=".dat,application/octet-stream" hidden></label>
+      <button id="saves-delete" class="quiet" hidden>Delete saved games</button>
+    </div>
+    <p class="note">The game saves to a memory card kept in this browser (15 slots).
+    Choose Load Game on the title screen to continue.</p>
+  </details>
+
+  <details class="card fold">
+    <summary>Controls</summary>
+    <div id="keys"></div>
+    <div class="actions">
+      <button id="keys-reset" class="quiet">Reset keys</button>
+    </div>
+    <p class="note" id="keys-hint">Click a key to change it, then press the new one (Esc cancels).
+    Gamepads work too. On phones and tablets an on-screen controller appears;
+    you can move, resize or hide its buttons from the ☰ menu while playing.</p>
+  </details>
+
+  <details class="card fold">
+    <summary>Advanced</summary>
+    <label class="chk"><input type="checkbox" id="opt-skip-intro"> Skip the logo screens at the start</label>
+    <label class="chk"><input type="checkbox" id="opt-debug-start"> Show the debug panel next to the game (F2)</label>
+    <label class="row" id="boot-row" hidden>Start at
+      <select id="boot-level"></select>
+    </label>
+    <h3>Game files</h3>
+    <div class="actions">
+      <label class="button" id="pick-files">Add .NSF / .NSD files
+        <input type="file" id="files" accept=".nsf,.nsd,.NSF,.NSD" multiple hidden></label>
+      <button id="forget" class="quiet" hidden>Remove the game from this browser</button>
+      <button id="opt-reset" class="quiet" hidden>Delete everything and download again</button>
+    </div>
+    <div class="actions" id="export-row" hidden>
+      <select id="export-file" aria-label="Stored game file"></select>
+      <button id="export-save">Save this file</button>
+    </div>
+    <p class="note" id="export-note" hidden>Saves one of the stored level files to your computer,
+    for example to reproduce a problem in a single level.</p>
+  </details>
+
+  <section class="card install" id="install-help">
+    <h2>Install it as an app</h2>
+    <p>Add the game to your home screen: it opens full screen, without the browser bars,
+    and keeps working without a connection once it is installed.</p>
+    <button id="install-app" class="primary" hidden>Install the app</button>
+    <div class="install-cols">
+      <div>
+        <h3>iPhone and iPad</h3>
+        <ol>
+          <li>Open this page in <strong>Safari</strong>.</li>
+          <li>Tap <strong>Share</strong> (the square with an arrow).</li>
+          <li>Choose <strong>Add to Home Screen</strong>, then <strong>Add</strong>.</li>
+          <li>Open the game from its icon. Safari deletes the data of web pages that are not
+          visited for 7 days, but not that of apps on the home screen.</li>
+        </ol>
+      </div>
+      <div>
+        <h3>Android</h3>
+        <ol>
+          <li>Open this page in <strong>Chrome</strong>.</li>
+          <li>Tap the menu <strong>⋮</strong> at the top right.</li>
+          <li>Choose <strong>Install app</strong> (or <strong>Add to Home screen</strong>), then <strong>Install</strong>.</li>
+          <li>Open the game from its icon.</li>
+        </ol>
+      </div>
+    </div>
+    <p class="note" id="install-local-note" hidden>This page is opened over plain http from another device, so the browser
+    can only add a shortcut: it will need this computer to be running. For the full app,
+    open it on the computer itself (localhost) or serve it over https.</p>
+  </section>
+
+  <p class="note center" id="build-info"></p>
+</main>
+
+<!-- A new build is ready (service worker waiting) -->
+<div id="update-bar" hidden>
+  <span>A new version is ready.</span>
+  <button id="update-now" class="primary">Update</button>
+  <button id="update-later" class="quiet">Later</button>
+</div>
+
+
+<!-- Hidden diagnostics: 5 taps on the build line, or ?diag in the address -->
+<div id="diag" hidden>
+  <div class="report-bar">
+    <strong>Diagnostics</strong>
+    <button id="diag-parts">Verify stored parts</button>
+    <button id="diag-tone">Test sound (Web Audio)</button>
+    <button id="diag-audio">Test sound (&lt;audio&gt;)</button>
+    <button id="diag-copy">Copy</button>
+    <button id="diag-close">Close</button>
+  </div>
+  <pre id="diag-text"></pre>
+</div>
+
+<canvas id="canvas" width="1024" height="768" tabindex="-1" hidden></canvas>
+
+<!-- On-screen controller (js/touch.js) -->
+<div id="touch-layer" class="tc-hidden"></div>
+
+<button id="menu-btn" aria-label="Menu" hidden>☰</button>
+<div id="menu" hidden>
+  <label class="col">Volume <span id="opt-volume-value">100%</span>
+    <input type="range" id="opt-volume" min="0" max="500" step="10" value="100"></label>
+  <label>Picture
+    <select id="opt-aspect">
+      <option value="fill">Fill window (wider view)</option>
+      <option value="stretch">Fill window (stretched)</option>
+      <option value="4:3">Original 4:3</option>
+    </select>
+  </label>
+  <label>Resolution
+    <select id="opt-res">
+      <option value="1">1x (PS1)</option>
+      <option value="2">2x</option>
+      <option value="3">3x</option>
+      <option value="4">4x</option>
+      <option value="0">Auto (window)</option>
+    </select>
+  </label>
+  <label>Antialiasing
+    <select id="opt-aa">
+      <option value="1">On</option>
+      <option value="0">Off</option>
+    </select>
+  </label>
+  <label>Touch controls
+    <select id="opt-touch">
+      <option value="auto">Auto</option>
+      <option value="on">Always on</option>
+      <option value="off">Off</option>
+    </select>
+  </label>
+  <button id="opt-edit">Edit touch layout</button>
+  <button id="opt-fullscreen">Fullscreen</button>
+  <button id="opt-debug">Debug panel</button>
+  <button id="opt-log">Show report</button>
+  <button id="opt-close" class="primary">Back to game</button>
+</div>
+
+<!-- Touch layout editor toolbar -->
+<div id="touch-editor" hidden>
+  <p class="hint">Drag a control to move it. Tap one to select it, then resize or hide it.</p>
+  <div class="ed-row" id="ed-selected">
+    <span id="ed-name">—</span>
+    <label>Size <input type="range" id="ed-size" min="0.06" max="0.6" step="0.01"></label>
+    <button id="ed-hide">Hide</button>
+  </div>
+  <div class="ed-row">
+    <label>Opacity <input type="range" id="ed-opacity" min="0.15" max="1" step="0.05"></label>
+    <select id="ed-mode" aria-label="Direction control">
+      <option value="dpad">D-pad</option>
+      <option value="stick">Stick</option>
+    </select>
+    <label class="chk"><input type="checkbox" id="ed-haptics"> Vibration</label>
+  </div>
+  <div class="ed-row">
+    <button id="ed-showall">Show all</button>
+    <button id="ed-reset">Reset</button>
+    <button id="ed-done" class="primary">Done</button>
+  </div>
+</div>
+
+<!-- Debug panel: live engine state and log, beside the game -->
+<aside id="debug" hidden>
+  <div class="debug-bar">
+    <strong>Debug</strong>
+    <button id="debug-copy">Copy</button>
+    <button id="debug-clear">Clear</button>
+    <button id="debug-close" aria-label="Close">✕</button>
+  </div>
+  <pre id="debug-stats"></pre>
+  <div id="debug-log"></div>
+</aside>
+
+<!-- Error report / log (c1web.js) -->
+<div id="report" hidden>
+  <div class="report-bar">
+    <strong id="report-title">Log</strong>
+    <button id="report-copy">Copy report</button>
+    <button id="report-close">Close</button>
+  </div>
+  <pre id="log"></pre>
+</div>
+
+<!-- Shown when the browser blocks the game menu's link from opening by itself -->
+<div id="link-bar" hidden>
+  <a id="link-open" target="_blank" rel="noopener"></a>
+  <button id="link-close" aria-label="Close">✕</button>
+</div>
+
+<script src="version.js?v=20261117-070448"></script>
+<script src="js/dpad-gemuboy.js?v=20261117-070448"></script>
+<script src="js/touch.js?v=20261117-070448"></script>
+<script src="js/sha256.js?v=20261117-070448"></script>
+<script src="js/zippack.js?v=20261117-070448"></script>
+<script src="js/netpack.js?v=20261117-070448"></script>
+<script src="c1web.js?v=20261117-070448"></script>
+<script async src="c1.js?v=20261117-070448"></script>
+</body>
+</html>
