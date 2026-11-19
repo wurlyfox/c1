@@ -510,7 +510,7 @@ int ReflGetCount(void *data, refl_field *field) {
  * \returns int - field offset
  */
 int ReflGetOffset(void *data, refl_field *field) {
-  refl_common common;
+  refl_common common = {0};
   refl_type *type;
 
   if (field->after[0]) {

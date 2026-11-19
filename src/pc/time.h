@@ -3,7 +3,8 @@
 
 #include "common.h"
 
-extern void SetTicksElapsed(int32_t ticks);
-extern int GetTicksElapsed();
+extern void SetTicksElapsed(ticks_t ticks);
+extern ticks_t GetTicksElapsed();
+extern ticks_t GetTicksMonotonic();
 
 #endif /* _TIME_H_ */

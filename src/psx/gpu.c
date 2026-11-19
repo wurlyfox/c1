@@ -11,7 +11,7 @@ extern entry *cur_zone;
 extern int paused;
 extern uint32_t ticks_elapsed;
 extern int draw_count;
-extern rgb8 vram_fill_color, vram_fill_color_next;
+extern rgb8 sky_color, sky_color_next;
 
 int GpuFillDisplay() {
   BLK_FILL bf;
@@ -193,7 +193,7 @@ int GpuUpdate() {
   int fh, elapsed_since;
   zone_header *header;
 
-  vram_fill_color = vram_fill_color_next; /* fourth/third byte not copied (its an rgb8 = 3byte value) */
+  sky_color = sky_color_next; /* fourth/third byte not copied (its an rgb8 = 3byte value) */
   if (!paused && (cur_display_flags & 0x1000))
     draw_count++;
   if (fade_counter != 0) { /* brightness */
@@ -215,8 +215,8 @@ int GpuUpdate() {
   if (cur_display_flags & 0x80000) {
     if (cur_display_flags & 0x2000) {
       header = (zone_header*)cur_zone->items[0];
-      fill = vram_fill_color;
-      fh = header->vram_fill_height;
+      fill = sky_color;
+      fh = header->sky_color_fill_height;
       GpuDrawRect(0, 0, 512, fh, fill.r, fill.g, fill.b);
       GpuDrawRect(0, y, 512, 216-fh, fill.r, fill.g, fill.b);
     }

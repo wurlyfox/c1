@@ -6,9 +6,6 @@
 #include "level.h"
 #include "audio.h"
 #include "midi.h"
-#ifdef GOOL_DEBUG
-#include "ext/disgool.h"
-#endif
 #ifdef PSX
 #include <LIBGTE.h>
 #include "psx/card.h"
@@ -32,8 +29,11 @@ void GoolTextObjectTransform(gool_object*,gool_text*,int,void*,int);
 int GoolProject(vec*,vec*);
 int GoolSendToColliders2(gool_object*,gool_object*,uint32_t,int,int,uint32_t*);
 int GoolObjectInterrupt(gool_object*,uint32_t,int,uint32_t*);
-#ifdef GOOL_DEBUG
+
+#ifdef CFLAGS_EXTENSIONS
+void GoolObjectHighlight(gool_object*);
 void GoolObjectPrintDebug(gool_object*,FILE*);
+static int GoolObjectKilled(gool_object*);
 #endif
 
 #define init_obj          player
@@ -146,7 +146,13 @@ extern gfx_context_db context;
 #include "pc/gfx/soft.h"
 extern gl_context context;
 extern sw_transform_struct params;
+#ifdef CFLAGS_EXTENSIONS
+#include "ext/ext.h"
+#include "ext/gui.h"
+#include "ext/disgool.h"
 #endif
+#endif
+
 extern int draw_count;
 
 extern ns_struct ns;
@@ -163,6 +169,12 @@ extern mat16 mn_trans;
 extern mat16 ms_rot, ms_cam_rot;
 extern int32_t cam_rot_xz;
 extern quad28_t uv_map[600];
+
+#ifdef PSX
+#define ticks_per_frame context->c1_p.ticks_per_frame
+#else
+#define ticks_per_frame context.ticks_per_frame
+#endif
 
 //----- (8001AAD8) --------------------------------------------------------
 int GoolInitAllocTable() {
@@ -846,6 +858,9 @@ int GoolObjectKill(gool_object *obj, int sig) {
   AudioVoiceFree(obj);
   idx = obj->pid_flags >> 8;
   spawns[idx] &= 0xFFFFFFFE; /* clear bit 1 */
+#ifdef CFLAGS_EXTENSIONS
+  GoolObjectKilled(obj);
+#endif
   obj->handle.type = 0;
   if (obj == crash) {
     children = GoolObjectGetChildren(&free_objects);
@@ -967,6 +982,9 @@ void GoolUpdateObjects(int flag) {
   gool_handle *handle;
   int i;
 
+#ifdef CFLAGS_EXTENSIONS
+  hq.crash_updated = 0;
+#endif
   object_bound_count = 0;
   draw_count_ro = draw_count;
 #ifdef PSX
@@ -1087,12 +1105,105 @@ static int GoolObjectPopFrame(gool_object *obj, uint32_t *flags) {
   return SUCCESS;
 }
 
-#ifdef CFLAGS_HIRES_TEST
+#ifdef CFLAGS_EXTENSIONS
+ 
+static int GoolCanSpawnChildren(gool_object *obj, int type, int subtype) {
+  gool_header *header;
+  
+  /* WarpC state Warp_Out_Used spawns 3 child DoctC sparkles (i.e. "warp particles") 
+     at every trans frame after certain conditions are met; at high frame rates 
+     this is enough to exhaust the object pool without the below fix */
+  if (hq.trans && type == 5 && subtype == 3) {
+    header = (gool_header*)obj->global->items[0];  
+    if (header->type == 32)
+      return IsOrigTick();
+  }
+  return 1;
+}
 
-extern int hires;
-svtx_frame *next_frame = 0;
-double interp_factor = 0.0;
-int is_last_frame = 0;
+/* minimally invasive hacks to check if a value 
+   was produced by a SPD instruction */
+static void GoolNoteSpd(int32_t v) {
+  if (hq.trans) 
+    hq.spd_seen[hq.spd_count++ & 7] = v;
+}
+
+static int GoolIsSpd(int32_t v) {
+  int i;
+
+  for (i=0;i<8&&i<hq.spd_count;i++)
+    if (hq.spd_seen[i] == v) return 1;
+  return 0;
+}
+
+static int32_t GoolScaleStep(int32_t step, ticks_t stamp, ticks_t rate) {
+  ticks_t dur;
+  
+  dur = limit(rate, 0.0, 34.0);
+  return (int32_t)(step * (dur / 34.0));
+}
+
+static void GoolScaleAnimStep(gool_object *obj, int32_t old) {
+  int32_t cur, step, mod, next;
+
+  if (!ext_config.fps_mode) 
+    return;
+  cur = obj->anim_frame;
+  /* Q24.8 quantities anim_frame and delta step
+     can sufficiently represent this ratio;
+     redefine anim_frame as a double if more precision is needed */
+  step = (int32_t)(0x100 * ticks_per_frame / 34);
+  if (cur == old + 0x100)
+    obj->anim_frame = old + step;
+  else if (cur >= 0 && cur < 0x100 && old > cur) {
+    mod = old + 0x100 - cur;
+    if ((mod & 0xFF) == 0) {
+      next = old + step;
+      obj->anim_frame = (next >= mod ? next - mod : next);
+    }
+  }
+}
+
+static double GoolAnimInterpFactor(ticks_t stamp, uint32_t frame, uint32_t elapsed, uint32_t wait) {
+  double t, delta;
+
+  /* objects that do not wait, have too long to wait, 
+     or have already waited enough, are not interpolated */
+  if (!wait || wait > 8 || elapsed >= wait)
+    return 0;
+  delta = (stamp / 34.0) - frame;
+  t = (elapsed + delta) / wait;
+  t = limit(t, 0.0, 1.0);
+  return t;
+}
+
+static int GoolPrepareVertexInterp(entry *vtx, int *frame_idx) {
+  int idx;
+  
+  hq.is_last_frame = 0;
+  if (ext_config.fps_mode == 0)
+    return -1;
+  if (vtx->item_count <= 1)
+    return -1;
+  idx = *frame_idx;
+  if (idx == vtx->item_count-1) {
+    --(*frame_idx);
+    hq.is_last_frame = 1;
+    return idx;
+  }
+  return idx + 1;
+}
+
+static inline int GoolObjectBoundCanUpdate(gool_object *obj) {
+  if (ext_config.fps_mode)
+    return obj == crash || hq.crash_updated;
+  return obj->anim_stamp == crash->anim_stamp;
+}
+#else
+
+static inline int GoolObjectBoundCanUpdate(gool_object *obj) {
+  return obj->anim_stamp == crash->anim_stamp;
+}
 
 #endif
 
@@ -1103,9 +1214,14 @@ int GoolObjectUpdate(gool_object *obj, int flag) {
   uint32_t status_b, category, flags;
   uint32_t top, timestamp, wait;
   int animate, display;
-  int elapsed_since;
+  uint32_t elapsed_since;
   int res;
+#ifdef CFLAGS_EXTENSIONS
+  gool_debug *dbg;
+  int32_t prev_frame = 0;
 
+  hq.interp = 0;
+#endif
   if (obj->handle.subtype != 3) { return SUCCESS; }
   if (obj == crash)
     PadUpdate();
@@ -1137,24 +1253,33 @@ int GoolObjectUpdate(gool_object *obj, int flag) {
     }
   }
   if (animate && flag) {
-#ifdef CFLAGS_GOOL_DEBUG
-    gool_debug *dbg;
+#ifdef CFLAGS_EXTENSIONS
     dbg = GoolObjectDebug(obj);
 #endif
     if ((status_b & GOOL_FLAG_STALL) && (obj->anim_counter != 0)) {
+#ifdef CFLAGS_EXTENSIONS
+      if (IsOrigTick())
+#endif
       obj->anim_counter--; /* decrement while stall flag is set */
       if (obj->anim_counter == 0)
         obj->status_b &= ~GOOL_FLAG_STALL; /* clear stall flag when 0 is reached */
     }
-#ifdef CFLAGS_GOOL_DEBUG
+#ifdef CFLAGS_EXTENSIONS
     else if ((dbg->flags & GOOL_FLAGS_PAUSED) == GOOL_FLAGS_PAUSED) {}
 #endif
     else { /* countdown finished in previous frame */
       obj->anim_stamp = frames_elapsed; /* record 'timestamp' */
+#ifdef CFLAGS_EXTENSIONS
+      if (obj == crash) hq.crash_updated = 1;
+#endif
       if ((status_b & GOOL_FLAG_COLLIDABLE) && /* collidable object? */
-        obj->anim_stamp == crash->anim_stamp) /* same frame as crash? */
+       GoolObjectBoundCanUpdate(obj)) /* same frame as crash? */
         GoolObjectBound(obj); /* calculate bound */
-#ifdef CFLAGS_GOOL_DEBUG
+#ifndef CFLAGS_EXTENSIONS
+      if (obj->tp) { /* is there a trans block to run? */
+        GoolObjectPushFrame(obj, 0, 0xFFFF);
+        obj->pc = obj->tp;
+#else
       if (dbg->flags & GOOL_FLAG_PAUSED_TRANS) {}
       else if (obj->tp) {
         if (!(dbg->flags & GOOL_FLAG_RESTORED_TRANS)) { /* not resuming from trans block? */
@@ -1163,32 +1288,27 @@ int GoolObjectUpdate(gool_object *obj, int flag) {
         }
         else
           dbg->flags &= ~GOOL_FLAG_RESTORED_TRANS;
-#else
-      if (obj->tp) { /* is there a trans block to run? */
-        GoolObjectPushFrame(obj, 0, 0xFFFF);
-        obj->pc = obj->tp;
+        prev_frame = obj->anim_frame;
+        hq.spd_count = 0;
+        hq.trans = 1; /* mark that we are in a trans block */
 #endif
         flags = GOOL_FLAG_SUSPEND_ON_RET | GOOL_FLAG_SUSPEND_ON_RETLNK;
         res = GoolObjectInterpret(obj, flags, &response); /* run it */
+#ifdef CFLAGS_EXTENSIONS
+        hq.trans = 0; /* end of trans block */
+        GoolScaleAnimStep(obj, prev_frame);
+#endif
         if (ISERRORCODE(res)) { return res; } /* return on fail */
       }
       top = *(obj->sp-1); /* peek back one from top */
       timestamp = top & 0x00FFFFFF;
       wait = (top & 0xFF000000) >> 24;
-      elapsed_since = frames_elapsed - timestamp;
-#ifdef CFLAGS_HIRES_TEST
-      interp_factor = ((((double)context.draw_stamp/34.0f)-(double)timestamp)/((double)wait));
-      interp_factor = limit(interp_factor, 0.0, 1.0);
-      if (wait > 0x8) { interp_factor = 0.0; }
-#endif
-#ifdef CFLAGS_GOOL_DEBUG
-      if (dbg->flags & GOOL_FLAG_PAUSED_CODE) {}
-      else
+      elapsed_since = (frames_elapsed - timestamp) & 0x00FFFFFF;
+#ifdef CFLAGS_EXTENSIONS
+      hq.interp = GoolAnimInterpFactor(context.draw_stamp, frames_elapsed, elapsed_since, wait);
+      if (dbg->flags & GOOL_FLAG_PAUSED_CODE) {} else
 #endif
       if ((uint32_t)elapsed_since >= wait) { /* if the required wait time (or more) has elapsed */
-#ifdef CFLAGS_HIRES_TEST
-        if (hires) { interp_factor = 0.0; }
-#endif
         obj->sp--;                 /* get rid of the now useless tag */
         res = GoolObjectInterpret(obj, GOOL_FLAG_SUSPEND_ON_ANIM, &response); /* ...and continue execution until another animation instruction is reached */
         if (ISERRORCODE(res)) { return res; } /* return on fail */
@@ -1224,8 +1344,13 @@ int GoolObjectUpdate(gool_object *obj, int flag) {
       break;
     }
   }
-  if (display)
+  if (display) {
+#ifdef CFLAGS_EXTENSIONS
+    extern gool_object *hover_obj;
+    if (obj == hover_obj) GoolObjectHighlight(obj);
+#endif
     GoolObjectTransform(obj);
+  }
   cur_obj = 0;
   return SUCCESS;
 }
@@ -1234,6 +1359,8 @@ int GoolObjectUpdate(gool_object *obj, int flag) {
 void GoolObjectTransform(gool_object *obj) {
   gool_anim *anim; // $s0
   entry *en, *svtx, *cvtx, *zone;
+  svtx_frame *frame_svtx;
+  cvtx_frame *frame_cvtx;
   zone_header *header;
   texinfo2 *info2;
 #ifdef PSX
@@ -1246,6 +1373,9 @@ void GoolObjectTransform(gool_object *obj) {
   gool_vectors *obj_vectors, *cam_vectors;
   int i,frame_idx,status_b,flag,flag2;
   int res,far,shrink,x,offs;
+#ifdef CFLAGS_EXTENSIONS
+  int next_idx;
+#endif
 #ifdef PSX
    int size,*src,*dst,flag2;
    char *eid_str;
@@ -1269,31 +1399,21 @@ void GoolObjectTransform(gool_object *obj) {
 #endif
     if (en->type != 20) {
       svtx = NSLookup(&anim->v.eid);
-      svtx_frame *frame;
-      frame = (svtx_frame*)svtx->items[frame_idx];
-#ifdef CFLAGS_HIRES_TEST
-      next_frame = 0;
-      if (hires) {
-        if (svtx->item_count == 1) { 
-          next_frame = 0; 
-        }
-        else if (frame_idx == svtx->item_count-1) {
-          frame_idx--;
-          frame = (svtx_frame*)svtx->items[frame_idx];
-          next_frame = (svtx_frame*)svtx->items[frame_idx+1];
-          is_last_frame = 1;
-        }
-        else { 
-          is_last_frame = 0;
-          next_frame = (svtx_frame*)svtx->items[frame_idx+1];
-        }
-      }
+#ifdef CFLAGS_EXTENSIONS
+      next_idx = GoolPrepareVertexInterp(svtx, &frame_idx);
+      hq.next_frame = next_idx >= 0 ? (svtx_frame*)svtx->items[next_idx] : 0;
 #endif
-      GfxTransformSvtx(frame, ot, obj);
+      frame_svtx = (svtx_frame*)svtx->items[frame_idx];
+      GfxTransformSvtx(frame_svtx, ot, obj);
     }
     else {
       cvtx = NSLookup(&anim->v.eid);
-      GfxTransformCvtx((cvtx_frame*)cvtx->items[frame_idx], ot, obj);
+#ifdef CFLAGS_EXTENSIONS
+      next_idx = GoolPrepareVertexInterp(cvtx, &frame_idx);
+      hq.next_cvtx_frame = next_idx >= 0 ? (cvtx_frame*)cvtx->items[next_idx] : 0;
+#endif
+      frame_cvtx = (cvtx_frame*)cvtx->items[frame_idx];
+      GfxTransformCvtx(frame_cvtx, ot, obj);
     }
     if (status_b & 0x100000) {
       /* inherit zone colors */
@@ -1422,6 +1542,37 @@ void GoolObjectTransform(gool_object *obj) {
     }
   }
 }
+
+#ifdef CFLAGS_EXTENSIONS
+void GoolObjectHighlight(gool_object *obj) {
+  gool_colors colors;
+  uint8_t *start, *end, *it;
+  int i;
+
+  start = *GLGetPrimsTail();
+  colors = obj->colors;
+  GoolObjectTransform(obj);
+  obj->colors = colors;
+  end = *GLGetPrimsTail();
+  for (it=start;it<end;) {
+    prim_struct *prim = (prim_struct*)it;
+    if (prim->type == 1) {
+      poly3i *poly = (poly3i*)it;
+      poly->flags |= PRIM_FLAG_HIGHLIGHT;
+      for (i=0;i<3;i++)
+        poly->colors[i] = (rgba){.r=0x33333333, .g=0x33333333, .b=0x33333333, .a=0};
+      it += sizeof(poly3i);
+    }
+    else {
+      poly4i *poly = (poly4i*)it;
+      poly->flags |= PRIM_FLAG_HIGHLIGHT;
+      for (i=0;i<4;i++)
+        poly->colors[i] = (rgba){.r=0x33333333, .g=0x33333333, .b=0x33333333, .a=0};
+      it += sizeof(poly4i);
+    }
+  }
+}
+#endif
 
 //----- (8001E3D4) --------------------------------------------------------
 static int GoolTextStringTransform(
@@ -1640,7 +1791,7 @@ int GoolObjectColors(gool_object *obj) {
       collider = obj->collider;
       g_header = (gool_header*)collider->global->items[0];
       if (g_header->category == 0x300)
-        GoolSendEvent(obj, collider, GOOL_EVENT_HIT_INVINCIBLE, 1, 0);
+        GoolSendEvent(obj, collider, GOOL_EVENT_HIT_INVINCIBLE, 1, (uint32_t[]){0});
     }
   case 3:
     if (invincibility_state == 3 && elapsed_since > 451) /* 7.5s at 60fps */
@@ -1675,17 +1826,14 @@ int GoolObjectColors(gool_object *obj) {
   return SUCCESS;
 }
 
-int GoolObjectBound(gool_object *obj) {
-  gool_bound *bound, crash_bound;
+inline void GoolObjectGetBound(gool_object *obj, gool_bound *bound) {
   gool_anim *anim;
   svtx_frame *frame;
   entry *entry;
   vec trans;
   int32_t rot_x;
-  int bound_idx, frame_idx;
+  int frame_idx;
 
-  bound_idx = object_bound_count++;
-  bound = &object_bounds[bound_idx]; /* allocate a new bound for this object/frame */
   bound->obj = obj;
   anim = obj->anim_seq;
   frame_idx = obj->anim_frame >> 8;
@@ -1752,7 +1900,15 @@ int GoolObjectBound(gool_object *obj) {
     bound->p2.y = obj->trans.y + obj->bound.p2.y;
     bound->p2.z = obj->trans.z + obj->bound.p2.z;
   }
-  if (obj->anim_stamp == crash->anim_stamp) { /* rendered during same frame as crash? */
+}
+
+//----- (8001D33C) --------------------------------------------------------
+int GoolObjectBound(gool_object *obj) {
+  gool_bound *bound, crash_bound;
+
+  bound = &object_bounds[object_bound_count++];
+  GoolObjectGetBound(obj, bound);
+  if (GoolObjectBoundCanUpdate(obj)) { /* rendered during same frame as crash? */
     crash_bound.p1.x = crash->trans.x + crash->bound.p1.x;
     crash_bound.p1.y = crash->trans.y + crash->bound.p1.y;
     crash_bound.p1.z = crash->trans.z + crash->bound.p1.z;
@@ -1767,7 +1923,7 @@ int GoolObjectBound(gool_object *obj) {
    return 0;
 }
 
-static inline int32_t GoolObjectControlDir(gool_object *obj, int scale) {
+static inline int32_t GoolObjectControlDir(gool_object *obj, ticks_t scale) {
   const gool_accel_state *accel_state;
   const gool_move_state *move_state;
   uint32_t status_a,state_flags,dir;
@@ -1808,7 +1964,7 @@ static inline int32_t GoolObjectControlDir(gool_object *obj, int scale) {
     delta = 0x1000 - delta;
   if (state_flags & GOOL_FLAG_AIR_STATE) { /* in air? */
     accel = accel_state->accel;
-    accel = ((cos(delta)>>6)*((accel*scale)/1024))>>6; /* angular acceleration */
+    accel = ((cos(delta)>>6)*(int32_t)((accel*scale)/1024))>>6; /* angular acceleration */
     obj->speed += accel; /* accelerate */
     if (obj->speed <= 0x100) /* slow enough? */
       obj->target_rot.x = tgt_ang_xz; /* set directly to target angle */
@@ -1846,15 +2002,12 @@ static inline int32_t GoolObjectControlDir(gool_object *obj, int scale) {
 int GoolObjectPhysics(gool_object *obj) {
   vec trans, velocity;
   uint32_t status_a, status_b;
-  int32_t scale, speed, speed_scale, tgt_ang_xz, lim;
+  int32_t speed, speed_scale, tgt_ang_xz, lim;
+  ticks_t scale;
 
   status_a = obj->status_a;
   status_b = obj->status_b;
-#ifdef PSX
-  scale = min(context->c1_p.ticks_per_frame, 0x66);
-#else
-  scale = min(context.ticks_per_frame, 0x66);
-#endif
+  scale = min(ticks_per_frame, 102);
   if ((status_b & GOOL_FLAG_DPAD_CONTROL) && (game_state == GAME_STATE_PLAYING)) { /* dir controlled by joypad? */
     speed_scale = GoolObjectControlDir(obj, scale);
     /* calc velocity vector */
@@ -1921,7 +2074,7 @@ int GoolObjectPhysics(gool_object *obj) {
   }
   if (status_b & GOOL_FLAG_COLLIDABLE) { /* collidable? */
     /* not the same render frame as crash and within range of crash? */
-    if (obj->anim_stamp != crash->anim_stamp &&
+    if (!GoolObjectBoundCanUpdate(obj) &&
       !OutOfRange(obj, &obj->trans, &crash->trans, 0x7D000, 0xAF000, 0x7D000))
       GoolObjectBound(obj); /* compute and record object rect */
   }
@@ -2093,7 +2246,7 @@ static int GoolTestControls(uint32_t instruction, int port) {
 }
 
 /* forward declarations */
-static inline void GoolOp13unnamed(gool_object*,uint32_t);
+static inline void GoolOpTriangleWave(gool_object*,uint32_t);
 static inline void GoolOp2225unnamed(gool_object*,uint32_t);
 static inline void GoolOpMisc(gool_object*,uint32_t);
 static inline int GoolOpControlFlow(gool_object*,uint32_t,uint32_t*,gool_state_ref*);
@@ -2144,10 +2297,10 @@ G_TRANS_GOPB(obj,ins,b)
 (((a) == 0x1F) ? GoolObjectPop(obj) \
                : obj->regs[a])
 
-#ifdef CFLAGS_GOOL_DEBUG
+#ifdef CFLAGS_EXTENSIONS
 gool_debug_cache debug_cache = { 0 };
 int GoolObjectTryBreak(gool_object *obj, uint32_t opcode, uint32_t flags, int res);
-#endif /* CFLAGS_GOOL_DEBUG */
+#endif
 
 //----- (800201DC) --------------------------------------------------------
 int GoolObjectInterpret(gool_object *obj, uint32_t flags, gool_state_ref *transition) {
@@ -2175,14 +2328,14 @@ int GoolObjectInterpret(gool_object *obj, uint32_t flags, gool_state_ref *transi
 #define sb r2.sb
 #define sl r2.sl
 #define dst r2.dst
-#ifdef CFLAGS_GOOL_DEBUG
+#ifdef CFLAGS_EXTENSIONS
   gool_debug *dbg;
 
   dbg = GoolObjectDebug(obj);
   if (dbg && ((dbg->flags & GOOL_FLAGS_PAUSED)==GOOL_FLAGS_PAUSED)) { return SUCCESS; } /* paused */
 #endif
   while (1) {
-#ifdef CFLAGS_GOOL_DEBUG
+#ifdef CFLAGS_EXTENSIONS
     if (dbg) { dbg->obj_prev = *obj; }
 #endif
     res = 0;
@@ -2275,7 +2428,7 @@ int GoolObjectInterpret(gool_object *obj, uint32_t flags, gool_state_ref *transi
       *(dst) = !a;
       break;
     case 0x13:
-      GoolOp13unnamed(obj,instruction);
+      GoolOpTriangleWave(obj,instruction);
       break;
     case 0x14:
       G_TRANS_GOPA_IN(obj,instruction,src);
@@ -2332,14 +2485,18 @@ int GoolObjectInterpret(gool_object *obj, uint32_t flags, gool_state_ref *transi
       break;
     }
     case 0x1B: {
-      int32_t speed, velocity;
+      ticks_t speed;
+      int32_t velocity;
       G_TRANS_GOPS(obj,instruction,sa,sb);
-#ifdef PSX
-      speed = min(context.cur->ticks_per_frame, 0x66); /* offset 0x84 in disp */
-#else
-      speed = min(context.ticks_per_frame, 0x66);
+      speed = min(ticks_per_frame, 102);
+#ifdef CFLAGS_EXTENSIONS
+      if (ext_config.fps_mode && !hq.trans)
+        speed = max(speed, 34.0);
 #endif
       velocity = sb + (sa*speed)/1024;
+#ifdef CFLAGS_EXTENSIONS
+      GoolNoteSpd(velocity);
+#endif
       GoolObjectPush(obj, velocity);
       break;
     }
@@ -2454,7 +2611,7 @@ int GoolObjectInterpret(gool_object *obj, uint32_t flags, gool_state_ref *transi
       GoolOpReactSolidSurfaces(obj,instruction);
       break;
     }
-#ifdef CFLAGS_GOOL_DEBUG
+#ifdef CFLAGS_EXTENSIONS
     res = GoolObjectTryBreak(obj,opcode,flags,res);
 #endif
     if (ISCODE(res)) { return res; }
@@ -2471,7 +2628,7 @@ int GoolObjectInterpret(gool_object *obj, uint32_t flags, gool_state_ref *transi
 #undef sl
 #undef dst
 
-#ifdef CFLAGS_GOOL_DEBUG
+#ifdef CFLAGS_EXTENSIONS
 #define GOOL_FLAGS_TRANS_BLOCK (GOOL_FLAG_SUSPEND_ON_RET | GOOL_FLAG_SUSPEND_ON_RETLNK)
 #define GOOL_FLAGS_CODE_BLOCK GOOL_FLAG_SUSPEND_ON_ANIM
 int GoolObjectTryBreak(gool_object *obj, uint32_t opcode, uint32_t flags, int res) {
@@ -2523,37 +2680,46 @@ int GoolObjectTryBreak(gool_object *obj, uint32_t opcode, uint32_t flags, int re
 #endif
 
 static inline
-void GoolOp13unnamed(gool_object *obj, uint32_t instruction) {
-  int32_t *inout,p1,p2,rate,prog,absprog;
+void GoolOpTriangleWave(gool_object *obj, uint32_t instruction) {
+  int32_t *inout,step,limit,phase,next,res;
 
   if (G_OPA(instruction) == 0xBF0) {
-    p1 = GoolObjectPop(obj);
-    p2 = GoolObjectPop(obj);
+    step = GoolObjectPop(obj);
+    limit = GoolObjectPop(obj);
   }
   else {
-    p1 = 0x100;
-    p2 = *(GoolTranslateInGop(obj,G_OPA(instruction)));
+    step = 0x100;
+    limit = *(GoolTranslateInGop(obj,G_OPA(instruction)));
   }
   inout = (int32_t*)GoolTranslateInGop(obj, G_OPB(instruction));
   if (!inout) { return; }
-  rate = *(inout);
-  if (p2 >= 0) {
-    if ((rate + p1) < p2)
-      prog = rate + p1;
+  phase = *(inout);
+#ifdef CFLAGS_EXTENSIONS
+  /* when in a trans block and a SPD instruction has not produced
+     the step input, scale it back so that effective frequency matches 
+     the original */
+  if (ext_config.fps_mode && hq.trans 
+   && step > 0 && !GoolIsSpd(step)) {
+    step = GoolScaleStep(step, context.draw_stamp, ticks_per_frame);
+  }
+#endif
+  if (limit >= 0) {
+    if ((phase + step) < limit)
+      next = phase + step;
     else
-      prog = (p1*2) - p2;
-    absprog = abs(prog);
+      next = (step*2) - limit;
+    res = abs(next);
   }
   else {
-    if (p2 >= (rate - p1))
-      prog = -p2 - (p1*2);
+    if (limit >= (phase - step))
+      next = -limit - (step*2);
     else
-      prog = rate - p1;
-    absprog = -abs(prog);
+      next = phase - step;
+    res = -abs(next);
   }
   inout = (int32_t*)GoolTranslateOutGop(obj, G_OPB(instruction));
-  *(inout) = prog;
-  GoolObjectPush(obj, absprog);
+  *(inout) = next;
+  GoolObjectPush(obj, res);
 }
 
 static inline
@@ -2856,7 +3022,7 @@ void GoolOpMisc(gool_object *obj, uint32_t instruction) {
         for (ii=0;ii<8;ii++)
           GoolObjectHandleTraverseTreePostorder(
             (gool_object*)&handles[ii],
-            (gool_ifnptr_t)(void*)GoolZoneObjectsTerminate,
+            (gool_ifnptr_t)(void*)GoolZoneObjectTerminate,
             (int)neighbor);
       }
       break;
@@ -3291,6 +3457,10 @@ static inline void GoolOpSpawnChildren(gool_object *obj, uint32_t instruction, u
   spawn_count = (instruction & 0x3F);
   if (!spawn_count)
     spawn_count = (int)obj->sp[--argc]; /* is this correct? */
+#ifdef CFLAGS_EXTENSIONS
+  if (!GoolCanSpawnChildren(obj, type, subtype)) 
+    spawn_count = 0;
+#endif
   if (spawn_count > 0) {
     flag = (opcode == 0x91);
     for (i=0;i<spawn_count;i++) {
@@ -3513,15 +3683,11 @@ int GoolSendEvent(gool_object *sender, gool_object *recipient, uint32_t event, i
 
 //----- (800243A0) --------------------------------------------------------
 int16_t GoolObjectRotate(int16_t anga, int16_t angb, int32_t speed, gool_object *obj) {
-  uint32_t scale;
+  ticks_t scale;
   int32_t velocity, delta, abs_delta;
 
-#ifdef PSX
-  scale = min(context.c1_p->ticks_per_frame, 0x66);
-#else
-  scale = min(context.ticks_per_frame, 0x66);
-#endif
-  velocity = (speed*(int32_t)scale)/1024;
+  scale = min(ticks_per_frame, 102);
+  velocity = (speed*scale)/1024;
   anga = angle12(anga);
   angb = angle12(angb);
   delta = angb - anga;
@@ -3569,15 +3735,11 @@ int16_t GoolObjectRotate(int16_t anga, int16_t angb, int32_t speed, gool_object 
 
 //----- (80024528) --------------------------------------------------------
 int16_t GoolObjectRotate2(int16_t anga, int16_t angb, int32_t speed, gool_object *obj) {
-  uint32_t scale;
+  ticks_t scale;
   int32_t velocity, delta, abs_delta;
 
-#ifdef PSX
-  scale = min(context.c1_p->ticks_per_frame, 0x66);
-#else
-  scale = min(context.ticks_per_frame, 0x66);
-#endif
-  velocity = (speed*(int32_t)scale)/1024; /* angular speed */
+  scale = min(ticks_per_frame, 102);
+  velocity = (speed*scale)/1024;
   anga = angle12(anga);
   angb = angle12(angb);
   delta = angb - anga;
@@ -3936,7 +4098,7 @@ int GoolObjectInterrupt(gool_object *obj, uint32_t addr, int argc, uint32_t *arg
 }
 
 //------ object debugging extensions -------------------------------------
-#ifdef CFLAGS_GOOL_DEBUG
+#ifdef CFLAGS_EXTENSIONS
 
 #define GOOL_DEBUG_DISLEN 8
 extern char *GoolDisassemble(uint32_t, uint32_t);
@@ -4165,6 +4327,18 @@ void GoolObjectStep(gool_object *obj, int type) {
     dbg->flags |= GOOL_FLAG_STEP_TRANS;
   else if (type == 2)
     dbg->flags |= GOOL_FLAG_STEP_CODE;
+}
+
+static int (*gool_on_kill)(gool_object *obj);
+
+static int GoolObjectKilled(gool_object *obj) {
+  if (gool_on_kill)
+    return gool_on_kill(obj);
+  return 0;
+}
+
+void GoolOnKill(int (*callback)(gool_object*)) {
+  gool_on_kill = callback;
 }
 
 #endif

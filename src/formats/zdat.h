@@ -44,20 +44,20 @@ typedef struct {
 } zone_world;
 
 typedef struct {
-  uint32_t vram_fill_height;
+  uint32_t sky_color_fill_height;
   uint32_t unknown_a;
   uint32_t visibility_depth;
   uint32_t unknown_b;
-  uint32_t unknown_c;
-  uint32_t unknown_d;
-  uint32_t unknown_e;
+  uint32_t max_depth_x;
+  uint32_t max_depth_y;
+  uint32_t max_depth_z;
   uint32_t flags;
   int32_t water_y;
   eid_t midi;
   uint32_t unknown_g;
-  rgb8 unknown_h;
+  rgb8 sky_color;
   uint8_t unused_a;
-  rgb8 vram_fill;
+  rgb8 ground_color;
   uint8_t unused_b;
   rgb8 far_color;
   uint8_t unused_c;

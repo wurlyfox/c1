@@ -10,7 +10,7 @@
 #endif
 
 /* default compilation settings */
-#define LID_BOOTLEVEL             LID_NSANITYBEACH
+#define LID_BOOTLEVEL             LID_TITLE
 #ifndef PSX                       /* non-PSX target options */
 #define CFLAGS_BUGFIXES
 #endif
@@ -58,6 +58,7 @@
   a09; a08; a07; a06; a05; a04; a03; a02; a01;
 
 /* misc */
+#define abs(a)   ((a)<0?-(a):(a))
 #define min(a,b) ((a)<(b)?(a):(b))
 #define max(a,b) ((a)>(b)?(a):(b))
 #define min3(a,b,c)   min(min(a,b),c)
@@ -118,5 +119,12 @@
 #define LID_CASTLEMACHINERY   0x37
 #define LID_INTRO             0x38
 #define LID_GAMEWIN           0x39
+
+/* timing precision */
+#ifndef CFLAGS_EXTENSIONS
+typedef int32_t ticks_t;
+#else
+typedef double ticks_t;
+#endif
 
 #endif /* _COMMON_H_ */

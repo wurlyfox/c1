@@ -93,6 +93,10 @@ uint32_t *p_circle_bitmap;       /* 8005670C; gp[0xC4] */
 vec prev_velocity;               /* 800567F8 */
 zone_query cur_zone_query;       /* 8005CFEC */
 
+#ifdef CFLAGS_EXTENSIONS
+#include "ext/ext.h"
+#endif
+
 extern ns_struct ns;
 extern entry *cur_zone;
 extern gool_bound object_bounds[28];
@@ -515,10 +519,6 @@ static int StopAtZone(gool_object *obj, vec *next_trans) {
   return SUCCESS;
 }
 
-#ifdef CFLAGS_HIRES_TEST
-extern int hires;
-#endif
-
 //----- (8002D384) --------------------------------------------------------
 void TransStopAtSolid(gool_object *obj, zone_query *query, vec *trans, vec *delta_trans, vec *next_trans) {
   vec bit_idx, adj_bit_idx, adj_trans;
@@ -537,14 +537,13 @@ void TransStopAtSolid(gool_object *obj, zone_query *query, vec *trans, vec *delt
     /* convert [adjusted] index back to a relative location and add to trans */
     adj_trans.x = trans->x + (((adj_bit_idx.x - 16)*8192)>>2); /* readjust */
     adj_trans.z = trans->z + (((adj_bit_idx.z - 16)*8192)>>2);
-#ifdef CFLAGS_HIRES_TEST
+#ifdef CFLAGS_EXTENSIONS
     /* when using smaller average displacement steps at higher frame rates
        and a non-solid location is directly targeted, do not quantize movement to the bitmap scale;
        at lower frame rates this is acceptable since 
        delta_trans approx= trans+(((adj_bit_idx-16)*8192)>>2)
-       but at higher frame rates the step is smaller and thus the RHS loses accuracy.
-       */
-    if (hires) {
+       but at higher frame rates the step is smaller and thus the RHS loses accuracy */
+    if (ext_config.fps_mode) {
       if (adj_bit_idx.x == bit_idx.x) 
         adj_trans.x = trans->x + delta_trans->x;
       if (adj_bit_idx.z == bit_idx.z) 
@@ -1319,4 +1318,3 @@ int FindCeilY(
 }
 
 #endif
-

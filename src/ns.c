@@ -229,6 +229,8 @@ uint8_t *NSFileReadRange(char *filename, int start, int end, size_t *size) {
   if (end == 0 || (end != -1 && start >= end)) { return 0; }
   if (size == 0) { size = &tmp; }
   file = fopen(filename, "r");
+  if (!file)
+    return (uint8_t*)ERROR_READ_FAILED;
   fseek(file, 0, SEEK_END);
   end = end == -1 ? ftell(file) : end;
   *size = end - start;
@@ -238,7 +240,7 @@ uint8_t *NSFileReadRange(char *filename, int start, int end, size_t *size) {
     return (uint8_t*)ERROR_MALLOC_FAILED;
   }
   fseek(file, start, SEEK_SET);
-  fread(data, 1, *size, file);
+  tmp = fread(data, 1, *size, file);
   return data;
 }
 
@@ -1339,6 +1341,7 @@ static inline void NSInitAudioPages(ns_struct *nss, uint32_t lid) {
     ns.wavebank_page_count = limit(8-count, 2, 4);
     break;
   }
+  addr = 0;
   for (i=0;i<8;i++) {
     aps = &audio_pages[i];
     aps->idx = i;

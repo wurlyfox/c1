@@ -153,6 +153,20 @@ typedef union {
   float c[3];
 } fvec;
 
+typedef union {
+  struct {
+    double x, y;
+  };
+  double c[2];
+} dvec2;
+
+typedef union {
+  struct {
+    double x, y, z;
+  };
+  double c[3];
+} dvec;
+
 typedef vec pnt;
 typedef vec16 pnt16;
 typedef vec8 pnt8;
@@ -167,6 +181,8 @@ typedef uvec216 upnt216;
 typedef uvec28 upnt28;
 typedef fvec fpnt;
 typedef fvec2 fpnt2;
+typedef dvec dpnt;
+typedef dvec2 dpnt2;
 
 /* euler/tait-bryan angle types */
 #define angle12(c) ((c)&0xFFF)
@@ -212,6 +228,20 @@ typedef union {
   };
   float c[2];
 } fang2; /* 2 component, float-valued euler or tait-bryan angle */
+
+typedef union {
+  struct {
+    double y, x, z;
+  };
+  double c[3];
+} dang; /* 3 component, double-valued euler or tait-bryan angle */
+
+typedef union {
+  struct {
+    double x, y;
+  };
+  double c[2];
+} dang2; /* 2 component, double-valued euler or tait-bryan angle */
 
 /* dimensions types */
 typedef union {
@@ -280,7 +310,21 @@ typedef union {
     float w, h, d;
   };
   float c[3];
-} fdim;
+} fdim3;
+
+typedef union {
+  struct {
+    double w, h;
+  };
+  double c[2];
+} ddim2;
+
+typedef union {
+  struct {
+    double w, h, d;
+  };
+  double c[3];
+} ddim;
 
 /* bound types */
 typedef struct {
@@ -322,6 +366,16 @@ typedef struct {
   fvec2 p1;
   fvec2 p2;
 } fbound2;
+
+typedef struct {
+  dvec p1;
+  dvec p2;
+} dbound;
+
+typedef struct {
+  dvec2 p1;
+  dvec2 p2;
+} dbound2;
 
 /* rect types */
 typedef union {
@@ -399,7 +453,7 @@ typedef union {
   };
   struct {
     fvec loc;
-    fdim dim;
+    fdim3 dim;
   };
 } frect;
 
@@ -413,6 +467,28 @@ typedef union {
     fdim2 dim;
   };
 } frect2;
+
+typedef union {
+  struct {
+    double x, y, z;
+    double w, h, d;
+  };
+  struct {
+    dvec loc;
+    ddim dim;
+  };
+} drect;
+
+typedef union {
+  struct {
+    double x, y;
+    double w, h;
+  };
+  struct {
+    dvec2 loc;
+    ddim2 dim;
+  };
+} drect2;
 
 /* color types */
 typedef union {
@@ -467,6 +543,8 @@ typedef union {
 /* matrix types */
 typedef int16_t mat16_t[3][3];
 typedef int32_t mat_t[3][3];
+typedef float fmat_t[3][3];
+typedef double dmat_t[3][3];
 
 /* matrix (plus trans vector) types */
 typedef struct {
@@ -489,6 +567,24 @@ typedef struct {
   vec t;
 } mat;
 
+typedef struct {
+  union {
+    float m[3][3];
+    fvec v[3];
+    fang a[3];
+  };
+  fvec t;
+} fmat;
+
+typedef struct {
+  union {
+    double m[3][3];
+    dvec v[3];
+    dang a[3];
+  };
+  dvec t;
+} dmat;
+
 /* matrix (no trans vector) types */
 typedef union {
   int32_t m[3][3];
@@ -504,6 +600,18 @@ typedef union {
   rgb16 c[3];
 } matn16;
 
+/* line types */
+typedef vec line_t[2];
+typedef vec16 line16_t[2];
+typedef vec8 line8_t[2];
+typedef vec2 line2_t[2];
+typedef vec216 line216_t[2];
+typedef vec28 line28_t[2];
+typedef fvec fline_t[2];
+typedef fvec2 fline2_t[2];
+typedef dvec dline_t[2];
+typedef dvec2 dline2_t[2];
+
 /* triangle types */
 typedef vec tri_t[3];
 typedef vec16 tri16_t[3];
@@ -513,6 +621,8 @@ typedef vec216 tri216_t[3];
 typedef vec28 tri28_t[3];
 typedef fvec ftri_t[3];
 typedef fvec2 ftri2_t[3];
+typedef dvec dtri_t[3];
+typedef dvec2 dtri2_t[3];
 
 typedef struct { vec p[3]; } tri;
 typedef struct { vec16 p[3]; } tri16;
@@ -522,6 +632,8 @@ typedef struct { vec216 p[3]; } tri216;
 typedef struct { vec28 p[3]; } tri28;
 typedef struct { fvec p[3]; } ftri;
 typedef struct { fvec2 p[3]; } ftri2;
+typedef struct { dvec p[3]; } dtri;
+typedef struct { dvec2 p[3]; } dtri2;
 
 /* quad types */
 typedef vec qudad_t[4];
@@ -532,6 +644,8 @@ typedef vec216 quad216_t[4];
 typedef vec28 quad28_t[4];
 typedef fvec fquad_t[4];
 typedef fvec2 fquad2_t[4];
+typedef dvec dquad_t[4];
+typedef dvec2 dquad2_t[4];
 
 typedef struct { vec p[4]; } quad;
 typedef struct { vec16 p[4]; } quad16;
@@ -541,6 +655,8 @@ typedef struct { vec216 p[4]; } quad216;
 typedef struct { vec28 p[4]; } quad28;
 typedef struct { fvec p[4]; } fquad;
 typedef struct { fvec2 p[4]; } fquad2;
+typedef struct { dvec p[4]; } dquad;
+typedef struct { dvec2 p[4]; } dquad2;
 
 /* texture types */
 typedef struct { /* idx_x, idx_y, y_half stored twice to ease conversion to tpage id and clut id, respectively */
@@ -622,116 +738,170 @@ typedef struct {
 /* vector operations */
 
 /* metaprogramming primitives */
-#define EVAL(a) a
-#define CONCAT(a,b,...) EVAL(a) EVAL(b)
-#define RCONCAT(a,b,...) CONCAT(b,a)
+#define ARGC(...) \
+ARGC_AUX(,##__VA_ARGS__, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+#define ARGC_AUX(_0, _1,  _2,  _3,  _4,  _5,  _6,  _7,  _8, \
+                 _9, _10, _11, _12, _13, _14, _15, _16, x, ...) x
 
-#define REPEAT_9(m,...) m(9,REPEAT_8(m,__VA_ARGS__),__VA_ARGS__)
-#define REPEAT_8(m,...) m(8,REPEAT_7(m,__VA_ARGS__),__VA_ARGS__)
-#define REPEAT_7(m,...) m(7,REPEAT_6(m,__VA_ARGS__),__VA_ARGS__)
-#define REPEAT_6(m,...) m(6,REPEAT_5(m,__VA_ARGS__),__VA_ARGS__)
-#define REPEAT_5(m,...) m(5,REPEAT_4(m,__VA_ARGS__),__VA_ARGS__)
-#define REPEAT_4(m,...) m(4,REPEAT_3(m,__VA_ARGS__),__VA_ARGS__)
-#define REPEAT_3(m,...) m(3,REPEAT_2(m,__VA_ARGS__),__VA_ARGS__)
-#define REPEAT_2(m,...) m(2,REPEAT_1(m,__VA_ARGS__),__VA_ARGS__)
-#define REPEAT_1(m,...) m(1,,__VA_ARGS__)
-#define REPEAT(n,m,...) REPEAT_ ## n(m,__VA_ARGS__)
+#define TG0(_0, ...) _0
+#define TG1(_0, _1, ...) _1
 
-/* tuples */
-#define TGET(t,i,...) \
-T_ ## t ## _ ## i(__VA_ARGS__)
+#define _CONCAT(a,b) a ## b
+#define CONCAT(a,b) _CONCAT(a,b)
+#define CONCATX(a,b,...) CONCAT(a,b)(__VA_ARGS__)
+#define CONCATC(m,...) CONCATX(m, ARGC(__VA_ARGS__), __VA_ARGS__)
 
-/* binary operation, inferred source operand types */
-#define BOp(d,a,b,t,op) \
-d = (t)((t)(a) op (t)(b));
-/* binary operation, operands are parallel members of tuples */
-#define TOp1(i,d,a,b,h,e,f,t,op) \
-BOp(TGET(h,i,d),TGET(e,i,a),TGET(f,i,b),t,op)
-/* fold macro for TOpN */
-#define TOpR(i,r,...) \
-EVAL(r) EVAL(TOp1(i,__VA_ARGS__))
-/* binary operation, operands are n-tuples */
-#define TOpN(n,...) \
-REPEAT(n,TOpR,__VA_ARGS__)
+#define STMT_EXPR_N1(a,ra,x)  \
+({ __auto_type ra = (a); x; })
+#define STMT_EXPR_N2(a,b,ra,rb,x) \
+({ __auto_type _ra = (a); __auto_type _rb = (b); \
+   __auto_type ra = _ra; __auto_type rb = _rb; x; })
+#define STMT_EXPR_N3(a,b,c,ra,rb,rc,x) \
+({ __auto_type _ra = (a); __auto_type _rb = (b); __auto_type _rc = (c); \
+   __auto_type ra = _ra; __auto_type rb = _rb; __auto_type rc = _rc; x; })
+#define STMT_EXPR_1(a,x) STMT_EXPR_N1(a,ra,x)
+#define STMT_EXPR_2(a,b,x) STMT_EXPR_N2(a,b,ra,rb,x)
+#define STMT_EXPR_3(a,b,c,x) STMT_EXPR_N3(a,b,c,ra,rb,rc,x)
 
-/* specializations of TOpN for pair of equal operand types */
-#define TOp(n,d,a,b,x,t,op) \
-TOpN(n,d,a,b,x,x,x,t,op)
-#define ATOp(n,d,a,b,x,y,t,op) \
-TOpN(n,d,a,b,x,y,x,t,op)
-#define BTOp(n,d,a,b,x,y,t,op) \
-TOpN(n,d,a,b,x,x,y,t,op)
-#define DTOp(n,d,a,b,x,y,t,op) \
-TOpN(n,d,a,b,y,x,x,t,op)
-#define DATOp(n,d,a,b,x,y,t,op) \
-TOpN(n,d,a,b,y,y,x,t,op)
-#define DBTOp(n,d,a,b,x,y,t,op) \
-TOpN(n,d,a,b,y,x,y,t,op)
-#define ABTOp(n,d,a,b,x,y,t,op) \
-TOpN(n,d,a,b,x,y,y,t,op)
+#define MAP_EXPR_2(t,a,c,f) STMT_EXPR_N1(a, ma, \
+((t){ .c = { f(ma.c[0]), f(ma.c[1]) } }))
+#define MAP_EXPR_3(t,a,c,f) STMT_EXPR_N1(a, ma, \
+((t){ .c = { f(ma.c[0]), f(ma.c[1]), f(ma.c[2]) } }))
+#define MAPX_EXPR_2(t,a,c,d,x) STMT_EXPR_N1(a, ma, \
+({ typeof(ma.c[0]) d; (t){ .c = { ((d=ma.c[0]),x), ((d=ma.c[1]),x) } }; }))
+#define MAPX_EXPR_3(t,a,c,d,x) STMT_EXPR_N1(a, ma, \
+({ typeof(ma.c[0]) d; (t){ .c = { ((d=ma.c[0]),x), ((d=ma.c[1]),x), ((d=ma.c[2]),x) } }; }))
 
-#define T_vec_1(n) n.x
-#define T_vec_2(n) n.y
-#define T_vec_3(n) n.z
-#define T_dim_1(n) n.w
-#define T_dim_2(n) n.h
-#define T_dim_3(n) n.d
+/* templates for 2d vector ops */
+#define VEC2_OP_OP(t,a,b,op) \
+((t){ .c = { a.c[0] op b.c[0], a.c[1] op b.c[1] } })
+#define VEC2_OP_UNARY(t,a,b,op) \
+((t){ .c = { op a.c[0], op a.c[1] }})
+#define VEC2_OP_SCALAR(t,a,b,op) \
+((t){ .c = { a.c[0] op b, a.c[1] op b }})
+#define VEC2_OP_MAP(t,a,b,f) \
+((t){ .c = { f(a.c[0]), f(a.c[1]) } })
+#define VEC2_OP_ZIP(t,a,b,f) \
+((t){ .c = { f(a.c[0],b.c[0]), f(a.c[1],b.c[1]) } })
+#define VEC2_OP_MAPX(t,a,b,x) \
+({ typeof(a.c[0]) c; (t){ .c = { ((c=a.c[0]),x), ((c=a.c[1]),x) } }; })
+#define VEC2_OP_ZIPX(t,a,b,x) \
+({ typeof(a.c[0]) l,r; (t){ .c = { ((l=a.c[0]),(r=b.c[0]),x), ((l=a.c[1]),(r=b.c[1]),x) } }; })
+#define VEC2_OP_OPFOLD(t,a,b,op) \
+((a.c[0] TG0 op b.c[0]) TG1 op (a.c[1] TG0 op b.c[1]))
 
-#define VecOp(d,a,b,op) \
-TOp(3,d,a,b,vec,int32_t,op)
-#define Vec2Op(d,a,b,op) \
-TOp(2,d,a,b,vec,int32_t,op)
+/* templates for 3d vector ops */
+#define VEC3_OP_OP(t,a,b,op) \
+((t){ .c = { a.c[0] op b.c[0], a.c[1] op b.c[1], a.c[2] op b.c[2] } })
+#define VEC3_OP_UNARY(t,a,b,op) \
+((t){ .c = { op a.c[0], op a.c[1], op a.c[2] }})
+#define VEC3_OP_SCALAR(t,a,b,op) \
+((t){ .c = { a.c[0] op b, a.c[1] op b, a.c[2] op b } })
+#define VEC3_OP_MAP(t,a,b,f) \
+((t){ .c = { f(a.c[0]), f(a.c[1]), f(a.c[2]) } })
+#define VEC3_OP_ZIP(t,a,b,f) \
+((t){ .c = { f(a.c[0],b.c[0]), f(a.c[1],b.c[1]), f(a.c[2],b.c[2]) } })
+#define VEC3_OP_MAPX(t,a,b,x) \
+({ typeof(a.c[0]) c; (t){ .c = { ((c=a.c[0]),x), ((c=a.c[1]),x), ((c=a.c[2]),x) } }; })
+#define VEC3_OP_ZIPX(t,a,b,x) \
+({ typeof(a.c[0]) l,r; (t){ .c = { \
+  ((l=a.c[0]),(r=b.c[0]),x), \
+  ((l=a.c[1]),(r=b.c[1]),x), \
+  ((l=a.c[2]),(r=b.c[2]),x) \
+} }; })
+#define VEC3_OP_OPFOLD(t,a,b,op) \
+((a.c[0] TG0 op b.c[0]) TG1 op (a.c[1] TG0 op b.c[1]) TG1 op (a.c[2] TG0 op b.c[2]))
 
-/* Vec2Op specializations */
-#define Vec2Add(d,a,b) Vec2Op(d,a,b,+)
-#define Vec2Sub(d,a,b) Vec2Op(d,a,b,-)
-#define Vec2Mul(d,a,b) Vec2Op(d,a,b,*)
-#define Vec2Div(d,a,b) Vec2Op(d,a,b,/)
+/* generic vector op templates */
+#define VEC2_OP(type, a, b, arg) \
+STMT_EXPR_2(a, b, VEC2_OP_ ## type(typeof((a)),ra,rb,arg))
+#define VEC3_OP(type, a, b, arg) \
+STMT_EXPR_2(a, b, VEC3_OP_ ## type(typeof((a)),ra,rb,arg))
 
-/* Vec2Op specializations, compound assignment */
-#define Vec2AddL(a,b) Vec2Op(a,a,b,+)
-#define Vec2SubL(a,b) Vec2Op(a,a,b,-)
-#define Vec2MulL(a,b) Vec2Op(a,a,b,*)
-#define Vec2DivL(a,b) Vec2Op(a,a,b,/)
-#define Vec2AddR(a,b) Vec2Op(b,a,b,+)
-#define Vec2SubR(a,b) Vec2Op(b,a,b,-)
-#define Vec2MulR(a,b) Vec2Op(b,a,b,*)
-#define Vec2DivR(a,b) Vec2Op(b,a,b,/)
+/* 2d vector [generic] constructors */
+#define Vec2(type, x, y) ((type){ (x),(y) })
+#define Vec2Const(type, c) \
+STMT_EXPR_N1(c, rc, ((type){ rc,rc }))
+#define Vec2Cast(type, a) STMT_EXPR_1(a,((type){ ra.x, ra.y }))
 
-/* VecOp specializations */
-#define VecAdd(d,a,b) VecOp(d,a,b,+)
-#define VecSub(d,a,b) VecOp(d,a,b,-)
-#define VecMul(d,a,b) VecOp(d,a,b,*)
-#define VecDiv(d,a,b) VecOp(d,a,b,/)
+/* 2d vector [generic] ops */
+#define Vec2Add(a,b) VEC2_OP(OP,a,b,+)
+#define Vec2Sub(a,b) VEC2_OP(OP,a,b,-)
+#define Vec2Mul(a,b) VEC2_OP(OP,a,b,*)
+#define Vec2Div(a,b) VEC2_OP(OP,a,b,/)
+#define Vec2Pow(a,b) VEC2_OP(ZIP,a,b,pow)
+#define Vec2AddS(a,b) VEC2_OP(SCALAR,a,b,+)
+#define Vec2SubS(a,b) VEC2_OP(SCALAR,a,b,-)
+#define Vec2MulS(a,b) VEC2_OP(SCALAR,a,b,*)
+#define Vec2DivS(a,b) VEC2_OP(SCALAR,a,b,/)
+#define Vec2PowS(a,b) VEC2_OP(MAPX,a,b,pow(c,b))
+#define Vec2Neg(a) VEC2_OP(UNARY,a,b,-)
+#define Vec2Floor(a) VEC2_OP(MAP,a,b,floor)
+#define Vec2Ceil(a) VEC2_OP(MAP,a,b,ceil)
+#define Vec2Round(a) VEC2_OP(MAP,a,b,round)
+#define Vec2MinB(a) VEC2_OP(ZIP,a,b,min)
+#define Vec2MaxB(a) VEC2_OP(ZIP,a,b,max)
+#define Vec2Eq(a,b) VEC2_OP(OPFOLD,a,b,(==,&&))
+#define Vec2Dot(a,b) VEC2_OP(OPFOLD,a,b,(*,+))
 
-/* VecOp specializations, compound assignment */
-#define VecAddL(a,b) VecOp(a,a,b,+)
-#define VecSubL(a,b) VecOp(a,a,b,-)
-#define VecMulL(a,b) VecOp(a,a,b,*)
-#define VecDivL(a,b) VecOp(a,a,b,/)
-#define VecAddR(a,b) VecOp(b,a,b,+)
-#define VecSubR(a,b) VecOp(b,a,b,-)
-#define VecMulR(a,b) VecOp(b,a,b,*)
-#define VecDivR(a,b) VecOp(b,a,b,/)
+#define Vec2Mag(a) STMT_EXPR_N1(a,rv,\
+  ((typeof((rv).c[0]))(sqrt((double)Vec2Dot(rv,rv)))))
+#define Vec2Dist(a,b) (Vec2Mag(Vec2Sub(a,b)))
+#define Vec2SqrDist(a,b) (Vec2Dot(Vec2Sub(a,b),Vec2Sub(a,b)))
+#define Vec2Norm(a) (Vec2DivS(a,Vec2Mag(a)))
+#define Vec2PNorm(a) (Vec2SubS(Vec2MulS(Vec2Div(a,b),2),1))
+#define Vec2PDenorm(a) (Vec2DivS(Vec2Mul(Vec2Add(a,1),b),2))
+#define Vec2Dezero(a) VEC2_OP(MAPX,a,0,(c==0?0.0001:c))
+#define Vec2Interp(a,b,t) (Vec2Add(a,Vec2MulS(Vec2Sub(b,a),t)))
 
-/* specializations for Vec = Vec op Dim and Dim = Vec op Vec */
-#define Vec2Dim2Add(d,a,b) BTOp(2,d,a,b,vec,dim,int32_t,+)
-#define Vec2Dim2Sub(d,a,b) BTOp(2,d,a,b,vec,dim,int32_t,-)
-#define Vec2AddDim(d,a,b) DTOp(2,d,a,b,vec,dim,int32_t,+)
-#define Vec2SubDim(d,a,b) DTOp(2,d,a,b,vec,dim,int32_t,-)
-#define VecDimAdd(d,a,b) BTOp(3,d,a,b,vec,dim,int32_t,+)
-#define VecDimSub(d,a,b) BTOp(3,d,a,b,vec,dim,int32_t,-)
-#define VecAddDim(d,a,b) DTOp(3,d,a,b,vec,dim,int32_t,+)
-#define VecSubDim(d,a,b) DTOp(3,d,a,b,vec,dim,int32_t,-)
+#define Vec2Cross(a,b) \
+STMT_EXPR_2(a,b,ra.c[0]*rb.c[1]-ra.c[1]*rb.c[0])
 
-/* bound/rect conversion */
-#define Bound2ToRect2(r,b) \
-r.loc = b.p1; Vec2SubDim(r.dim,b.p2,b.p1)
-#define Rect2ToBound2(b,r) \
-b.p1 = r.loc; Vec2Dim2Add(b.p2,r.loc,r.dim)
-#define BoundToRect(r,b) \
-r.loc = b.p1; VecSubDim(r.dim,b.p2,b.p1)
-#define RectToBound(b,r) \
-b.p1 = r.loc; VecDimAdd(b.p2,r.loc.r.dim)
+/* 3d vector [generic] constructors */
+#define Vec(type, x, y, z) ((type){ (x),(y),(z) })
+#define VecConst(type, c) \
+STMT_EXPR_N1((c),rc,((type){ rc,rc,rc }))
+#define VecCast(type, a) STMT_EXPR_1(a,((type){ ra.x, ra.y, ra.z }))
+
+/* 3d vector [generic] properties */
+#define VecXY(a) STMT_EXPR_1(a,((typeof(ra.xy)){ ra.x, ra.y }))
+#define VecXZ(a) STMT_EXPR_1(a,((typeof(ra.xy)){ ra.x, ra.z }))
+#define VecYZ(a) STMT_EXPR_1(a,((typeof(ra.xy)){ ra.y, ra.z }))
+
+/* 3d vector [generic] ops */
+#define VecAdd(a,b) VEC3_OP(OP,a,b,+)
+#define VecSub(a,b) VEC3_OP(OP,a,b,-)
+#define VecMul(a,b) VEC3_OP(OP,a,b,*)
+#define VecDiv(a,b) VEC3_OP(OP,a,b,/)
+#define VecPow(a,b) VEC3_OP(ZIP,a,b,pow)
+#define VecAddS(a,b) VEC3_OP(SCALAR,a,b,+)
+#define VecSubS(a,b) VEC3_OP(SCALAR,a,b,-)
+#define VecMulS(a,b) VEC3_OP(SCALAR,a,b,*)
+#define VecDivS(a,b) VEC3_OP(SCALAR,a,b,/)
+#define VecPowS(a,b) VEC3_OP(MAPX,a,b,pow(c,b))
+#define VecNeg(a) VEC3_OP(UNARY,a,0,-)
+#define VecFloor(a) VEC3_OP(MAP,a,0,floor)
+#define VecCeil(a) VEC3_OP(MAP,a,0,ceil)
+#define VecRound(a) VEC3_OP(MAP,a,0,round)
+#define VecMinB(a) VEC3_OP(ZIP,a,0,min)
+#define VecMaxB(a) VEC3_OP(ZIP,a,0,max)
+#define VecEq(a,b) VEC3_OP(OPFOLD,a,b,(==,&&))
+#define VecDot(a,b) VEC3_OP(OPFOLD,a,b,(*,+))
+#define VecDezero(a) VEC3_OP(MAPX,a,0,(c==0?0.0001:c))
+
+#define VecMag(a) STMT_EXPR_N1(a,rv,\
+  ((typeof((rv).c[0]))(sqrt((double)VecDot(rv,rv)))))
+#define VecDist(a,b) (VecMag(VecSub(a,b)))
+#define VecSqrDist(a,b) (VecDot(VecSub(a,b),VecSub(a,b)))
+#define VecNorm(a) (VecDivS(a,VecMag(a)))
+#define VecPNorm(a,b) (VecSubS(VecMulS(VecDiv(a,b),2),1))
+#define VecPDenorm(a,b) (VecDivS(VecMul(VecAddS(a,1),b),2))
+#define VecInterp(a,b,t) (VecAdd(a,VecMulS(VecSub(b,a),t)))
+
+#define VecCross(a,b) \
+STMT_EXPR_2(a,b,((typeof(ra)){ \
+  ra.c[1]*rb.c[2]-ra.c[2]*rb.c[1], \
+  ra.c[2]*rb.c[0]-ra.c[0]*rb.c[2], \
+  ra.c[0]*rb.c[1]-ra.c[1]*rb.c[0]}))
 
 #endif /* _GEOM_H_ */

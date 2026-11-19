@@ -6,6 +6,10 @@
 #include "tex.h"
 #include "math.h"
 
+#ifdef CFLAGS_EXTENSIONS
+#include "ext/ext.h"
+#endif
+
 #define gte_divide(a,b) ((a)/(b))
 
 sw_transform_struct params;
@@ -71,6 +75,12 @@ int SwRotTrans(vec *in, vec *out, vec *trans, mat16 *m_rot) {
 #undef t
 #undef r
   res = 1;
+#ifdef CFLAGS_EXTENSIONS
+  if (ext_config.enable_hwpersp) {
+    if (r_vert.z <= 0) res = 0; /* only cull if strictly behind camera */
+  } 
+  else
+#endif
   if (r_vert.x > 0x7FFF || r_vert.x < -0x8000
    || r_vert.y > 0x7FFF || r_vert.y < -0x8000
    || r_vert.z > 0xFFFF || r_vert.z < 0)
@@ -323,11 +333,121 @@ int SwCalcSpriteRotMatrix(
   return 1;
 }
 
-#ifdef CFLAGS_HIRES_TEST
-extern int hires;
-extern double interp_factor;
-extern svtx_frame *next_frame;
-extern int is_last_frame;
+#ifdef CFLAGS_EXTENSIONS
+
+static inline void SwInterpSvtxLocal(
+  svtx_frame *frame, 
+  svtx_frame *next_frame, 
+  svtx_vertex *vert, 
+  svtx_vertex *next_vert, 
+  double interp, 
+  int is_last_frame, 
+  vec *u_vert) {
+  if (!next_frame || (interp == 0.0 && !is_last_frame)) {
+    u_vert->x=((frame->x-128)+vert->x)*4;
+    u_vert->y=((frame->y-128)+vert->y)*4;
+    u_vert->z=((frame->z-128)+vert->z)*4;
+  }
+  else if (is_last_frame) {
+    u_vert->x=(((frame->x-128)+vert->x)*4)+((interp+1)*
+              ((((next_frame->x-128)+next_vert->x)*4)-(((frame->x-128)+vert->x)*4)));
+    u_vert->y=(((frame->y-128)+vert->y)*4)+((interp+1)*
+              ((((next_frame->y-128)+next_vert->y)*4)-(((frame->y-128)+vert->y)*4)));
+    u_vert->z=(((frame->z-128)+vert->z)*4)+((interp+1)*
+              ((((next_frame->z-128)+next_vert->z)*4)-(((frame->z-128)+vert->z)*4)));
+  }
+  else {      
+    u_vert->x=((1-interp)*(((frame->x-128)+vert->x)*4)) +
+              (interp*(((next_frame->x-128)+next_vert->x)*4));
+    u_vert->y=((1-interp)*(((frame->y-128)+vert->y)*4)) +
+              (interp*(((next_frame->y-128)+next_vert->y)*4));
+    u_vert->z=((1-interp)*(((frame->z-128)+vert->z)*4)) +
+              (interp*(((next_frame->z-128)+next_vert->z)*4));
+  }
+}
+
+static inline void SwInterpSvtxNormal(
+  svtx_frame *frame, 
+  svtx_frame *next_frame, 
+  svtx_vertex *vert, 
+  svtx_vertex *next_vert, 
+  double interp, 
+  int is_last_frame, 
+  vec *norm)  {
+  if (!next_frame || (interp == 0.0 && !is_last_frame)) {
+    norm->x=(int32_t)vert->normal_x*256;
+    norm->y=(int32_t)vert->normal_y*256;
+    norm->z=(int32_t)vert->normal_z*256;
+  }
+  else if (is_last_frame) {
+    norm->x=((int32_t)vert->normal_x*256)+
+          ((interp+1)*(((int32_t)next_vert->normal_x*256)-((int32_t)vert->normal_x*256)));
+    norm->y=((int32_t)vert->normal_y*256)+
+          ((interp+1)*(((int32_t)next_vert->normal_y*256)-((int32_t)vert->normal_y*256)));
+    norm->z=((int32_t)vert->normal_z*256)+
+          ((interp+1)*(((int32_t)next_vert->normal_z*256)-((int32_t)vert->normal_z*256)));
+  }
+  else {
+    norm->x=(1-interp)*((int32_t)vert->normal_x*256) +
+        (interp)*((int32_t)next_vert->normal_x*256);
+    norm->y=(1-interp)*((int32_t)vert->normal_y*256) +
+        (interp)*((int32_t)next_vert->normal_y*256);
+    norm->z=(1-interp)*((int32_t)vert->normal_z*256) +
+        (interp)*((int32_t)next_vert->normal_z*256);
+  }
+}
+
+static inline void SwInterpCvtxLocal(
+  cvtx_frame *frame,
+  cvtx_frame *next_frame,
+  cvtx_vertex *vert,
+  cvtx_vertex *next_vert,
+  double interp,
+  int is_last_frame,
+  vec *u_vert) {
+  if (!next_frame || (interp == 0.0 && !is_last_frame)) {
+    u_vert->x=((frame->x-128)+vert->x)*4;
+    u_vert->y=((frame->y-128)+vert->y)*4;
+    u_vert->z=((frame->z-128)+vert->z)*4;
+  }
+  else if (is_last_frame) {
+    u_vert->x=(((frame->x-128)+vert->x)*4)+((interp+1)*
+              ((((next_frame->x-128)+next_vert->x)*4)-(((frame->x-128)+vert->x)*4)));
+    u_vert->y=(((frame->y-128)+vert->y)*4)+((interp+1)*
+              ((((next_frame->y-128)+next_vert->y)*4)-(((frame->y-128)+vert->y)*4)));
+    u_vert->z=(((frame->z-128)+vert->z)*4)+((interp+1)*
+              ((((next_frame->z-128)+next_vert->z)*4)-(((frame->z-128)+vert->z)*4)));
+  }
+  else {
+    u_vert->x=((1-interp)*(((frame->x-128)+vert->x)*4)) +
+              (interp*(((next_frame->x-128)+next_vert->x)*4));
+    u_vert->y=((1-interp)*(((frame->y-128)+vert->y)*4)) +
+              (interp*(((next_frame->y-128)+next_vert->y)*4));
+    u_vert->z=((1-interp)*(((frame->z-128)+vert->z)*4)) +
+              (interp*(((next_frame->z-128)+next_vert->z)*4));
+  }
+}
+
+static inline void SwInterpCvtxColor(
+  cvtx_vertex *vert, cvtx_vertex *next_vert,
+  double interp, int is_last_frame, rgb8 *color) {
+  if (!next_vert || (interp == 0.0 && !is_last_frame)) {
+    color->r=vert->r;
+    color->g=vert->g;
+    color->b=vert->b;
+  }
+  else if (is_last_frame) {
+    color->r=vert->r+(interp+1)*(next_vert->r-vert->r);
+    color->g=vert->g+(interp+1)*(next_vert->g-vert->g);
+    color->b=vert->b+(interp+1)*(next_vert->b-vert->b);
+  }
+  else {
+    color->r=(1-interp)*vert->r+interp*next_vert->r;
+    color->g=(1-interp)*vert->g+interp*next_vert->g;
+    color->b=(1-interp)*vert->b+interp*next_vert->b;
+  }
+}
+
 #endif
 
 void SwTransformSvtx(
@@ -366,10 +486,10 @@ void SwTransformSvtx(
     poly_verts[0]=(svtx_vertex*)((uint8_t*)verts+poly->a_idx);
     poly_verts[1]=(svtx_vertex*)((uint8_t*)verts+poly->b_idx);
     poly_verts[2]=(svtx_vertex*)((uint8_t*)verts+poly->c_idx);
-#ifdef CFLAGS_HIRES_TEST
-    svtx_vertex *verts2, *poly_verts2[3];
-    if (hires && next_frame) {
-      verts2 = next_frame->vertices;
+#ifdef CFLAGS_EXTENSIONS
+    svtx_vertex *verts2, *poly_verts2[3], *next_vert;
+    if (hq.next_frame) {
+      verts2 = hq.next_frame->vertices;
       poly_verts2[0]=(svtx_vertex*)((uint8_t*)verts2+poly->a_idx);
       poly_verts2[1]=(svtx_vertex*)((uint8_t*)verts2+poly->b_idx);
       poly_verts2[2]=(svtx_vertex*)((uint8_t*)verts2+poly->c_idx);
@@ -377,46 +497,26 @@ void SwTransformSvtx(
 #endif
     for (ii=0;ii<3;ii++) {
       vert=poly_verts[ii];
-#ifndef CFLAGS_HIRES_TEST
+#ifndef CFLAGS_EXTENSIONS
       u_vert.x=((frame->x-128)+vert->x)*4;
       u_vert.y=((frame->y-128)+vert->y)*4;
       u_vert.z=((frame->z-128)+vert->z)*4;
 #else
-      if (!hires || !next_frame) {
-        u_vert.x=((frame->x-128)+vert->x)*4;
-        u_vert.y=((frame->y-128)+vert->y)*4;
-        u_vert.z=((frame->z-128)+vert->z)*4;
-      }
-      else if (is_last_frame) {
-        svtx_vertex *vert2;
-        vert2=poly_verts2[ii];
-        u_vert.x=(((frame->x-128)+vert->x)*4)+((1+interp_factor)*
-                  ((((next_frame->x-128)+vert2->x)*4)-(((frame->x-128)+vert->x)*4)));
-        u_vert.y=(((frame->y-128)+vert->y)*4)+((1+interp_factor)*
-                  ((((next_frame->y-128)+vert2->y)*4)-(((frame->y-128)+vert->y)*4)));
-        u_vert.z=(((frame->z-128)+vert->z)*4)+((1+interp_factor)*
-                  ((((next_frame->z-128)+vert2->z)*4)-(((frame->z-128)+vert->z)*4)));
-      }
-      else {
-        svtx_vertex *vert2;
-        vert2=poly_verts2[ii];
-        u_vert.x=((1-interp_factor)*(((frame->x-128)+vert->x)*4)) +
-                 (interp_factor*(((next_frame->x-128)+vert2->x)*4));
-        u_vert.y=((1-interp_factor)*(((frame->y-128)+vert->y)*4)) +
-                 (interp_factor*(((next_frame->y-128)+vert2->y)*4));
-        u_vert.z=((1-interp_factor)*(((frame->z-128)+vert->z)*4)) +
-                 (interp_factor*(((next_frame->z-128)+vert2->z)*4));
-      }
-#endif                  
-#ifdef CFLAGS_GFX_SW_PERSP
+      next_vert = hq.next_frame ? poly_verts2[ii] : 0;
+      SwInterpSvtxLocal(frame, hq.next_frame, vert, next_vert, 
+                        hq.interp, hq.is_last_frame, &u_vert);
+      if (ext_config.enable_hwpersp)
+        res = SwRotTrans(&u_vert, &r_verts[ii], &params->trans, &params->m_rot);
+      else
+#endif
       res = SwRotTransPers(&u_vert, &r_verts[ii], &params->trans, &params->m_rot,
         &params->screen, params->screen_proj);
-#else
-      res = SwRotTrans(&u_vert, &r_verts[ii], &params->trans, &params->m_rot);
-#endif
       if (!res) { break; }
     }
     if (!res) { continue; }
+#ifdef CFLAGS_EXTENSIONS
+    if (!ext_config.enable_hwpersp)
+#endif
     if (!info.no_cull) {
       ndot = (r_verts[0].x*r_verts[1].y) + (r_verts[1].x*r_verts[2].y)
            + (r_verts[2].x*r_verts[0].y) - (r_verts[0].x*r_verts[2].y)
@@ -435,34 +535,14 @@ void SwTransformSvtx(
     else {
       for (ii=0;ii<3;ii++) {
         vert=poly_verts[ii];
-#ifndef CFLAGS_HIRES_TEST
+#ifndef CFLAGS_EXTENSIONS
         n.x=(int32_t)vert->normal_x*256;
         n.y=(int32_t)vert->normal_y*256;
         n.z=(int32_t)vert->normal_z*256;
 #else
-        svtx_vertex *vert2;
-        vert2=poly_verts2[ii];
-        if (!hires || !next_frame) {
-          n.x=(int32_t)vert->normal_x*256;
-          n.y=(int32_t)vert->normal_y*256;
-          n.z=(int32_t)vert->normal_z*256;
-        }
-        else if (is_last_frame) {
-          n.x=((int32_t)vert->normal_x*256)+
-               ((interp_factor+1)*(((int32_t)vert2->normal_x*256)-((int32_t)vert->normal_x*256)));
-          n.y=((int32_t)vert->normal_y*256)+
-               ((interp_factor+1)*(((int32_t)vert2->normal_y*256)-((int32_t)vert->normal_y*256)));
-          n.z=((int32_t)vert->normal_z*256)+
-               ((interp_factor+1)*(((int32_t)vert2->normal_z*256)-((int32_t)vert->normal_z*256)));
-        }
-        else {
-          n.x=(1-interp_factor)*((int32_t)vert->normal_x*256) +
-              (interp_factor)*((int32_t)vert2->normal_x*256);
-          n.y=(1-interp_factor)*((int32_t)vert->normal_y*256) +
-              (interp_factor)*((int32_t)vert2->normal_y*256);
-          n.z=(1-interp_factor)*((int32_t)vert->normal_z*256) +
-              (interp_factor)*((int32_t)vert2->normal_z*256);
-        }
+        next_vert = hq.next_frame ? poly_verts2[ii] : 0;
+        SwInterpSvtxNormal(frame, hq.next_frame, vert, next_vert, 
+                           hq.interp, hq.is_last_frame, &n);
 #endif    
         ldir.x=(((int64_t)lm[0][0]*n.x)+((int64_t)lm[0][1]*n.y)+((int64_t)lm[0][2]*n.z))>>12;
         ldir.y=(((int64_t)lm[1][0]*n.x)+((int64_t)lm[1][1]*n.y)+((int64_t)lm[1][2]*n.z))>>12;
@@ -535,7 +615,7 @@ void SwTransformCvtx(
   tgeo_texinfo *texinfos, info;
   vec u_vert, r_verts[3];
   fvec uvs[4]; /* only first 3 are used */
-  rgb8 color;
+  rgb8 u_color, color;
   poly3i *prim, *next;
   int32_t ndot;
   int32_t z_sum;
@@ -551,17 +631,31 @@ void SwTransformCvtx(
     poly_verts[0]=(cvtx_vertex*)((uint8_t*)verts+poly->a_idx);
     poly_verts[1]=(cvtx_vertex*)((uint8_t*)verts+poly->b_idx);
     poly_verts[2]=(cvtx_vertex*)((uint8_t*)verts+poly->c_idx);
+#ifdef CFLAGS_EXTENSIONS
+    cvtx_vertex *verts2, *poly_verts2[3], *next_vert;
+    if (hq.next_cvtx_frame) {
+      verts2 = hq.next_cvtx_frame->vertices;
+      poly_verts2[0]=(cvtx_vertex*)((uint8_t*)verts2+poly->a_idx);
+      poly_verts2[1]=(cvtx_vertex*)((uint8_t*)verts2+poly->b_idx);
+      poly_verts2[2]=(cvtx_vertex*)((uint8_t*)verts2+poly->c_idx);
+    }
+#endif
     for (ii=0;ii<3;ii++) {
       vert=poly_verts[ii];
+#ifndef CFLAGS_EXTENSIONS
       u_vert.x=((frame->x-128)+vert->x)*4;
       u_vert.y=((frame->y-128)+vert->y)*4;
       u_vert.z=((frame->z-128)+vert->z)*4;
-#ifdef CFLAGS_GFX_SW_PERSP
+#else
+      next_vert = hq.next_cvtx_frame ? poly_verts2[ii] : 0;
+      SwInterpCvtxLocal(frame, hq.next_cvtx_frame, vert, next_vert,
+                        hq.interp, hq.is_last_frame, &u_vert);
+      if (ext_config.enable_hwpersp)
+        res = SwRotTrans(&u_vert, &r_verts[ii], &params->trans, &params->m_rot);
+      else
+#endif
       res = SwRotTransPers(&u_vert, &r_verts[ii], &params->trans, &params->m_rot,
         &params->screen, params->screen_proj);
-#else
-      res = SwRotTrans(&u_vert, &r_verts[ii], &params->trans, &params->m_rot);
-#endif
       if (!res) { break; }
     }
     if (!res) { continue; }
@@ -577,15 +671,21 @@ void SwTransformCvtx(
     t1=info.t1;t2=info.t2;t3=info.t3;
     for (ii=0;ii<3;ii++) {
       vert=poly_verts[ii];
+#ifdef CFLAGS_EXTENSIONS
+      next_vert = hq.next_cvtx_frame ? poly_verts2[ii] : 0;
+      SwInterpCvtxColor(vert, next_vert, hq.interp, hq.is_last_frame, &u_color);
+#else
+      u_color = (rgb8){vert->r, vert->g, vert->b};
+#endif
       color.r = ((t1>=0 ?
-          (127-abs(t1))*0   +     (abs(t1)*(int32_t)vert->r)
-        : (128-abs(t1))*255 + ((abs(t1)-1)*(int32_t)vert->r))*32)>>(shamt+12);
+          (127-abs(t1))*0   +     (abs(t1)*(int32_t)u_color.r)
+        : (128-abs(t1))*255 + ((abs(t1)-1)*(int32_t)u_color.r))*32)>>(shamt+12);
       color.g = ((t2>=0 ?
-          (127-abs(t2))*0   +     (abs(t2)*(int32_t)vert->g)
-        : (128-abs(t2))*255 + ((abs(t2)-1)*(int32_t)vert->g))*32)>>(shamt+12);
+          (127-abs(t2))*0   +     (abs(t2)*(int32_t)u_color.g)
+        : (128-abs(t2))*255 + ((abs(t2)-1)*(int32_t)u_color.g))*32)>>(shamt+12);
       color.b = ((t3>=0 ?
-          (127-abs(t3))*0   +     (abs(t3)*(int32_t)vert->b)
-        : (128-abs(t3))*255 + ((abs(t3)-1)*(int32_t)vert->b))*32)>>(shamt+12);
+          (127-abs(t3))*0   +     (abs(t3)*(int32_t)u_color.b)
+        : (128-abs(t3))*255 + ((abs(t3)-1)*(int32_t)u_color.b))*32)>>(shamt+12);
       prim->colors[ii]=Rgb8ToA32(color);
     }
     if (info.type == 1) { /* textured poly? */
@@ -631,12 +731,13 @@ void SwTransformSprite(
   verts[2].x=-size;verts[2].y=-size;verts[2].z=0;
   verts[3].x= size;verts[3].y=-size;verts[3].z=0;
   for (i=0;i<4;i++) {
-#ifdef CFLAGS_GFX_SW_PERSP
+#ifdef CFLAGS_EXTENSIONS
+    if (ext_config.enable_hwpersp)
+      res = SwRotTrans(&verts[i], &r_verts[i], &params->trans, &params->m_rot);
+    else
+#endif
     res = SwRotTransPers(&verts[i], &r_verts[i], &params->trans, &params->m_rot,
       &params->screen, params->screen_proj);
-#else
-    res = SwRotTrans(&verts[i], &r_verts[i], &params->trans, &params->m_rot);
-#endif
   }
   if (!res) { return; } /* return on fail */
   prim=(poly4i*)*prims_tail;
@@ -752,7 +853,7 @@ static void SwTransformAndShadeWorlds(
   poly3i *prim, *next;
   int32_t z_sum;
   int texid, z_idx, min_z_idx;
-  int i, ii, world_idx, poly_idx, info_idx;
+  int i, ii, res, world_idx, poly_idx, info_idx;
 
   worlds = params->worlds;
   poly_ids = poly_id_list->ids;
@@ -783,12 +884,16 @@ static void SwTransformAndShadeWorlds(
         vert_id.vert_idx = ii;
         pre_shader(vert_id, &u_verts[ii], &colors[ii], params);
       }
-#ifdef CFLAGS_GFX_SW_PERSP
-      SwRotTransPers(&u_verts[ii], &r_verts[ii], &world->trans, &params->m_rot,
-        &params->screen, params->screen_proj);
-#else
-      SwRotTrans(&u_verts[ii], &r_verts[ii], &world->trans, &params->m_rot);
+#ifdef CFLAGS_EXTENSIONS
+      if (ext_config.enable_hwpersp) {
+        SwRotTrans(&u_verts[ii], &r_verts[ii], &world->trans, &params->m_rot);
+        res = 1;
+      }
+      else
 #endif
+      res = SwRotTransPers(&u_verts[ii], &r_verts[ii], &world->trans, &params->m_rot,
+        &params->screen, params->screen_proj);
+      if (!res) { break; }
       if (post_shader) {
         vert_id.world_idx = world_idx;
         vert_id.poly_idx = poly_idx;
@@ -796,6 +901,7 @@ static void SwTransformAndShadeWorlds(
         post_shader(vert_id, &r_verts[ii], &colors[ii], params);
       }
     }
+    if (!res) { continue; }
     info_idx = poly->tinf_idx;
     tpag = tpags[poly->tpag_idx];
     wgeo_info = (wgeo_texinfo*)(&((uint32_t*)texinfos)[info_idx]);
@@ -820,9 +926,19 @@ static void SwTransformAndShadeWorlds(
     }
     prim->texid = texid;
     prim->flags = info.semi_trans;
+#ifdef CFLAGS_EXTENSIONS
+    if (ext_config.enable_hwpersp && world->header->is_backdrop) {
+      prim->flags |= PRIM_FLAG_BACKDROP;
+      z_sum = 0x10000;
+    }
+    else
+#endif
     z_sum = prim->verts[0].z+prim->verts[1].z+prim->verts[2].z;
     z_idx = far - (z_sum/32);
     z_idx = limit(z_idx, 0, 0x7FF);
+#ifdef CFLAGS_EXTENSIONS
+    if (!ext_config.enable_hwpersp)
+#endif
     if (z_idx < min_z_idx)
       min_z_idx = z_idx;
     else
@@ -1024,7 +1140,7 @@ void SwTransformWorldsDark2(
 #ifdef CFLAGS_EXTENSIONS
 
 #include "level.h"
-extern mat16 ms_cam_rot;
+extern mat16 ms_cam_rot, mn_cam_rot;
 const int rface_vert_idxes[6][4] = { { 0, 1, 2, 3 },
                                      { 1, 5, 3, 7 },
                                      { 4, 5, 6, 7 },
@@ -1083,10 +1199,18 @@ void SwTransformZoneQuery(zone_query *query, void *ot, void **prims_tail) {
       else { u_vert.y = v_nbound.p2.y; }
       if ((ii/4)%2) { u_vert.z = v_nbound.p1.z; }
       else { u_vert.z = v_nbound.p2.z; }
-      u_vert.x -= (cam_trans.x >> 8);
-      u_vert.y -= (cam_trans.y >> 8);
-      u_vert.z -= (cam_trans.z >> 8);
-      SwRotTransPers(&u_vert, &r_verts[ii], &zero, &ms_cam_rot, &params.screen, params.screen_proj);
+      if (ext_config.enable_hwpersp) {
+        u_vert.x -= mn_cam_rot.t.x;
+        u_vert.y -= mn_cam_rot.t.y;
+        u_vert.z -= mn_cam_rot.t.z;
+        SwRotTrans(&u_vert, &r_verts[ii], &zero, &ms_cam_rot);
+      }
+      else {
+        u_vert.x -= (cam_trans.x >> 8);
+        u_vert.y -= (cam_trans.y >> 8);
+        u_vert.z -= (cam_trans.z >> 8);
+        SwRotTransPers(&u_vert, &r_verts[ii], &zero, &ms_cam_rot, &params.screen, params.screen_proj);
+      }
     }
     color.r = 127+((type&1)*(subtype+1)*2);
     color.g = 127+((type&2)*(subtype+1)*2);
@@ -1137,14 +1261,14 @@ void SwDrawWallMap(uint32_t *wall_bitmap, void *ot, void **prims_tail) {
   for (i=0;i<4;i++) {
     prim->verts[i].x = (i%2)?0:32;
     prim->verts[i].y = (i/2)?32:0;
-    prim->verts[i].z = -1;
+    prim->verts[i].z = 1;
     prim->uvs[i].x = (i%2)?0:1.0;
     prim->uvs[i].y = (i/2)?1.0:0;
     tmp=-1;
     prim->colors[i] = Rgb8ToA32(*(rgb8*)&tmp);
   }
   prim->texid=wallmap_image;
-  prim->flags=3;
+  prim->flags=3 | PRIM_FLAG_SCREEN;
   next=((poly4i**)ot)[0x7FE];
   prim->next=next;
   prim->type=2;
@@ -1169,10 +1293,18 @@ void SwTransformObjectBounds(gool_bound *bounds, int count, void *ot, void **pri
       else { u_vert.y = bound->p2.y >> 8; }
       if ((ii/4)%2) { u_vert.z = bound->p1.z >> 8; }
       else { u_vert.z = bound->p2.z >> 8; }
-      u_vert.x -= (cam_trans.x >> 8);
-      u_vert.y -= (cam_trans.y >> 8);
-      u_vert.z -= (cam_trans.z >> 8);
-      SwRotTransPers(&u_vert, &r_verts[ii], &zero, &ms_cam_rot, &params.screen, params.screen_proj);
+      if (ext_config.enable_hwpersp) {
+        u_vert.x -= mn_cam_rot.t.x;
+        u_vert.y -= mn_cam_rot.t.y;
+        u_vert.z -= mn_cam_rot.t.z;
+        SwRotTrans(&u_vert, &r_verts[ii], &zero, &ms_cam_rot);
+      }
+      else {
+        u_vert.x -= (cam_trans.x >> 8);
+        u_vert.y -= (cam_trans.y >> 8);
+        u_vert.z -= (cam_trans.z >> 8);
+        SwRotTransPers(&u_vert, &r_verts[ii], &zero, &ms_cam_rot, &params.screen, params.screen_proj);
+      }
     }
     color.r = 255;
     color.g = 255;

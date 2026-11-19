@@ -1,42 +1,48 @@
-#include "common.h"
+#include "time.h"
 
-int32_t ticks_base = 0;
+ticks_t ticks_base = 0;
 
 #ifdef _WIN32
 #include <windows.h>
-static inline int32_t GetTicks() {
+static inline ticks_t GetTicks() {
   LARGE_INTEGER _freq, _count;
   int64_t freq, count;
-  int32_t ticks;
 
   QueryPerformanceFrequency(&_freq);
   QueryPerformanceCounter(&_count);
   freq = _freq.QuadPart;
   count = _count.QuadPart;
-
-  ticks = ((1000000*(count*34)) / 0x8000) / freq;
-  return ticks;
+#ifdef CFLAGS_EXTENSIONS
+  return ((double)count / (double)freq) * (1000000.0 * 34.0 / 32768.0);
+#else
+  return ((1000000*(count*34)) / 0x8000) / freq;
+#endif
 }
 #elif __linux__
 #include <time.h>
-static inline int32_t GetTicks() {
+static inline ticks_t GetTicks() {
   struct timespec tp;
-  int32_t ticks;
 
   clock_gettime(CLOCK_MONOTONIC_RAW, &tp);
-  ticks = ((((int64_t)tp.tv_sec*1000000000)+tp.tv_nsec) / 963765);
-  //printf("%i ticks elapsed\n", ticks);
-  return ticks;
+#ifdef CFLAGS_EXTENSIONS
+  return ((double)tp.tv_sec * 1000000000.0 + (double)tp.tv_nsec) / 963765.0;
+#else
+  return ((((int64_t)tp.tv_sec * 1000000000) + tp.tv_nsec) / 963765);
+#endif
 }
 #endif
 
-void SetTicksElapsed(int32_t ticks) {
+void SetTicksElapsed(ticks_t ticks) {
   ticks_base = GetTicks() - ticks;
 }
 
-int GetTicksElapsed() {
-  int32_t ticks;
+ticks_t GetTicksElapsed() {
+  ticks_t ticks;
 
   ticks = GetTicks() - ticks_base;
   return ticks;
+}
+
+ticks_t GetTicksMonotonic() {
+  return GetTicks();
 }

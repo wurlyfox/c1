@@ -6,10 +6,13 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Default to Debug if not specified
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
+# Default to Release if not specified
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
+
+# Option to enable game extensions
+option(CFLAGS_EXTENSIONS "Enable game extensions" ON)
 
 # Option to build dependencies
 option(BUILD_DEPS "Build dependencies if not found" OFF)
@@ -17,18 +20,16 @@ option(BUILD_DEPS "Build dependencies if not found" OFF)
 # Option to toggle shared libraries
 option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 
-# Preprocessor definitions
-add_compile_definitions(
-    CFLAGS_HIRES_TEST
-    CFLAGS_GFX_SW_PERSP
-    CFLAGS_EXTENSIONS
-    CFLAGS_GUI
-    CFLAGS_GOOL_DEBUG
-)
+if(CFLAGS_EXTENSIONS)
+    add_compile_definitions(CFLAGS_EXTENSIONS)
+endif()
 
 # Compiler flags
 if(MSVC)
     add_compile_options(/W3 /utf-8 /wd4200 /Zc:zeroSizeArray-)
+    if(CMAKE_C_COMPILER_ID MATCHES "Clang")
+        add_compile_options($<$<CONFIG:Release>:/clang:-O3>)
+    endif()
     add_compile_definitions(_CRT_SECURE_NO_WARNINGS NOMINMAX WIN32_LEAN_AND_MEAN
                             _USE_MATH_DEFINES)
     if(CMAKE_SIZEOF_VOID_P EQUAL 8)
@@ -38,7 +39,8 @@ if(MSVC)
 else()
     add_compile_options($<$<COMPILE_LANGUAGE:C>:-fplan9-extensions> 
                         -Wall -Wextra -Wno-unused-parameter -Wno-unused-function
-                        -Wno-missing-braces -Wno-implicit-fallthrough)
+                        -Wno-missing-braces -Wno-implicit-fallthrough -Wno-maybe-uninitialized
+                        -Wno-array-bounds -Wno-strict-aliasing -Wno-dangling-else)
     if(WIN32)
         # MinGW: a 64-bit toolchain must be retargeted to 32-bit; a 32-bit
         # (i686) toolchain needs nothing.
@@ -57,9 +59,6 @@ else()
             set(ENV{PKG_CONFIG_LIBDIR}
                 "/usr/lib/i386-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig")
         endif()
-    endif()
-    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-        add_compile_options(-g -O0)
     endif()
 endif()
 
@@ -391,16 +390,20 @@ file(GLOB_RECURSE C1_PC_SOURCES
     "src/pc/*.c"
 )
 
-# Extension source files
-file(GLOB_RECURSE C1_EXT_SOURCES
-    "src/ext/*.c"
+# Utility source files
+file(GLOB_RECURSE C1_UTIL_SOURCES
     "src/util/*.c"
 )
 
 add_library(c1core STATIC
     ${C1_CORE_SOURCES}
-    ${C1_EXT_SOURCES}
+    ${C1_UTIL_SOURCES}
 )
+
+if(CFLAGS_EXTENSIONS)
+    file(GLOB_RECURSE C1_EXT_SOURCES "src/ext/*.c")
+    target_sources(c1core PRIVATE ${C1_EXT_SOURCES})
+endif()
 
 target_include_directories(c1core PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
@@ -458,4 +461,3 @@ target_link_libraries(c1 PRIVATE
 if(UNIX AND NOT APPLE)
     target_link_libraries(c1 PRIVATE m pthread dl)
 endif()
-

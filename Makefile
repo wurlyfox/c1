@@ -7,7 +7,7 @@ all: $(BUILD_DIR)/Makefile
 	@$(MAKE) -C $(BUILD_DIR) -j$(JOBS)
 
 $(BUILD_DIR)/Makefile:
-	@cmake -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=Debug
+	@cmake -B $(BUILD_DIR)
 
 clean:
 	@if [ -d "$(BUILD_DIR)" ]; then $(MAKE) -C $(BUILD_DIR) clean; fi

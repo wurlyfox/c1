@@ -99,8 +99,8 @@ int32_t dark_afx0_next;             /* 8005661C; gp[0x8A] */
 int32_t dark_dist_tgt;              /* 80056620; gp[0x8B] */
 int32_t dark_dist_step;             /* 80056624; gp[0x8C] */
 int32_t dark_dist_next;             /* 80056628; gp[0x8D] */
-uint32_t lightning_stamp;           /* 8005662C; gp[0x8E] */
-uint32_t prev_lightning_stamp;      /* 80056630; gp[0x8F] */
+ticks_t lightning_stamp;            /* 8005662C; gp[0x8E] */
+ticks_t prev_lightning_stamp;       /* 80056630; gp[0x8F] */
 vec dark_illum;                     /* 800566D4; gp[0xB6] */
 
 extern ns_struct ns;
@@ -142,11 +142,12 @@ void ShaderParamsUpdate(int init) {
   char buf[6];
   rgb c, ca, cb;
   vec *trans;
-  uint32_t val, elapsed_since;
+  uint32_t val;
+  ticks_t elapsed_since;
   uint32_t pitch, vol;
   int32_t t;
 #ifndef PSX
-  int ticks_elapsed;
+  ticks_t ticks_elapsed;
 #endif
 
   if (init) {

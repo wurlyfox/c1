@@ -10,6 +10,10 @@
 #include "formats/wgeo.h"
 #include "formats/slst.h"
 
+#ifdef CFLAGS_EXTENSIONS
+#include "ext/ext.h"
+#endif
+
 static inline void GfxFillMatrix(mat16 *m, uint16_t val) {
   m->m[0][0]=val;m->m[0][1]=val;m->m[0][2]=val;
   m->m[1][0]=val;m->m[1][1]=val;m->m[1][2]=val;
@@ -30,6 +34,8 @@ static inline void GfxCopyMatrix(mat16 *m_s, mat16 *m_d) {
 #include "pc/gfx/tex.h"
 #include "pc/gfx/gl.h"
 extern sw_transform_struct params;
+extern gl_context context;
+#define ticks_per_frame context.ticks_per_frame
 
 static rgb Rgb8To32(rgb8 c) {
   rgb res;
@@ -689,7 +695,7 @@ extern int32_t ripple_speed;
 extern int32_t ripple_period;
 extern vec dark_illum;
 
-extern int frames_elapsed;
+extern uint32_t frames_elapsed;
 extern int draw_count;
 
 extern int paused;
@@ -842,7 +848,7 @@ void GfxUpdateMatrices() {
   GfxCopyMatrix(&ms_cam_rot, &ms_cam_rot2);
   if (header->flags & 0x1000) {
     /* linearly ramp cam up and down approx. every 4 seconds or 128 draws */
-    y_offs = abs(frames_elapsed % 128 - 64)*800;
+    y_offs = abs((int32_t)(frames_elapsed % 128) - 64)*800;
     cam_trans_prev.y = y_offs + 901600;
     s = sin(125);
     c = cos(125);
@@ -1378,10 +1384,13 @@ void GfxTransformFragment(gool_frag *frag, int32_t z, eid_t tpag,
   verts[1].x=bound->p2.x;verts[1].y=bound->p2.y;
   for (i=0;i<4;i++) {
     verts[i].z = 0;
-#ifdef CFLAGS_GFX_SW_PERSP
+#ifdef CFLAGS_EXTENSIONS
+    if (!ext_config.enable_hwpersp)
+#endif
     SwRotTransPers(&verts[i], &r_verts[i], &params.trans, &params.m_rot,
       &params.screen, screen_proj);
-#else
+#ifdef CFLAGS_EXTENSIONS
+    else
     SwRotTrans(&verts[i], &r_verts[i], &params.trans, &params.m_rot);
 #endif
   }
@@ -1429,10 +1438,13 @@ void GfxTransformFontChar(gool_object *obj, gool_glyph *glyph, int32_t z,
   verts[1].x=bound->p2.x;verts[1].y=bound->p2.y;
   for (i=0;i<4;i++) {
     verts[i].z = 0;
-#ifdef CFLAGS_GFX_SW_PERSP
+#ifdef CFLAGS_EXTENSIONS
+    if (!ext_config.enable_hwpersp)
+#endif    
     SwRotTransPers(&verts[i], &r_verts[i], &params.trans, &params.m_rot,
       &params.screen, screen_proj);
-#else
+#ifdef CFLAGS_EXTENSIONS
+    else
     SwRotTrans(&verts[i], &r_verts[i], &params.trans, &params.m_rot);
 #endif
   }
@@ -1621,6 +1633,9 @@ void GfxTransformWorldsRipple(void *ot) {
   zone_header *header;
   zone_world *worlds;
   size_t size;
+#ifdef CFLAGS_EXTENSIONS
+  double mod;
+#endif
   void **prims_tail;
   int i, val;
 
@@ -1634,6 +1649,9 @@ void GfxTransformWorldsRipple(void *ot) {
   }
   if (!cur_poly_ids->len) { return; }
   if (!paused) {
+#ifdef CFLAGS_EXTENSIONS
+    if (IsOrigTick())
+#endif
     for (i=0;i<16;i++) {
       tri_wave[i]+=ripple_speed;
       if (tri_wave[i]>ripple_period)
@@ -1655,6 +1673,15 @@ void GfxTransformWorldsRipple(void *ot) {
   prims_tail=GpuGetPrimsTail();
   RGteTransformWorldsRipple(poly_ids,ot,0x800-(screen_proj/2),draw_count,prims_tail,(quad28*)uv_map);
 #else
+#ifdef CFLAGS_EXTENSIONS
+  if (ext_config.fps_mode) {
+    mod = hq.draw_count - (int)hq.draw_count;
+    for (i=0;i<16;i++)
+      params.tri_wave[i] = (1-mod)*(double)abs(tri_wave[i])
+                         + mod*(double)abs(tri_wave[(i+1)%16]);
+  }
+  else
+#endif
   for (i=0;i<16;i++)
     params.tri_wave[i] = abs(tri_wave[i]);
   memcpy((void*)params.worlds,(void*)worlds,size);

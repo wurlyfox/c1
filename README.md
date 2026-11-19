@@ -75,6 +75,7 @@ The build system provides the following configuration toggles via CMake:
 
 | Option | Default | Description |
 | :--- | :--- | :--- |
+| `CFLAGS_EXTENSIONS` | `ON` | Enables game extensions and compiles sources in `src/ext/`. |
 | `BUILD_DEPS` | `OFF` | When `OFF`, searches locally or automatically downloads/installs pre-compiled libraries (APT multiarch on Linux, pre-compiled packages on Windows). When `ON`, fetches and compiles SDL2 and FluidSynth from source via FetchContent. |
 | `BUILD_SHARED_LIBS` | `OFF` | When building dependencies from source (`BUILD_DEPS=ON`), controls whether dependencies are built as shared DLLs/SOs or static libraries. |
 
@@ -194,9 +195,16 @@ Note that further documentation can be found in the `doc` directory.
 │       │   ├── gui.c        # minimal GUI library ([c]imgui thin wrapper)
 │       │   ├── refl.c       # minimal type reflection library
 │       │   └── cimgui       # cimgui and imgui
+│       ├── cam.c            # camera extensions
+│       ├── disgool.c,h      # GOOL disassembler
+│       ├── ext.c,h          # main extensions code
+│       ├── gfx.c,h          # graphics extensions
+│       ├── gool.c,h         # GOOL extensions
 │       ├── gui.c,h          # in-game GUI
+│       ├── math.h           # extension math include
+│       ├── ns.c,h           # paging/entry system extensions
 │       ├── refl.c,h         # game-specific type metadata
-│       └── disgool.c,h      # GOOL disassembler
+│       └── tex.c,h          # texture-specific extensions
 ├── streams                  # game assets (.NSD/.NSF files)
 ├── CMakeLists.txt           # CMake build script
 ├── CMakeSettings.json       # Visual Studio CMake presets

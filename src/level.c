@@ -6,6 +6,10 @@
 #include "midi.h"
 #include "formats/mdat.h"
 
+#ifdef CFLAGS_EXTENSIONS
+#include "ext/ext.h"
+#endif
+
 /* .data */
 const uint32_t size_map[16] = {  0, -256, -128, -64, -48, -40, -32, -26,   /* 80052CA4 */
                                -20,  -14,   -8,   8,  16,  24,  32,  64 };
@@ -28,10 +32,10 @@ vec cam_rot_xz_dir;         /* 8005794C */
 uint32_t unk_80057958;      /* 80057958 */
 uint32_t unk_8005795C;      /* 8005795C */
 int draw_count;             /* 80057960 */
-rgb8 prev_vram_fill_color;  /* 80057964 */
-rgb8 vram_fill_color;       /* 80057968 */
-rgb8 next_vram_fill_color;  /* 8005796C */
-uint32_t respawn_stamp;     /* 80057970 */
+rgb8 prev_sky_color;  /* 80057964 */
+rgb8 sky_color;             /* 80057968 */
+rgb8 next_sky_color;        /* 8005796C */
+ticks_t respawn_stamp;      /* 80057970 */
 level_state savestate;      /* 80057974 */
 
 extern ns_struct ns;
@@ -93,9 +97,9 @@ int LdatInit() {
     cur_zone = 0;
     cur_path = 0;
     cur_progress = 0;
-    vram_fill_color.r = 0;
-    vram_fill_color.g = 0;
-    vram_fill_color.b = 0;
+    sky_color.r = 0;
+    sky_color.g = 0;
+    sky_color.b = 0;
     respawn_stamp = 0;
     if (game_state == GAME_STATE_TITLE) /* coming directly from main menu? */
       PbakChoose(&crash_eid); /* load playback demo */
@@ -197,6 +201,30 @@ static inline void ZoneTerminateDifference(entry *zone) {
   }
 }
 
+#ifdef CFLAGS_EXTENSIONS
+int ZoneLoadAllPolyIds(entry *zone) {
+  entry *world;
+  zone_header *zh;
+  wgeo_header *wh;
+  poly_id *poly_id;
+  int i, ii, idx;
+
+  zh = (zone_header*)zone->items[0];
+  idx = 0;
+  for (i=0;i<(int)zh->world_count;i++) {
+    world = NSLookup(&zh->worlds[i].eid);
+    wh = (wgeo_header*)world->items[0];
+    for (ii=0;ii<(int)wh->poly_count;ii++) {
+      poly_id = &cur_poly_ids->ids[idx++];
+      poly_id->world_idx = i;
+      poly_id->poly_idx = ii;
+    }
+  }
+  cur_poly_ids->len = idx;
+  return 1;
+}
+#endif
+
 /**
  * update the current zone, path, and progress
  *
@@ -235,6 +263,14 @@ void LevelUpdate(entry *zone, zone_path *path, int32_t progress, uint32_t flags)
   pt_idx = progress >> 8;
   cur_pt_idx = cur_progress >> 8;
   change = zone != cur_zone || path != cur_path || pt_idx != cur_pt_idx;
+#ifdef CFLAGS_EXTENSIONS
+  static int prev_hwpersp = 0;
+  if (ext_config.enable_hwpersp)
+    prev_hwpersp = ZoneLoadAllPolyIds(zone);
+  else if (prev_hwpersp /* force reload raw SLST when disabling hwpersp */
+        && ((change=1) && !(prev_hwpersp=0) && (cur_path=0))) {}
+  else
+#endif
   if (change && header->world_count) { /* change in zone, path, or pt idx? */
     slst = NSOpen(&path->slst, 1, 1);
     delta_pt_idx = abs((progress - cur_progress) >> 8);
@@ -337,13 +373,13 @@ void LevelUpdate(entry *zone, zone_path *path, int32_t progress, uint32_t flags)
 //----- (800260AC) --------------------------------------------------------
 void LevelUpdateMisc(zone_gfx *gfx, uint32_t flags) {
 #ifndef PSX
-  int ticks_elapsed;
+  ticks_t ticks_elapsed;
 
   ticks_elapsed = GetTicksElapsed();
 #endif
   respawn_stamp = ticks_elapsed;
-  prev_vram_fill_color = vram_fill_color;
-  next_vram_fill_color = gfx->unknown_h;
+  prev_sky_color = sky_color;
+  next_sky_color = gfx->sky_color;
   cur_zone_flags_ro = gfx->flags;
   if (!(flags & 4))
     MidiSetStateStopped();
@@ -548,6 +584,9 @@ void LevelRestart(level_state *state) {
     crash->collider = 0;
   }
   draw_count = 0;
+#ifdef CFLAGS_EXTENSIONS
+  hq.draw_count = 0;
+#endif
   screen_shake = 0;
   // dword_800566E8 = 0;
   next_display_flags = GOOL_FLAG_DISPLAY_WORLDS | GOOL_FLAG_DISPANIM_OBJECTS | GOOL_FLAG_CAM_UPDATE;
@@ -1473,6 +1512,11 @@ int ZonePathProgressToLoc(zone_path *path, int progress, gool_vectors *cam) {
   cam->trans.y += ((cam_next.trans.y - cam->trans.y)*fractional) >> 8;
   cam->trans.z += ((cam_next.trans.z - cam->trans.z)*fractional) >> 8;
   cam->rot.y += (GoolAngDiff(cam->rot.y, cam_next.rot.y)*fractional) >> 8;
+#ifdef CFLAGS_EXTENSIONS
+  if (ext_config.fps_mode && (path->cam_mode == 7 || path->cam_mode == 8))
+    cam->rot.x += (GoolAngDiff(cam->rot.x, cam_next.rot.x)*fractional) >> 8;
+  else
+#endif
   cam->rot.x += ((cam_next.rot.x - cam->rot.x)*fractional) >> 8;
   cam->rot.z += ((cam_next.rot.z - cam->rot.z)*fractional) >> 8;
   return path->length;

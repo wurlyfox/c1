@@ -3,18 +3,14 @@
 ## General
 
 - colors are slightly different from psx (map differently?)
-- title sequence background images become too bright in some instances
-- it is sometimes (but rarely) possible to jump in mid-air when beside walls
 - demo mode does not function correctly
 - attempting to enter the options menu causes the game to crash
-- compiling with optimization flags causes the game to behave differently (aside from performance improvements)
 - tree change tracking implementation is broken
 
 ## Per-level
 
 ### Map
 
-- camera is incorrect
 - textures fail to load in some instances
 
 ### N. Sanity Beach
@@ -29,7 +25,7 @@
 
 ### Rolling Stones
 
-- falling pegs seem to be positioned slightly higher than Crash when Crash stands on them
+- falling pegs seem to be positioned slightly higher than Crash when Crash stands on them (swpersp mode only)
 
 ### Papu Papu
 
