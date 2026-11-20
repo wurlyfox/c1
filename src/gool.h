@@ -363,8 +363,9 @@ extern int GoolTransform(vec*,vec*,ang*,vec*,vec*);
 extern int GoolTransform2(vec*,vec*,int);
 extern int GoolCollide(gool_object*,bound*,gool_object*,bound*);
 extern int GoolSendToColliders(gool_object*,uint32_t,int,int,uint32_t*);
+extern void GoolObjectGetBound(gool_object*,gool_bound*);
 
-#ifdef CFLAGS_GOOL_DEBUG
+#ifdef CFLAGS_EXTENSIONS
 
 #define GOOL_FLAG_PAUSED_TRANS   1
 #define GOOL_FLAG_PAUSED_CODE    2
@@ -413,6 +414,8 @@ extern void GoolObjectPause(gool_object *obj, int type, int trans);
 extern void GoolObjectResume(gool_object *obj, int type);
 extern void GoolObjectStep(gool_object *obj, int type);
 
-#endif /* CFLAGS_GOOL_DEBUG */
+extern void GoolOnKill(int (*callback)(gool_object*));
+
+#endif /* CFLAGS_EXTENSIONS */
 
 #endif /* _GOOL_H_ */

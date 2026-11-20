@@ -6,10 +6,12 @@
 typedef struct { /* RIFF chunk */
   char ckID[4];
   uint32_t ckSize;
+#ifndef _WIN32
   union {
     char fccType[0];
     uint8_t ckData[0];
   };
+#endif
 } CK;
 
 typedef struct {
@@ -114,6 +116,11 @@ typedef enum {
   _switch        = 3
 } __attribute__((packed)) SFCtrlType;
 
+#ifdef _WIN32
+#define SFCtrlPalette uint16_t
+#define SFCtrlType uint16_t
+#endif
+
 typedef struct {
   SFCtrlPalette index:7;
   uint16_t cc:1;
@@ -134,6 +141,11 @@ typedef enum {
   absolute       = 2,
   sfctForce16Bit = 65535
 } __attribute__((packed)) SFTransform;
+
+#ifdef _WIN32
+#define SFGenerator uint16_t
+#define SFTransform uint16_t
+#endif
 
 typedef struct {
   SFModulator sfModSrcOper;
@@ -182,6 +194,10 @@ typedef enum {
   RomLeftSample   = 0x8004,
   RomLinkedSample = 0x8008
 } __attribute__((packed)) SFSampleLink;
+
+#ifdef _WIN32
+#define SFSampleLink uint16_t
+#endif
 
 typedef struct {
   char achSampleName[20];

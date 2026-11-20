@@ -10,6 +10,11 @@
 #include "formats/tgeo.h"
 #include "formats/zdat.h"
 
+#ifdef CFLAGS_EXTENSIONS
+#include "ext/ext.h"
+extern gl_context context;
+#endif
+
 /* .sdata */
 int32_t cam_offset_z  = -0x12C00; /* 800564A4; gp[0x2A] */
 int32_t cam_zoom      =  0x6A400; /* 800564A8; gp[0x2B] */
@@ -312,24 +317,36 @@ static void CamFollow(gool_object *obj, uint32_t flag) {
   }
   else
     cam_offset_dir_x = 0; /* offset cam left */
+#ifdef CFLAGS_EXTENSIONS
+  double scale = ext_config.fps_mode ? context.ticks_per_frame / 34.0 : 1.0;
+#define STEP_3200 (0x3200 * scale)
+#define STEP_25600 (25600 * scale)
+#define STEP_1900 (0x1900 * scale)
+#define STEP_6400 (0x6400 * scale)
+#else
+#define STEP_3200 0x3200
+#define STEP_25600 25600
+#define STEP_1900 0x1900
+#define STEP_6400 0x6400
+#endif
   if (cam_offset_dir_z == 0) /* cam offset is forward? */
-    cam_offset_z = max(cam_offset_z - 0x3200, -0x12C00); /* seek towards -0x12C00 */
+    cam_offset_z = max(cam_offset_z - STEP_3200, -0x12C00); /* seek towards -0x12C00 */
   else /* cam offset is backward; so seek towards 0x12C00, cortex power 0x4B000 */
-    cam_offset_z = min(cam_offset_z + 0x3200, (ns.ldat->lid != 3 ? 0x12C00: 0x4B000));
+    cam_offset_z = min(cam_offset_z + STEP_3200, (ns.ldat->lid != 3 ? 0x12C00: 0x4B000));
   if (!(header->flags & 0x4000)) /* not a left/right direction zone? */
     cam_offset_x = 0; /* no x offset */
   else if (cur_path->direction_x) { /* path runs left or right? */
     if (cam_offset_dir_x == 0) { /* cam offset is left? */
       if (cur_path->direction_x < 0) /* path runs left? */
-        cam_offset_x = max(cam_offset_x - 25600, -307200); /* seek towards -307200 */
+        cam_offset_x = max(cam_offset_x - STEP_25600, -307200); /* seek towards -307200 */
       else
-        cam_offset_x = max(cam_offset_x - 25600, 0); /* seek towards 0 */
+        cam_offset_x = max(cam_offset_x - STEP_25600, 0); /* seek towards 0 */
     }
     else { /* cam offset is right */
       if (cur_path->direction_x > 0) /* path runs right? */
-        cam_offset_x = min(cam_offset_x + 25600, 307200); /* seek towards 307200 */
+        cam_offset_x = min(cam_offset_x + STEP_25600, 307200); /* seek towards 307200 */
       else
-        cam_offset_x = min(cam_offset_x + 25600, 0); /* seek towards 0 */
+        cam_offset_x = min(cam_offset_x + STEP_25600, 0); /* seek towards 0 */
     }
   }
   seek_pan = 0; new_pan = 0; /* seek_pan/seek_zoom boolean vals are inverted in orig impl */
@@ -354,15 +371,16 @@ static void CamFollow(gool_object *obj, uint32_t flag) {
   }
   /* current or at least one neighbor path is forward/backward
      and we are at least more than 10 units from either end of the path? */
+  
   if (new_zoom && (path_idx >= 11) && (path_idx < ((int)cur_path->length-10))) {
     if (seek_zoom)
-      cam_zoom = GoolSeek(cam_zoom, new_zoom, 0x1900); /* seek to new_zoom 25.0 increments */
+      cam_zoom = GoolSeek(cam_zoom, new_zoom, STEP_1900); /* seek to new_zoom 25.0 increments */
     else
       cam_zoom = new_zoom;
   }
   if (new_pan) { /* current or at least one neighbor path is up/down? */
     if (seek_pan)
-      cam_offset_y = GoolSeek(cam_offset_y, new_pan, 0x6400); /* seek to new_pan at 100.0 increments */
+      cam_offset_y = GoolSeek(cam_offset_y, new_pan, STEP_6400); /* seek to new_pan at 100.0 increments */
     else
       cam_offset_y = new_pan;
   }
@@ -474,9 +492,48 @@ static void CamFollow(gool_object *obj, uint32_t flag) {
       cam_speed = 0x200; /* limit to 2 */
     else /* > 5 */ 
       cam_speed = min((cam_nearest->delta_progress/2), cam_speed)+0x100;
+#ifndef CFLAGS_EXTENSIONS
     CamAdjustProgress(cam_speed, cam_nearest);
+#else
+    CamAdjustProgress(cam_speed * context.ticks_per_frame / 34, cam_nearest);
+#endif
   }
 }
+
+#ifdef CFLAGS_EXTENSIONS
+static void CamIslandScaleProgress(zone_path **path, int32_t *progress,
+                                   int dir, int step) {
+  int32_t delta;
+
+  if (!ext_config.fps_mode || step == 0x100)
+    return;
+  if (*path == cur_path) {
+    delta = *progress - cur_progress;
+    if (delta > 0)
+      delta = ((delta + 0xFF) / 0x100) * 0x100;
+    else if (delta < 0)
+      delta = (delta / 0x100) * 0x100;
+    *progress = cur_progress + (delta * step) / 0x100;
+    return;
+  }
+  delta = 0;
+  if (dir > 0)
+    delta = ((cur_path->length << 8) - cur_progress) + *progress;
+  else if (dir < 0)
+    delta = -(cur_progress + (((*path)->length << 8) - *progress));
+  if (delta > 0)
+    delta = ((delta + 0xFF) / 0x100) * 0x100;
+  else if (delta < 0)
+    delta = (delta / 0x100) * 0x100;
+  *progress = cur_progress + (delta * step) / 0x100;
+  if (*progress >= (int32_t)(cur_path->length << 8))
+    *progress -= (int32_t)(cur_path->length << 8);
+  else if (*progress < 0)
+    *progress += (int32_t)((*path)->length << 8);
+  else
+    *path = cur_path;
+}
+#endif
 
 //----- (8002B2BC) --------------------------------------------------------
 int CamUpdate() {
@@ -488,6 +545,19 @@ int CamUpdate() {
   zone_path_point *point;
   int next_island_cam_state;
   int i, cam_mode, skip, n_path_idx, pt_idx;
+#ifdef CFLAGS_EXTENSIONS
+  int STEP_100;
+  double step;
+
+  STEP_100 = 0x100;
+  if (ext_config.fps_mode) {
+    step = 0x100 * context.ticks_per_frame / 34.0;
+    /* nearest power of 2 as divisor of 0x100 */
+    for (STEP_100=1;step>STEP_100*1.5;STEP_100*=2);
+  }
+#else
+#define STEP_100 0x100
+#endif
 
   if (!crash) { return 0; }
   if (cur_display_flags & GOOL_FLAG_SPIN_DEATH) {
@@ -517,7 +587,7 @@ int CamUpdate() {
       pt_idx = (cur_progress >> 8) + 1;
       /* auto-cam hasn't reached end of path and not skipping? */
       if (pt_idx < cur_path->length && !skip) {
-        LevelUpdate(cur_zone, cur_path, cur_progress + 0x100, 0);
+        LevelUpdate(cur_zone, cur_path, cur_progress + STEP_100, 0);
         return 1;
       }
       neighbor_path = cur_path->neighbor_paths[0];
@@ -607,6 +677,10 @@ int CamUpdate() {
         break;
       }
     } while (path_s1 != cur_path || (n_progress >> 8) != (cur_progress >> 8));
+#ifdef CFLAGS_EXTENSIONS
+    if (path && (path != cur_path || progress != cur_progress))
+      CamIslandScaleProgress(&path, &progress, angle, STEP_100);
+#endif
     if (island_cam_state == -1)
       island_cam_state = next_island_cam_state;
     if (path && (path != cur_path || progress != cur_progress)) {
@@ -626,7 +700,7 @@ int CamUpdate() {
     if (island_cam_state & 1) {
       pt_idx = (cur_progress >> 8) + 1;
       if (pt_idx < cur_path->length)
-        LevelUpdate(cur_zone, cur_path, cur_progress+0x100, 0);
+        LevelUpdate(cur_zone, cur_path, cur_progress+STEP_100, 0);
       else if (n_path_idx != -1) {
         neighbor_path = cur_path->neighbor_paths[n_path_idx];
         n_path = ZoneGetNeighborPath(cur_zone, cur_path, n_path_idx);
@@ -641,7 +715,7 @@ int CamUpdate() {
     else {
       pt_idx = (cur_progress >> 8) - 1;
       if (pt_idx >= 0)
-        LevelUpdate(cur_zone, cur_path, cur_progress-0x100, 0);
+        LevelUpdate(cur_zone, cur_path, cur_progress-STEP_100, 0);
       else if (n_path_idx != -1) {
         neighbor_path = cur_path->neighbor_paths[n_path_idx];
         n_path = ZoneGetNeighborPath(cur_zone, cur_path, n_path_idx);
@@ -701,14 +775,25 @@ int CamDeath(int *count) {
   dist_xz = sqrt(v_vert.x*v_vert.x+v_vert.z*v_vert.z);
   ang_xz = atan2(-v_vert.x, -v_vert.z) + 0x800;
   if (*count < 9) {
-    if (*count == 0) /* calculate delta xz angle between transformed vertex and camera, for 9 iterations */
+    if (*count == 0
+#ifdef CFLAGS_EXTENSIONS
+        && *count != hq.i_death_cam_prev
+#endif
+    ) /* calculate delta xz angle between transformed vertex and camera, for 9 iterations */
       dcam_angvel = GoolAngDiff(cam_rot.x, ang_xz) / 9;
     dcam_trans_z = dist_xz << 8; /* radius of the below circle (this seeks towards 175000 for count >= 9 */
     dcam_rot_y1 = 0; /* base angular distance around the below circle circumference */
     dcam_rot_y2 = ang_xz; /* angular distance around the below circle circumference */
     dcam_accel = 22;
+#ifndef CFLAGS_EXTENSIONS
     cam_rot.x += dcam_angvel; /* rotate cam in xz plane towards the vertex */
     (*count)++;
+#else
+    cam_rot.x += dcam_angvel * (context.ticks_per_frame / 34);
+    hq.d_death_cam += context.ticks_per_frame / 34;
+    hq.i_death_cam_prev = *count;
+    *count = (int)(hq.d_death_cam);
+#endif
   }
   /* calculate the angle in the yz plane */
   ang_yz = atan2(v_vert.y, dist_xz);
@@ -718,14 +803,23 @@ int CamDeath(int *count) {
     dcam_angvel2 = dcam_flip_speed; /* normal yz rot rate */
   /* rotate cam in yz plane towards the vertex */
   cam_rot.y = GoolObjectRotate(cam_rot.y, -ang_yz, dcam_angvel2, 0);
+#ifndef CFLAGS_EXTENSIONS
+#define STEP_ACCEL dcam_accel
+#define STEP_ZOOM dcam_zoom_speed
+#define STEP_19000 0x19000
+#else
+#define STEP_ACCEL (dcam_accel * (context.ticks_per_frame / 34))
+#define STEP_ZOOM (dcam_zoom_speed * (context.ticks_per_frame / 34))
+#define STEP_19000 (0x19000 * (context.ticks_per_frame / 34))
+#endif
   if (cur_display_flags & GOOL_FLAG_SPIN_ACCEL) {
-    dcam_rot_y1 += dcam_accel; /* accelerate?? no further usage of this value... */
-    cam_rot.x += dcam_accel; /* additional rotation??? */
+    dcam_rot_y1 += STEP_ACCEL; /* accelerate?? no further usage of this value... */
+    cam_rot.x += STEP_ACCEL; /* additional rotation??? */
   }
   /* move camera up towards the vertex */
-  cam_trans.y = GoolSeek(cam_trans.y, r_vert.y + 120000, 102400);
+  cam_trans.y = GoolSeek(cam_trans.y, r_vert.y + 120000, STEP_19000);
   /* seek the xz distance toward 175000 */
-  dcam_trans_z = GoolSeek(dist_xz << 8, 175000, dcam_zoom_speed);
+  dcam_trans_z = GoolSeek(dist_xz << 8, 175000, STEP_ZOOM);
   /* translate cam around the circle of radius equal to the xz distance in the xz plane */
   u_trans.x = 0;
   u_trans.y = 0;

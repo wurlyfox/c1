@@ -3,6 +3,10 @@
 
 #include "geom.h"
 
+#define PRIM_FLAG_BACKDROP 4
+#define PRIM_FLAG_HIGHLIGHT 8
+#define PRIM_FLAG_SCREEN 16
+
 /* gfx primitive types */
 #define PRIM_NEXT(p) (void*)((int)((p)->next) & ~3)
 #define PRIM_SETNEXT(p,n) { \

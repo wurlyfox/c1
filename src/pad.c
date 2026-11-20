@@ -20,6 +20,13 @@ extern gfx_context_db context;
 extern gl_context context;
 #endif
 
+#ifdef CFLAGS_EXTENSIONS
+#include "ext/ext.h"
+uint32_t pad_hist[2][64] = {0};
+int pad_hist_idx = 0;
+void PadUpdateHist();
+#endif
+
 //----- (80016718) --------------------------------------------------------
 void PadInit(int count) {
   pad *pad;
@@ -92,4 +99,26 @@ void PadUpdate() {
       PadUpdatePbak(pad);
     pad->tapped = (~pad->held_prev & pad->held) & 0xF9FF; /* select bits for buttons not held in previous frame (except L3 & R3) */
   }
+#ifdef CFLAGS_EXTENSIONS
+  PadUpdateHist();
+#endif
 }
+
+#ifdef CFLAGS_EXTENSIONS
+void PadUpdateHist() {
+  pad *pad;
+  int i;
+  /* at high frame rates, set held_prev to held during the frame at 34 ticks 
+     worth of time into the past instead of the immediately preceding frame */
+  for (i=0;i<pad_count;i++) {
+    pad = &pads[i];
+    pad_hist[i][pad_hist_idx] = pad->held;
+    if (ext_config.fps_mode) {
+      int step = limit((34.0 / context.ticks_per_frame) + 0.5, 1, 31);
+      pad->held_prev = pad_hist[i][(pad_hist_idx - step) & 63];
+      pad->held_prev2 = pad_hist[i][(pad_hist_idx - 2*step) & 63];
+    }
+  }
+  pad_hist_idx = (pad_hist_idx + 1) & 63;
+}
+#endif

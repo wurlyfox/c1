@@ -606,6 +606,7 @@ tree_node_t *tree_map_postorder(tree_node_t *root, void *(*map)(void*, void**)) 
   void **cd_mapped, *md;
   int count, i;
 
+  if (!root) { return 0; }
   count=tree_child_count(root);
   c_mapped=(tree_node_t**)malloc(sizeof(tree_node_t*)*count);
   cd_mapped=(void**)malloc(sizeof(void*)*(count+1));
@@ -727,7 +728,9 @@ list_t *tree_changes(tree_node_t *src, tree_node_t *dst) {
     delta->op = 2;
     delta->value = val;
     list_append(dl, delta);
+    node = tree_find_node(sr, val);
     sr = tree_remove_inherit(sr, val);
+    tree_node_free(node, 0);
   }
   list_for_each(dd, val) {
     /*
@@ -815,6 +818,12 @@ list_t *tree_changes(tree_node_t *src, tree_node_t *dst) {
       else { break; }
     }
   }
+  list_free(sf, 1);
+  list_free(df, 1);
+  list_free(sd, 1);
+  list_free(dd, 1);
+  list_free(sc, 1);
+  if (sr) tree_node_free(sr, 1);
   return dl;
 }
 

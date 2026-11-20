@@ -1,9 +1,9 @@
 {
   "configurations": [
     {
-      "name": "x86-Clang-Debug",
+      "name": "x86-Clang-Release",
       "generator": "Ninja",
-      "configurationType": "Debug",
+      "configurationType": "Release",
       "inheritEnvironments": [ "msvc_x86" ],
       "buildRoot": "${projectDir}\\build\\vs-${name}",
       "installRoot": "${projectDir}\\build\\install\\${name}",
@@ -33,8 +33,36 @@
         },
         {
           "name": "CMAKE_BUILD_TYPE",
-          "value": "Debug",
+          "value": "Release",
           "type": "STRING"
+        },
+        {
+          "name": "x86-Clang-Debug",
+          "generator": "Ninja",
+          "configurationType": "Debug",
+          "inheritEnvironments": [ "msvc_x86" ],
+          "buildRoot": "${projectDir}\\build\\vs-${name}",
+          "installRoot": "${projectDir}\\build\\install\\${name}",
+          "cmakeCommandArgs": "",
+          "buildCommandArgs": "",
+          "ctestCommandArgs": "",
+          "variables": [
+            {
+              "name": "CMAKE_C_COMPILER",
+              "value": "clang-cl",
+              "type": "FILEPATH"
+            },
+            {
+              "name": "CMAKE_CXX_COMPILER",
+              "value": "clang-cl",
+              "type": "FILEPATH"
+            },
+            {
+              "name": "CMAKE_BUILD_TYPE",
+              "value": "Debug",
+              "type": "STRING"
+            }
+          ]
         }
       ]
     }

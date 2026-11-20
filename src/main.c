@@ -58,8 +58,8 @@ int pause_status = 0;           /* 8005640C; gp[0x4]  */
 int use_cd = 1;                 /* 80056410; gp[0x5]  */
 int done = 0;                   /* 80056428; gp[0xB]  */
 /* .sbss */
-uint32_t pause_stamp;           /* 800565B8; gp[0x6F] */
-uint32_t pause_draw_stamp;      /* 800565BC; gp[0x70] */
+ticks_t pause_stamp;            /* 800565B8; gp[0x6F] */
+ticks_t pause_draw_stamp;       /* 800565BC; gp[0x70] */
 
 extern ns_struct ns;
 extern pad pads[2];
@@ -71,21 +71,32 @@ extern gool_handle handles[8];
 extern int bonus_return;
 extern level_state savestate;
 
-#ifdef CFLAGS_DRAW_EXTENSIONS
+#ifdef CFLAGS_EXTENSIONS
+#include "ext/ext.h"
+
+extern zone_path *cur_path;
+extern uint32_t cur_progress;
 extern zone_query cur_zone_query;
 extern uint32_t *wall_bitmap;
 extern gool_bound object_bounds[96];
 extern int object_bound_count;
-int draw_octrees = 0;
-int draw_wallmap = 0;
-int draw_objbounds = 0;
+
+void ExtInit() {
+  ext_config.fps_mode = 0;
+  ext_config.enable_hwpersp = 0;
+  ext_config.use_title_font = 1;
+}
 #endif
 
 #ifdef PSX
 extern gfx_context_db context;
 extern int ticks_elapsed;
+#define draw_stamp context.c2_p->draw_stamp
+#define ot context.c2_p->ot
 #else
 extern gl_context context;
+#define draw_stamp context.draw_stamp
+#define ot context.ot
 #endif
 
 void CoreLoop(lid_t lid);
@@ -135,13 +146,17 @@ void CoreObjectsCreate() {
 void CoreLoop(lid_t lid) {
   int is_pause_lid, can_pause;
   zone_header *header;
-  void *ot;
   uint32_t arg;
   int bonus_return2;
 #ifndef PSX
-  int ticks_elapsed;
+  ticks_t ticks_elapsed;
 #endif
+#ifdef CFLAGS_EXTENSIONS
+  int prev_hwpersp;
 
+  prev_hwpersp = 0;
+  ExtInit();
+#endif
   LevelInitGlobals();
   NSInit(&ns, lid);
   CoreObjectsCreate();
@@ -159,11 +174,7 @@ void CoreLoop(lid_t lid) {
             ticks_elapsed = GetTicksElapsed();
 #endif
             pause_stamp = ticks_elapsed;
-#ifdef PSX
-            pause_draw_stamp = context.c2_p->draw_stamp;
-#else
-            pause_draw_stamp = context.draw_stamp;
-#endif
+            pause_draw_stamp = draw_stamp;
           }
           else {
             pause_status = 0;
@@ -177,14 +188,10 @@ void CoreLoop(lid_t lid) {
         GoolSendEvent(0, pause_obj, 0xC00, 1, &arg); /* send resume/kill? event to pause screen object */
         pause_obj = 0;
         pause_status = -1;
-#ifndef PSX
-        ticks_elapsed = GetTicksElapsed();
-#endif
         ticks_elapsed = pause_stamp;
-#ifdef PSX
-        context.c2_p->draw_stamp = pause_draw_stamp;
-#else
-        context.draw_stamp = pause_draw_stamp;
+        draw_stamp = pause_draw_stamp;
+#ifndef PSX
+        SetTicksElapsed(pause_stamp);
 #endif
       }
     }
@@ -244,12 +251,13 @@ void CoreLoop(lid_t lid) {
       /* if (!globals->paused) ???*/
       CamUpdate();
     }
-    GfxUpdateMatrices();
-#ifdef PSX
-    ot = context.c2_p->ot;
-#else
-    ot = context.ot;
+#ifdef CFLAGS_EXTENSIONS
+    CamExApply();
+    if (prev_hwpersp != ext_config.enable_hwpersp)
+      LevelUpdate(cur_zone, cur_path, cur_progress, 0);
+    prev_hwpersp = ext_config.enable_hwpersp;
 #endif
+    GfxUpdateMatrices();
     header = (zone_header*)cur_zone->items[0];
     if ((cur_display_flags & GOOL_FLAG_DISPLAY_WORLDS) && header->world_count && !wgeom_disabled) {
       if (header->flags & ZONE_FLAG_DARK2)
@@ -266,18 +274,22 @@ void CoreLoop(lid_t lid) {
         GfxTransformWorlds(ot);
     }
     GoolUpdateObjects(!paused);
-#if defined(CFLAGS_DRAW_EXTENSIONS) && !defined(PSX)
-    if (pads[0].tapped & 4)
-      draw_octrees = !draw_octrees;
-    if (draw_octrees)
-      SwTransformZoneQuery(&cur_zone_query, ot, GLGetPrimsTail());
-    if (pads[0].tapped & 8)
-      draw_wallmap = !draw_wallmap;
-    if (draw_wallmap)
-      SwDrawWallMap(wall_bitmap, ot, GLGetPrimsTail());
+#ifdef CFLAGS_EXTENSIONS
+    CamExRestore();
+    /* TODO: move these out of main.c */
     if (pads[0].tapped & 1)
-      draw_objbounds = !draw_objbounds;
-    if (draw_objbounds)
+      ext_config.show_objbounds = !ext_config.show_objbounds;
+    if (pads[0].tapped & 2)
+      ext_config.fps_mode = ext_config.fps_mode ? 0 : 2;
+    if (pads[0].tapped & 4)
+       ext_config.show_octrees = !ext_config.show_octrees;
+    if (pads[0].tapped & 8)
+      ext_config.show_wallmap = !ext_config.show_wallmap;
+    if (ext_config.show_octrees)
+      SwTransformZoneQuery(&cur_zone_query, ot, GLGetPrimsTail());
+    if (ext_config.show_wallmap)
+      SwDrawWallMap(wall_bitmap, ot, GLGetPrimsTail());
+    if (ext_config.show_objbounds)
       SwTransformObjectBounds(object_bounds, object_bound_count, ot, GLGetPrimsTail());
 #endif
 #ifndef PSX

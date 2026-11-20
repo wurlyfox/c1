@@ -159,7 +159,7 @@ void SwMidiInit() {
 
   /* silence fluidsynth logging (a NULL handler disables that level) */
   for (i=0;i<LAST_LOG_LEVEL;i++)
-    fluid_set_log_function(i, NULL, NULL);
+    fluid_set_log_function(i, 0, 0);
 
   settings = new_fluid_settings();
   loader = new_fluid_defsfloader(settings);

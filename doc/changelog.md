@@ -1,10 +1,24 @@
 # Changelog
 
+## 2026-11-19
+
+- added fullscreen support
+- added native perspective transform support
+- added high frame rate support (60 FPS, 120 FPS, uncapped)
+- added 16:9 widescreen support
+- improved in-game GUI
+- added in-game world geometry inspector and editor
+- added object mouse selection/dragging support
+- added user camera control and extended camera modes
+- added zone inspector view
+- fixed music playback on Windows
+
 ## 2026-10-29
 
 - migrated build system to CMake
 - added windows support (music playback/FluidSynth not working yet)
 - fixed a significant number of issues
+- updated README.md
 
 ## 2022-12-28
 

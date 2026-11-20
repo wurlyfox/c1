@@ -188,7 +188,7 @@ size_t SeqToMid(uint8_t *seq, uint8_t *mid, size_t *seq_size) {
 #define Sf2NextCc(s,c,t,n) \
 Sf2Next(s,CK,c); \
 set4c(c->ckID,t); \
-set4c(c->fccType,n); \
+set4c((char*)s,n); \
 s += sizeof(char)*4; 
 
 #define Sf2NextCk(s,c,n) \
