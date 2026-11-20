@@ -61,6 +61,10 @@ static int mem_read(void *buf, fluid_long_long_t count, void *handle) {
   mstream_t *stream;
 
   stream = (mstream_t*)handle;
+  if (stream == NULL || stream->p == NULL) {
+      // Handle error appropriately
+      return FLUID_FAILED;  // Or some other error code
+  }
   memcpy(buf, stream->p, count);
   stream->p += count;
   return FLUID_OK;
