@@ -27,6 +27,13 @@
 #include "cimgui_impl.h"
 #endif
 
+#ifdef _WIN32
+PFNGLACTIVETEXTUREPROC pfnGlActiveTexture = 0;
+PFNGLBLENDEQUATIONPROC pfnGlBlendEquation = 0;
+#define glActiveTexture pfnGlActiveTexture
+#define glBlendEquation pfnGlBlendEquation
+#endif
+
 int GLCreateTexture(dim2 dim, uint8_t *buf) {
   GLuint texid;
 
@@ -82,13 +89,6 @@ void GLKillGui() {
   GuiFontClear();
   ImGui_ImplOpenGL2_Shutdown();
 }
-#endif
-
-#ifdef _WIN32
-PFNGLACTIVETEXTUREPROC pfnGlActiveTexture = 0;
-PFNGLBLENDEQUATIONPROC pfnGlBlendEquation = 0;
-#define glActiveTexture pfnGlActiveTexture
-#define glBlendEquation pfnGlBlendEquation
 #endif
 
 int textures_inited=0;
